@@ -1,0 +1,27 @@
+*          text=auto eol=lf
+.gitignore text eol=lf
+.gitconfig text eol=lf
+.gitattributes text eol=lf
+
+*.bat      text eol=crlf
+*.cmd      text eol=crlf
+*.ps1      text eol=crlf
+*.vbs      text eol=crlf
+*.sh       text eol=lf
+*.pl       text eol=lf
+*.py       text eol=lf
+
+*.gz       binary
+*.tar      binary
+*.zip      binary
+*.7z       binary
+*.jar      binary
+
+*.exe      binary
+*.dll      binary
+*.pyc      binary
+*.pyd      binary
+*.pyo      binary
+
+*.json     text eol=lf
+*.conf     text eol=lf

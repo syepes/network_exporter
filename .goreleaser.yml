@@ -1,0 +1,42 @@
+dist: artifacts
+before:
+  hooks:
+    - go mod download
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    main: .
+    ldflags: -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
+    binary: ping_exporter
+archives:
+  - format: tar.gz
+    name_template: "{{ .ProjectName }}-{{ .Version }}.{{ .Os }}-{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
+    replacements:
+      darwin: Darwin
+      linux: Linux
+      amd64: x86_64
+    wrap_in_directory: true
+snapshot:
+  name_template: SNAPSHOT-{{ .Commit }}
+nfpms:
+  - vendor: Sebastian YEPES
+    homepage: "https://github.com/syepes/ping_exporter"
+    maintainer: Sebastian YEPES
+    description: "Ping prometheus exporter"
+    license: MIT
+    formats:
+      - deb
+      - rpm
+    bindir: /usr/bin
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"

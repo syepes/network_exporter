@@ -1,0 +1,12 @@
+.idea
+*.iml
+.vscode/
+artifacts/
+vendor/
+logs/
+temp/
+*~
+*.swp
+__debug_bin
+ping_exporter
+ping_exporter.exe
