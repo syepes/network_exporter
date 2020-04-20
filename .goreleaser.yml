@@ -1,3 +1,4 @@
+project_name: ping_exporter
 dist: artifacts
 before:
   hooks:
@@ -7,10 +8,10 @@ builds:
       - CGO_ENABLED=0
     goos:
       - linux
-      - darwin
+      # - darwin
     goarch:
       - amd64
-      - arm64
+      # - arm64
     main: .
     ldflags: -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
     binary: ping_exporter
