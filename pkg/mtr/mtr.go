@@ -10,14 +10,14 @@ import (
 )
 
 // Mtr Return traceroute object
-func Mtr(ipAddr string, maxHops int, sntSize int, timeoutMs time.Duration) (*MtrResult, error) {
+func Mtr(ipAddr string, maxHops int, sntSize int, timeout time.Duration) (*MtrResult, error) {
 	var out MtrResult
 	var err error
 
 	options := MtrOptions{}
 	options.SetMaxHops(maxHops)
 	options.SetSntSize(sntSize)
-	options.SetTimeout(timeoutMs)
+	options.SetTimeout(timeout)
 
 	out, err = runMtr(ipAddr, &options)
 
@@ -33,11 +33,11 @@ func Mtr(ipAddr string, maxHops int, sntSize int, timeoutMs time.Duration) (*Mtr
 }
 
 // MtrString Console print traceroute operation
-func MtrString(ipAddr string, maxHops int, sntSize int, timeoutMs time.Duration) (result string, err error) {
+func MtrString(ipAddr string, maxHops int, sntSize int, timeout time.Duration) (result string, err error) {
 	options := MtrOptions{}
 	options.SetMaxHops(maxHops)
 	options.SetSntSize(sntSize)
-	options.SetTimeout(timeoutMs)
+	options.SetTimeout(timeout)
 
 	var out MtrResult
 	var buffer bytes.Buffer

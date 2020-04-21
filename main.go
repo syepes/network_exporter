@@ -29,6 +29,7 @@ var (
 	sc            = &config.SafeConfig{Cfg: &config.Config{}}
 	logger        log.Logger
 	monitorICMP   *monitor.MonitorPing
+	monitorMTR    *monitor.MonitorMTR
 
 	indexHTML = `<!doctype html><html><head> <meta charset="UTF-8"><title>Ping Exporter (Version ` + version + `)</title></head><body><h1>Ping Exporter</h1><p><a href="%s">Metrics</a></p></body></html>`
 )
@@ -70,7 +71,9 @@ func main() {
 					continue
 				} else {
 					addTargets(logger)
+					addTargetsMTR(logger)
 					delTargets(logger)
+					delTargetsMTR(logger)
 				}
 			case <-susr:
 				level.Debug(logger).Log("msg", "Signal: USR1")
@@ -79,55 +82,12 @@ func main() {
 		}
 	}()
 
-	monitorICMP = monitor.New(logger, 6*time.Second, 1*time.Second, 3)
-	// monitorICMP.AddTarget("google test", "109.6.13.29")
+	monitorICMP = monitor.NewPing(logger, 6*time.Second, 1*time.Second, 3)
+	monitorMTR = monitor.NewMTR(logger, 6*time.Second, 1*time.Second, 30, 3)
+
 	addTargets(logger)
-
+	addTargetsMTR(logger)
 	startServer(logger)
-
-	// // MTR
-	// for _, val := range targets {
-	// 	go func(target string) {
-	// 		for {
-	// 			mm, err := mtr.Mtr(target, 30, 4, 300)
-	// 			if err != nil {
-	// 				fmt.Println(err)
-	// 			}
-	// 			// fmt.Println(mm)
-
-	// 			bytes, err2 := json.Marshal(mm)
-	// 			if err2 != nil {
-	// 				fmt.Println(err2)
-	// 			}
-	// 			fmt.Println("MTR:",string(bytes))
-
-	// 			time.Sleep(10 * time.Second)
-	// 		}
-	// 	}(val)
-	// }
-
-	// PING
-	// for _, val := range targets {
-	// 	go func(target string) {
-	// 		for {
-	// 			// mm, err := ping.Ping(target, 4, 3*time.Second, 10*time.Millisecond)
-	// 			mm, err := ping.Ping(target, 4, 3*time.Second, 10*time.Millisecond)
-	// 			if err != nil {
-	// 				fmt.Println(err)
-	// 			}
-
-	// 			bytes, err2 := json.Marshal(mm)
-	// 			if err2 != nil {
-	// 				fmt.Println(err2)
-	// 			}
-	// 			fmt.Println("PING:", string(bytes))
-
-	// 			time.Sleep(10 * time.Second)
-	// 		}
-	// 	}(val)
-	// }
-	// select {}
-
 }
 
 func startServer(logger log.Logger) {
@@ -141,6 +101,7 @@ func startServer(logger log.Logger) {
 	reg := prometheus.NewRegistry()
 	// reg.MustRegister(prometheus.NewGoCollector())
 	// reg.MustRegister(prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}))
+	reg.MustRegister(&collector.MtrCollector{Monitor: monitorMTR})
 	reg.MustRegister(&collector.PingCollector{Monitor: monitorICMP})
 	// reg.MustRegister(&pingCollector{monitor: monitorICMP})
 	// reg.MustRegister(&mtrCollector{monitor: monitorMTR})
@@ -176,10 +137,35 @@ func addTargets(logger log.Logger) {
 
 			if host.Type == "ICMP" {
 				monitorICMP.AddTarget(host.Alias, host.Host)
-			} else if host.Type == "MTR" {
+			}
+		}
+	}
+}
+func addTargetsMTR(logger log.Logger) {
+	targetsMTR := monitorMTR.TargetList()
+	level.Debug(logger).Log("msg", fmt.Sprintf("targetsMTR: %d, cfg: %d", len(targetsMTR), len(sc.Cfg.Dest)), "func", "addTargets")
 
-			} else {
+	targetActiveTmp := []string{}
+	for _, v := range targetsMTR {
+		targetActiveTmp = appendIfMissing(targetActiveTmp, v.ID())
+	}
 
+	targetConfigTmp := []string{}
+	for _, v := range sc.Cfg.Dest {
+		targetConfigTmp = appendIfMissing(targetConfigTmp, v.Alias+"::"+v.Host)
+	}
+
+	targetAdd := compareList(targetActiveTmp, targetConfigTmp)
+	level.Info(logger).Log("msg", fmt.Sprintf("targetID: %v", targetAdd))
+
+	for _, targetID := range targetAdd {
+		for _, host := range sc.Cfg.Dest {
+			if host.Alias+"::"+host.Host != targetID {
+				continue
+			}
+
+			if host.Type == "MTR" {
+				monitorMTR.AddTarget(host.Alias, host.Host)
 			}
 		}
 	}
@@ -209,6 +195,35 @@ func delTargets(logger log.Logger) {
 			}
 			if t.ID() == targetID {
 				monitorICMP.RemoveTarget(targetID)
+			}
+		}
+	}
+}
+
+func delTargetsMTR(logger log.Logger) {
+	targetsMTR := monitorMTR.TargetList()
+	level.Debug(logger).Log("msg", fmt.Sprintf("targetsMTR: %d, cfg: %d", len(targetsMTR), len(sc.Cfg.Dest)), "func", "delTargets")
+
+	targetActiveTmp := []string{}
+	for _, v := range targetsMTR {
+		if v != nil {
+			targetActiveTmp = appendIfMissing(targetActiveTmp, v.ID())
+		}
+	}
+
+	targetConfigTmp := []string{}
+	for _, v := range sc.Cfg.Dest {
+		targetConfigTmp = appendIfMissing(targetConfigTmp, v.Alias+"::"+v.Host)
+	}
+
+	targetDelete := compareList(targetConfigTmp, targetActiveTmp)
+	for _, targetID := range targetDelete {
+		for _, t := range targetsMTR {
+			if t == nil {
+				continue
+			}
+			if t.ID() == targetID {
+				monitorMTR.RemoveTarget(targetID)
 			}
 		}
 	}

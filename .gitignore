@@ -7,6 +7,7 @@ logs/
 temp/
 *~
 *.swp
+main
 __debug_bin
 ping_exporter
 ping_exporter.exe

@@ -22,7 +22,7 @@ type MonitorPing struct {
 }
 
 // New creates and configures a new ICMP instance
-func New(logger log.Logger, interval time.Duration, timeout time.Duration, count int) *MonitorPing {
+func NewPing(logger log.Logger, interval time.Duration, timeout time.Duration, count int) *MonitorPing {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
