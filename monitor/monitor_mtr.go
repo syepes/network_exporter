@@ -7,38 +7,42 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/syepes/ping_exporter/config"
+	"github.com/syepes/ping_exporter/pkg/common"
 	"github.com/syepes/ping_exporter/pkg/mtr"
 	"github.com/syepes/ping_exporter/target"
 )
 
-// MonitorMTR manages the goroutines responsible for collecting MTR data
-type MonitorMTR struct {
+// MTR manages the goroutines responsible for collecting MTR data
+type MTR struct {
+	sc       *config.SafeConfig
 	logger   log.Logger
 	interval time.Duration
 	timeout  time.Duration
 	maxHops  int
 	sntSize  int
-	targets  map[string]*target.TargetMTR
+	targets  map[string]*target.MTR
 	mtx      sync.RWMutex
 }
 
-// New creates and configures a new MTR instance
-func NewMTR(logger log.Logger, interval time.Duration, timeout time.Duration, maxHops int, sntSize int) *MonitorMTR {
+// NewMTR creates and configures a new Monitoring MTR instance
+func NewMTR(logger log.Logger, sc *config.SafeConfig) *MTR {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
-	return &MonitorMTR{
+	return &MTR{
+		sc:       sc,
 		logger:   logger,
-		interval: interval,
-		timeout:  timeout,
-		maxHops:  maxHops,
-		sntSize:  sntSize,
-		targets:  make(map[string]*target.TargetMTR),
+		interval: sc.Cfg.MTR.Interval.Duration(),
+		timeout:  sc.Cfg.MTR.Timeout.Duration(),
+		maxHops:  sc.Cfg.MTR.MaxHops,
+		sntSize:  sc.Cfg.MTR.SntSize,
+		targets:  make(map[string]*target.MTR),
 	}
 }
 
 // Stop brings the monitoring gracefully to a halt
-func (p *MonitorMTR) Stop() {
+func (p *MTR) Stop() {
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
 
@@ -47,19 +51,49 @@ func (p *MonitorMTR) Stop() {
 	}
 }
 
+// AddTargets adds newly added targets from the configuration
+func (p *MTR) AddTargets() {
+	level.Debug(p.logger).Log("type", "MTR", "func", "AddTargets", "msg", fmt.Sprintf("Current Targets: %d, cfg: %d", len(p.targets), len(p.sc.Cfg.Targets)))
+
+	targetActiveTmp := []string{}
+	for _, v := range p.targets {
+		targetActiveTmp = common.AppendIfMissing(targetActiveTmp, v.ID())
+	}
+
+	targetConfigTmp := []string{}
+	for _, v := range p.sc.Cfg.Targets {
+		targetConfigTmp = common.AppendIfMissing(targetConfigTmp, v.Name+"::"+v.Host)
+	}
+
+	targetAdd := common.CompareList(targetActiveTmp, targetConfigTmp)
+	level.Info(p.logger).Log("type", "MTR", "func", "AddTargets", "msg", fmt.Sprintf("targetID: %v", targetAdd))
+
+	for _, targetID := range targetAdd {
+		for _, host := range p.sc.Cfg.Targets {
+			if host.Name+"::"+host.Host != targetID {
+				continue
+			}
+
+			if host.Type == "MTR" || host.Type == "ICMP+MTR" {
+				p.AddTarget(host.Name, host.Host)
+			}
+		}
+	}
+}
+
 // AddTarget adds a target to the monitored list
-func (p *MonitorMTR) AddTarget(alias string, addr string) (err error) {
-	return p.AddTargetDelayed(alias, addr, 0)
+func (p *MTR) AddTarget(name string, addr string) (err error) {
+	return p.AddTargetDelayed(name, addr, 0)
 }
 
 // AddTargetDelayed is AddTarget with a startup delay
-func (p *MonitorMTR) AddTargetDelayed(alias string, addr string, startupDelay time.Duration) (err error) {
-	level.Debug(p.logger).Log("msg", fmt.Sprintf("Adding Target: %s (%s)", alias, addr), "type", "MTR", "func", "AddTargetDelayed")
+func (p *MTR) AddTargetDelayed(name string, addr string, startupDelay time.Duration) (err error) {
+	level.Debug(p.logger).Log("type", "MTR", "func", "AddTargetDelayed", "msg", fmt.Sprintf("Adding Target: %s (%s)", name, addr))
 
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
 
-	target, err := target.NewTargetMTR(p.logger, startupDelay, alias, addr, p.interval, p.timeout, p.maxHops, p.sntSize)
+	target, err := target.NewMTR(p.logger, startupDelay, name, addr, p.interval, p.timeout, p.maxHops, p.sntSize)
 	if err != nil {
 		return err
 	}
@@ -68,16 +102,45 @@ func (p *MonitorMTR) AddTargetDelayed(alias string, addr string, startupDelay ti
 	return nil
 }
 
+// DelTargets deletes/stops the removed targets from the configuration
+func (p *MTR) DelTargets() {
+	level.Debug(p.logger).Log("type", "MTR", "func", "DelTargets", "msg", fmt.Sprintf("Current Targets: %d, cfg: %d", len(p.targets), len(p.sc.Cfg.Targets)))
+
+	targetActiveTmp := []string{}
+	for _, v := range p.targets {
+		if v != nil {
+			targetActiveTmp = common.AppendIfMissing(targetActiveTmp, v.ID())
+		}
+	}
+
+	targetConfigTmp := []string{}
+	for _, v := range p.sc.Cfg.Targets {
+		targetConfigTmp = common.AppendIfMissing(targetConfigTmp, v.Name+"::"+v.Host)
+	}
+
+	targetDelete := common.CompareList(targetConfigTmp, targetActiveTmp)
+	for _, targetID := range targetDelete {
+		for _, t := range p.targets {
+			if t == nil {
+				continue
+			}
+			if t.ID() == targetID {
+				p.RemoveTarget(targetID)
+			}
+		}
+	}
+}
+
 // RemoveTarget removes a target from the monitoring list
-func (p *MonitorMTR) RemoveTarget(key string) {
-	level.Debug(p.logger).Log("msg", fmt.Sprintf("Removing Target: %s", key), "type", "MTR", "func", "RemoveTarget")
+func (p *MTR) RemoveTarget(key string) {
+	level.Debug(p.logger).Log("type", "MTR", "func", "RemoveTarget", "msg", fmt.Sprintf("Removing Target: %s", key))
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
 	p.removeTarget(key)
 }
 
 // Stops monitoring a target and removes it from the list (if the list includes the target)
-func (p *MonitorMTR) removeTarget(key string) {
+func (p *MTR) removeTarget(key string) {
 	target, found := p.targets[key]
 	if !found {
 		return
@@ -86,26 +149,19 @@ func (p *MonitorMTR) removeTarget(key string) {
 	delete(p.targets, key)
 }
 
-// TargetList removes a target from the monitoring list
-func (p *MonitorMTR) TargetList() map[string]*target.TargetMTR {
-	p.mtx.RLock()
-	defer p.mtx.RUnlock()
-	return p.targets
-}
-
 // Export collects the metrics for each monitored target and returns it as a simple map
-func (p *MonitorMTR) Export() map[string]*mtr.MtrResult {
+func (p *MTR) Export() map[string]*mtr.MtrResult {
 	m := make(map[string]*mtr.MtrResult)
 
 	p.mtx.RLock()
 	defer p.mtx.RUnlock()
 
 	for _, target := range p.targets {
-		alias := target.Alias()
+		name := target.Name()
 		metrics := target.Compute()
 		if metrics != nil {
 			// level.Debug(p.logger).Log("msg", fmt.Sprintf("METRICS: %v", metrics), "type", "MTR", "func", "Export")
-			m[alias] = metrics
+			m[name] = metrics
 		}
 	}
 	return m

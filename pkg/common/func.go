@@ -71,3 +71,55 @@ func IsEqualIP(ips1, ips2 string) bool {
 func Time2Float(t time.Duration) float32 {
 	return (float32)(t/time.Microsecond) / float32(1000)
 }
+
+// CompareList Compare two lists and return a list with the difference
+func CompareList(a, b []string) []string {
+	var tmpList []string
+	ma := make(map[string]bool, len(a))
+	for _, ka := range a {
+		ma[ka] = true
+	}
+	for _, kb := range b {
+		if !ma[kb] {
+			tmpList = append(tmpList, kb)
+		}
+	}
+	return tmpList
+}
+
+// AppendIfMissing Append only if the item does not exists in the current list
+func AppendIfMissing(slice []string, i string) []string {
+	for _, v := range slice {
+		if v == i {
+			return slice
+		}
+	}
+	return append(slice, i)
+}
+
+// HasMapDuplicates Find duplicates in a map keys
+func HasMapDuplicates(m map[string]string) bool {
+	x := make(map[string]struct{})
+
+	for _, v := range m {
+		if _, has := x[v]; has {
+			return true
+		}
+		x[v] = struct{}{}
+	}
+
+	return false
+}
+
+// HasListDuplicates Find duplicates in a list
+func HasListDuplicates(m []string) (string, error) {
+	tmp := map[string]bool{}
+
+	for v := range m {
+		if tmp[m[v]] == true {
+			return m[v], fmt.Errorf("Found duplicated record: %s", m[v])
+		}
+		tmp[m[v]] = true
+	}
+	return "", nil
+}

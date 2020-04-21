@@ -10,10 +10,10 @@ import (
 	"github.com/syepes/ping_exporter/pkg/mtr"
 )
 
-// TargetMTR is a unit of work
-type TargetMTR struct {
+// MTR is a unit of work
+type MTR struct {
 	logger   log.Logger
-	alias    string
+	name     string
 	host     string
 	interval time.Duration
 	timeout  time.Duration
@@ -25,14 +25,14 @@ type TargetMTR struct {
 	sync.RWMutex
 }
 
-// NewTargetMTR starts a new monitoring goroutine
-func NewTargetMTR(logger log.Logger, startupDelay time.Duration, alias string, host string, interval time.Duration, timeout time.Duration, maxHops int, sntSize int) (*TargetMTR, error) {
+// NewMTR starts a new monitoring goroutine
+func NewMTR(logger log.Logger, startupDelay time.Duration, name string, host string, interval time.Duration, timeout time.Duration, maxHops int, sntSize int) (*MTR, error) {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
-	n := &TargetMTR{
+	t := &MTR{
 		logger:   logger,
-		alias:    alias,
+		name:     name,
 		host:     host,
 		interval: interval,
 		timeout:  timeout,
@@ -40,85 +40,85 @@ func NewTargetMTR(logger log.Logger, startupDelay time.Duration, alias string, h
 		sntSize:  sntSize,
 		stop:     make(chan struct{}),
 	}
-	n.wg.Add(1)
-	go n.run(startupDelay)
-	return n, nil
+	t.wg.Add(1)
+	go t.run(startupDelay)
+	return t, nil
 }
 
-func (n *TargetMTR) run(startupDelay time.Duration) {
+func (t *MTR) run(startupDelay time.Duration) {
 	if startupDelay > 0 {
 		select {
 		case <-time.After(startupDelay):
-		case <-n.stop:
+		case <-t.stop:
 		}
 	}
 
-	tick := time.NewTicker(n.interval)
+	tick := time.NewTicker(t.interval)
 	for {
 		select {
-		case <-n.stop:
+		case <-t.stop:
 			tick.Stop()
-			n.wg.Done()
+			t.wg.Done()
 			return
 		case <-tick.C:
-			go n.mtr()
+			go t.mtr()
 		}
 	}
 }
 
-// Stop gracefully stops the monitoring.
-func (n *TargetMTR) Stop() {
-	close(n.stop)
-	n.wg.Wait()
+// Stop gracefully stops the monitoring
+func (t *MTR) Stop() {
+	close(t.stop)
+	t.wg.Wait()
 }
 
-func (n *TargetMTR) mtr() {
-	mm, err := mtr.Mtr(n.host, n.maxHops, n.sntSize, n.timeout)
+func (t *MTR) mtr() {
+	data, err := mtr.Mtr(t.host, t.maxHops, t.sntSize, t.timeout)
 	if err != nil {
-		level.Error(n.logger).Log("msg", fmt.Sprintf("%s", err), "func", "mtr")
+		level.Error(t.logger).Log("type", "MTR", "func", "mtr", "msg", fmt.Sprintf("%s", err))
 	}
 
 	/*
-		bytes, err2 := json.Marshal(mm)
+		bytes, err2 := json.Marshal(data)
 		if err2 != nil {
-			level.Error(n.logger).Log("msg", fmt.Sprintf("%s", err2), "func", "mtr")
+			level.Error(t.logger).Log("type", "MTR", "func", "mtr", "msg", fmt.Sprintf("%s", err2))
 		}
-		level.Debug(n.logger).Log("msg", fmt.Sprintf("%s", string(bytes)), "func", "mtr")
+		level.Debug(t.logger).Log("type", "MTR", "func", "mtr", "msg", fmt.Sprintf("%s", string(bytes)))
 	*/
 
-	n.Lock()
-	n.result = mm
-	n.Unlock()
+	t.Lock()
+	t.result = data
+	t.Unlock()
 }
 
-// Compute returns the results of the Ping metrics.
-func (n *TargetMTR) Compute() *mtr.MtrResult {
-	n.RLock()
-	defer n.RUnlock()
+// Compute returns the results of the Ping metrics
+func (t *MTR) Compute() *mtr.MtrResult {
+	t.RLock()
+	defer t.RUnlock()
 
-	if n.result == nil {
+	if t.result == nil {
 		return nil
 	}
-	return n.result
+	return t.result
 }
 
 // ID returns target ID
-func (n *TargetMTR) ID() string {
-	n.RLock()
-	defer n.RUnlock()
-	return n.alias + "::" + n.host
+func (t *MTR) ID() string {
+	t.RLock()
+	defer t.RUnlock()
+	return t.name + "::" + t.host
 }
 
-// Alias returns alias
-func (n *TargetMTR) Alias() string {
-	n.RLock()
-	defer n.RUnlock()
-	return n.alias
+// Name returns name
+func (t *MTR) Name() string {
+	t.RLock()
+	defer t.RUnlock()
+	return t.name
 }
 
 // Host returns host
-func (n *TargetMTR) Host() string {
-	n.RLock()
-	defer n.RUnlock()
-	return n.host
+func (t *MTR) Host() string {
+	t.RLock()
+	defer t.RUnlock()
+	return t.host
 }

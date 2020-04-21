@@ -10,8 +10,8 @@ import (
 )
 
 var (
-	// mtrLabelNames = []string{"alias", "target", "ip", "ip_version"}
-	mtrLabelNames = []string{"alias", "target", "ttl", "path"}
+	// mtrLabelNames = []string{"name", "target", "ip", "ip_version"}
+	mtrLabelNames = []string{"name", "target", "ttl", "path"}
 	mtrDesc       = prometheus.NewDesc("mtr_rtt_seconds", "MTR Round trip time in seconds", append(mtrLabelNames, "type"), nil)
 	mtrProgDesc   = prometheus.NewDesc("mtr_up", "ping_exporter version", nil, prometheus.Labels{"version": "xzy"})
 	mtrMutex      = &sync.Mutex{}
@@ -19,7 +19,7 @@ var (
 
 // MtrCollector prom
 type MtrCollector struct {
-	Monitor *monitor.MonitorMTR
+	Monitor *monitor.MTR
 	metrics map[string]*mtr.MtrResult
 }
 

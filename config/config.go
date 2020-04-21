@@ -4,21 +4,11 @@ import (
 	"fmt"
 	"os"
 	"regexp"
-	"strings"
 	"sync"
 	"time"
 
+	"github.com/syepes/ping_exporter/pkg/common"
 	yaml "gopkg.in/yaml.v3"
-)
-
-// Type of the test
-type Type string
-
-// Type of the test
-const (
-	ICMP Type = "ICMP"
-	MTR  Type = "MTR"
-	BOTH Type = "BOTH"
 )
 
 // Config represents configuration for the exporter
@@ -26,10 +16,6 @@ type Config struct {
 	Conf struct {
 		Refresh duration `yaml:"refresh"`
 	} `yaml:"conf"`
-	DNS struct {
-		Refresh    duration `yaml:"refresh"`
-		Nameserver string   `yaml:"nameserver"`
-	} `yaml:"dns"`
 	ICMP struct {
 		Interval duration `yaml:"interval"`
 		Timeout  duration `yaml:"timeout"`
@@ -41,10 +27,11 @@ type Config struct {
 		MaxHops  int      `yaml:"max-hops"`
 		SntSize  int      `yaml:"snt-size"`
 	} `yaml:"mtr"`
-	Dest []struct {
-		Host  string `yaml:"host"`
-		Alias string `yaml:"alias"`
-		Type  string `yaml:"type"`
+	Targets []struct {
+		Name  string   `yaml:"name"`
+		Host  string   `yaml:"host"`
+		Type  string   `yaml:"type"`
+		Probe []string `yaml:"probe"`
 	} `yaml:"targets"`
 }
 
@@ -58,6 +45,11 @@ type SafeConfig struct {
 
 // ReloadConfig Safe configuration reload
 func (sc *SafeConfig) ReloadConfig(confFile string) (err error) {
+	hostname, err := os.Hostname()
+	if err != nil {
+		panic(err)
+	}
+
 	var c = &Config{}
 	f, err := os.Open(confFile)
 	if err != nil {
@@ -66,21 +58,39 @@ func (sc *SafeConfig) ReloadConfig(confFile string) (err error) {
 	defer f.Close()
 
 	decoder := yaml.NewDecoder(f)
-
 	if err = decoder.Decode(c); err != nil {
 		return fmt.Errorf("Parsing config file: %s", err)
 	}
 
-	// Validate config
-	for _, t := range c.Dest {
-		found, _ := regexp.MatchString("ICMP|MTR|BOTH", t.Type)
+	// Validate and Filter config
+	targets := c.Targets[:0]
+	var targetNames []string
+
+	for _, t := range c.Targets {
+		targetNames = append(targetNames, t.Name)
+		found, _ := regexp.MatchString("ICMP|MTR|ICMP+MTR", t.Type)
 		if found == false {
-			return fmt.Errorf("Unknown check type '%s' must be one of (ICMP|MTR|BOTH)", t.Type)
+			return fmt.Errorf("Unknown check type '%s' must be one of (ICMP|MTR|ICMP+MTR)", t.Type)
+		}
+
+		// Filter out the targets that are not assigned to the running host, if the `probe` is not specified don't filter
+		if t.Probe == nil {
+			targets = append(targets, t)
+		} else {
+			for _, p := range t.Probe {
+				if p == hostname {
+					targets = append(targets, t)
+					continue
+				}
+			}
 		}
 	}
 
-	if !strings.HasSuffix(c.DNS.Nameserver, ":53") {
-		c.DNS.Nameserver += ":53"
+	// Remap the filtered targets
+	c.Targets = targets
+
+	if _, err = common.HasListDuplicates(targetNames); err != nil {
+		return fmt.Errorf("Parsing config file: %s", err)
 	}
 
 	// Config precheck

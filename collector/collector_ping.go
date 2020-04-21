@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	// icmpLabelNames = []string{"alias", "target", "ip", "ip_version"}
-	icmpLabelNames = []string{"alias", "target"}
+	// icmpLabelNames = []string{"name", "target", "ip", "ip_version"}
+	icmpLabelNames = []string{"name", "target"}
 	rttDesc        = prometheus.NewDesc("ping_rtt_seconds", "ICMP Round trip time in seconds", append(icmpLabelNames, "type"), nil)
 	lossDesc       = prometheus.NewDesc("ping_loss_percent", "Packet loss in percent", icmpLabelNames, nil)
 	icmpProgDesc   = prometheus.NewDesc("ping_up", "ping_exporter version", nil, prometheus.Labels{"version": "xzy"})
@@ -19,7 +19,7 @@ var (
 
 // PingCollector prom
 type PingCollector struct {
-	Monitor *monitor.MonitorPing
+	Monitor *monitor.PING
 	metrics map[string]*ping.PingReturn
 }
 
@@ -53,8 +53,9 @@ func (p *PingCollector) Collect(ch chan<- prometheus.Metric) {
 		// fmt.Printf("L: %v\n", l)
 
 		ch <- prometheus.MustNewConstMetric(rttDesc, prometheus.GaugeValue, float64(metrics.BestTime/1000), append(l, "best")...)
-		ch <- prometheus.MustNewConstMetric(rttDesc, prometheus.GaugeValue, float64(metrics.WrstTime/1000), append(l, "worst")...)
 		ch <- prometheus.MustNewConstMetric(rttDesc, prometheus.GaugeValue, float64(metrics.AvgTime/1000), append(l, "mean")...)
+		ch <- prometheus.MustNewConstMetric(rttDesc, prometheus.GaugeValue, float64(metrics.WrstTime/1000), append(l, "worst")...)
+		ch <- prometheus.MustNewConstMetric(rttDesc, prometheus.GaugeValue, float64(metrics.AllTime/1000), append(l, "all")...)
 		ch <- prometheus.MustNewConstMetric(lossDesc, prometheus.GaugeValue, metrics.DropRate, l...)
 	}
 }
