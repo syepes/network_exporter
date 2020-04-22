@@ -11,7 +11,7 @@ import (
 )
 
 // Ping ICMP Operation
-func Ping(addr string, count int, timeout time.Duration, interval time.Duration) (*PingReturn, error) {
+func Ping(addr string, count int, interval time.Duration, timeout time.Duration) (*PingReturn, error) {
 	var out PingReturn
 	var err error
 

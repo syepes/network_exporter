@@ -46,14 +46,14 @@ func (p *MTR) Collect(ch chan<- prometheus.Metric) {
 	}
 
 	targets := []string{}
-	for target, metrics := range p.metrics {
-		// fmt.Printf("target: %v\n", target)
-		// fmt.Printf("metrics: %v\n", metrics)
-		// l := strings.SplitN(target, " ", 2)
+	for target, metric := range p.metrics {
 		targets = append(targets, target)
-		l := []string{target, metrics.DestAddress}
+		// fmt.Printf("target: %v\n", target)
+		// fmt.Printf("metric: %v\n", metric)
+		// l := strings.SplitN(target, " ", 2)
+		l := []string{target, metric.DestAddress}
 		// fmt.Printf("L: %v\n", l)
-		for _, hop := range metrics.Hops {
+		for _, hop := range metric.Hops {
 			ll := append(l, strconv.Itoa(hop.TTL))
 			ll = append(ll, hop.AddressTo)
 			// fmt.Printf("LL: %v\n", ll)

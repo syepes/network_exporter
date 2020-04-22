@@ -29,6 +29,7 @@ var (
 	logger        log.Logger
 	monitorPING   *monitor.PING
 	monitorMTR    *monitor.MTR
+	monitorTCP    *monitor.TCPPort
 
 	indexHTML = `<!doctype html><html><head> <meta charset="UTF-8"><title>Ping Exporter (Version ` + version + `)</title></head><body><h1>Ping Exporter</h1><p><a href="%s">Metrics</a></p></body></html>`
 )
@@ -83,6 +84,9 @@ func main() {
 	monitorMTR = monitor.NewMTR(logger, sc)
 	monitorMTR.AddTargets()
 
+	monitorTCP = monitor.NewTCPPort(logger, sc)
+	monitorTCP.AddTargets()
+
 	go startConfigRefresh()
 
 	startServer()
@@ -121,6 +125,7 @@ func startServer() {
 	// reg.MustRegister(prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}))
 	reg.MustRegister(&collector.MTR{Monitor: monitorMTR})
 	reg.MustRegister(&collector.PING{Monitor: monitorPING})
+	reg.MustRegister(&collector.TCP{Monitor: monitorTCP})
 	h := promhttp.HandlerFor(reg, promhttp.HandlerOpts{})
 	http.Handle(metricsPath, h)
 

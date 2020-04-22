@@ -30,7 +30,7 @@ type MtrResult struct {
 
 type MtrOptions struct {
 	maxHops    int
-	timeoutMs  time.Duration
+	timeout    time.Duration
 	packetSize int
 	sntSize    int
 }
@@ -50,15 +50,15 @@ func (options *MtrOptions) SetMaxHops(maxHops int) {
 
 // Timeout Getter
 func (options *MtrOptions) Timeout() time.Duration {
-	if options.timeoutMs == 0 {
-		options.timeoutMs = defaultTimeout
+	if options.timeout == 0 {
+		options.timeout = defaultTimeout
 	}
-	return options.timeoutMs
+	return options.timeout
 }
 
 // SetTimeout Setter
-func (options *MtrOptions) SetTimeout(timeoutMs time.Duration) {
-	options.timeoutMs = timeoutMs
+func (options *MtrOptions) SetTimeout(timeout time.Duration) {
+	options.timeout = timeout
 }
 
 // SntSize Getter

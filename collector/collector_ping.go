@@ -48,19 +48,19 @@ func (p *PING) Collect(ch chan<- prometheus.Metric) {
 	}
 
 	targets := []string{}
-	for target, metrics := range p.metrics {
-		// fmt.Printf("target: %v\n", target)
-		// fmt.Printf("metrics: %v\n", metrics)
-		// l := strings.SplitN(target, " ", 2)
+	for target, metric := range p.metrics {
 		targets = append(targets, target)
-		l := []string{target, metrics.DestAddr}
+		// fmt.Printf("target: %v\n", target)
+		// fmt.Printf("metric: %v\n", metric)
+		// l := strings.SplitN(target, " ", 2)
+		l := []string{target, metric.DestAddr}
 		// fmt.Printf("L: %v\n", l)
 
-		ch <- prometheus.MustNewConstMetric(icmpRttDesc, prometheus.GaugeValue, float64(metrics.BestTime/1000), append(l, "best")...)
-		ch <- prometheus.MustNewConstMetric(icmpRttDesc, prometheus.GaugeValue, float64(metrics.AvgTime/1000), append(l, "mean")...)
-		ch <- prometheus.MustNewConstMetric(icmpRttDesc, prometheus.GaugeValue, float64(metrics.WrstTime/1000), append(l, "worst")...)
-		ch <- prometheus.MustNewConstMetric(icmpRttDesc, prometheus.GaugeValue, float64(metrics.AllTime/1000), append(l, "all")...)
-		ch <- prometheus.MustNewConstMetric(icmpLossDesc, prometheus.GaugeValue, metrics.DropRate, l...)
+		ch <- prometheus.MustNewConstMetric(icmpRttDesc, prometheus.GaugeValue, float64(metric.BestTime/1000), append(l, "best")...)
+		ch <- prometheus.MustNewConstMetric(icmpRttDesc, prometheus.GaugeValue, float64(metric.AvgTime/1000), append(l, "mean")...)
+		ch <- prometheus.MustNewConstMetric(icmpRttDesc, prometheus.GaugeValue, float64(metric.WrstTime/1000), append(l, "worst")...)
+		ch <- prometheus.MustNewConstMetric(icmpRttDesc, prometheus.GaugeValue, float64(metric.AllTime/1000), append(l, "all")...)
+		ch <- prometheus.MustNewConstMetric(icmpLossDesc, prometheus.GaugeValue, metric.DropRate, l...)
 	}
 	ch <- prometheus.MustNewConstMetric(icmpTargetsDesc, prometheus.GaugeValue, float64(len(targets)))
 }

@@ -27,6 +27,10 @@ type Config struct {
 		MaxHops  int      `yaml:"max-hops"`
 		SntSize  int      `yaml:"snt-size"`
 	} `yaml:"mtr"`
+	TCP struct {
+		Interval duration `yaml:"interval"`
+		Timeout  duration `yaml:"timeout"`
+	} `yaml:"tcp"`
 	Targets []struct {
 		Name  string   `yaml:"name"`
 		Host  string   `yaml:"host"`
@@ -68,9 +72,9 @@ func (sc *SafeConfig) ReloadConfig(confFile string) (err error) {
 
 	for _, t := range c.Targets {
 		targetNames = append(targetNames, t.Name)
-		found, _ := regexp.MatchString("ICMP|MTR|ICMP+MTR", t.Type)
+		found, _ := regexp.MatchString("ICMP|MTR|ICMP+MTR|TCP", t.Type)
 		if found == false {
-			return fmt.Errorf("Unknown check type '%s' must be one of (ICMP|MTR|ICMP+MTR)", t.Type)
+			return fmt.Errorf("Unknown check type '%s' must be one of (ICMP|MTR|ICMP+MTR|TCP)", t.Type)
 		}
 
 		// Filter out the targets that are not assigned to the running host, if the `probe` is not specified don't filter

@@ -33,7 +33,7 @@ type PingResult struct {
 // PingOptions ICMP Options
 type PingOptions struct {
 	count      int
-	timeoutMs  time.Duration
+	timeout    time.Duration
 	interval   time.Duration
 	packetSize int
 }
@@ -53,15 +53,15 @@ func (options *PingOptions) SetCount(count int) {
 
 // Timeout Getter
 func (options *PingOptions) Timeout() time.Duration {
-	if options.timeoutMs == 0 {
-		options.timeoutMs = defaultTimeout
+	if options.timeout == 0 {
+		options.timeout = defaultTimeout
 	}
-	return options.timeoutMs
+	return options.timeout
 }
 
 // SetTimeout Setter
-func (options *PingOptions) SetTimeout(timeoutMs time.Duration) {
-	options.timeoutMs = timeoutMs
+func (options *PingOptions) SetTimeout(timeout time.Duration) {
+	options.timeout = timeout
 }
 
 // Interval Getter

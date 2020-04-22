@@ -7,35 +7,35 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/syepes/ping_exporter/pkg/ping"
+	"github.com/syepes/ping_exporter/pkg/tcp"
 )
 
-// PING Object
-type PING struct {
+// TCPPort Object
+type TCPPort struct {
 	logger   log.Logger
 	name     string
 	host     string
+	port     string
 	interval time.Duration
 	timeout  time.Duration
-	count    int
-	result   *ping.PingReturn
+	result   *tcp.TCPPortReturn
 	stop     chan struct{}
 	wg       sync.WaitGroup
 	sync.RWMutex
 }
 
-// NewPing starts a new monitoring goroutine
-func NewPing(logger log.Logger, startupDelay time.Duration, name string, host string, interval time.Duration, timeout time.Duration, count int) (*PING, error) {
+// NewTCPPort starts a new monitoring goroutine
+func NewTCPPort(logger log.Logger, startupDelay time.Duration, name string, host string, port string, interval time.Duration, timeout time.Duration) (*TCPPort, error) {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
-	t := &PING{
+	t := &TCPPort{
 		logger:   logger,
 		name:     name,
 		host:     host,
+		port:     port,
 		interval: interval,
 		timeout:  timeout,
-		count:    count,
 		stop:     make(chan struct{}),
 	}
 	t.wg.Add(1)
@@ -43,7 +43,7 @@ func NewPing(logger log.Logger, startupDelay time.Duration, name string, host st
 	return t, nil
 }
 
-func (t *PING) run(startupDelay time.Duration) {
+func (t *TCPPort) run(startupDelay time.Duration) {
 	if startupDelay > 0 {
 		select {
 		case <-time.After(startupDelay):
@@ -59,28 +59,28 @@ func (t *PING) run(startupDelay time.Duration) {
 			t.wg.Done()
 			return
 		case <-tick.C:
-			go t.ping()
+			go t.portCheck()
 		}
 	}
 }
 
 // Stop gracefully stops the monitoring
-func (t *PING) Stop() {
+func (t *TCPPort) Stop() {
 	close(t.stop)
 	t.wg.Wait()
 }
 
-func (t *PING) ping() {
-	data, err := ping.Ping(t.host, t.count, t.interval, t.timeout)
+func (t *TCPPort) portCheck() {
+	data, err := tcp.Port(t.host, t.port, t.interval, t.timeout)
 	if err != nil {
-		level.Error(t.logger).Log("type", "ICMP", "func", "ping", "msg", fmt.Sprintf("%s", err))
+		level.Error(t.logger).Log("type", "TCP", "func", "port", "msg", fmt.Sprintf("%s", err))
 	}
 
 	// bytes, err2 := json.Marshal(data)
 	// if err2 != nil {
-	// 	level.Error(t.logger).Log("type", "ICMP", "func", "ping", "msg", fmt.Sprintf("%s", err2))
+	// 	level.Error(t.logger).Log("type", "TCP", "func", "port", "msg", fmt.Sprintf("%s", err2))
 	// }
-	// level.Debug(t.logger).Log("type", "ICMP", "func", "ping", "msg", fmt.Sprintf("%s", string(bytes)))
+	// level.Debug(t.logger).Log("type", "TCP", "func", "port", "msg", fmt.Sprintf("%s", string(bytes)))
 
 	t.Lock()
 	t.result = data
@@ -88,7 +88,7 @@ func (t *PING) ping() {
 }
 
 // Compute returns the results of the Ping metrics
-func (t *PING) Compute() *ping.PingReturn {
+func (t *TCPPort) Compute() *tcp.TCPPortReturn {
 	t.RLock()
 	defer t.RUnlock()
 
@@ -99,14 +99,14 @@ func (t *PING) Compute() *ping.PingReturn {
 }
 
 // Name returns name
-func (t *PING) Name() string {
+func (t *TCPPort) Name() string {
 	t.RLock()
 	defer t.RUnlock()
 	return t.name
 }
 
 // Host returns host
-func (t *PING) Host() string {
+func (t *TCPPort) Host() string {
 	t.RLock()
 	defer t.RUnlock()
 	return t.host
