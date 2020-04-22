@@ -15,8 +15,8 @@ import (
 
 // MTR manages the goroutines responsible for collecting MTR data
 type MTR struct {
-	sc       *config.SafeConfig
 	logger   log.Logger
+	sc       *config.SafeConfig
 	interval time.Duration
 	timeout  time.Duration
 	maxHops  int
@@ -31,8 +31,8 @@ func NewMTR(logger log.Logger, sc *config.SafeConfig) *MTR {
 		logger = log.NewNopLogger()
 	}
 	return &MTR{
-		sc:       sc,
 		logger:   logger,
+		sc:       sc,
 		interval: sc.Cfg.MTR.Interval.Duration(),
 		timeout:  sc.Cfg.MTR.Timeout.Duration(),
 		maxHops:  sc.Cfg.MTR.MaxHops,
@@ -57,25 +57,25 @@ func (p *MTR) AddTargets() {
 
 	targetActiveTmp := []string{}
 	for _, v := range p.targets {
-		targetActiveTmp = common.AppendIfMissing(targetActiveTmp, v.ID())
+		targetActiveTmp = common.AppendIfMissing(targetActiveTmp, v.Name())
 	}
 
 	targetConfigTmp := []string{}
 	for _, v := range p.sc.Cfg.Targets {
-		targetConfigTmp = common.AppendIfMissing(targetConfigTmp, v.Name+"::"+v.Host)
+		targetConfigTmp = common.AppendIfMissing(targetConfigTmp, v.Name)
 	}
 
 	targetAdd := common.CompareList(targetActiveTmp, targetConfigTmp)
-	level.Info(p.logger).Log("type", "MTR", "func", "AddTargets", "msg", fmt.Sprintf("targetID: %v", targetAdd))
+	level.Info(p.logger).Log("type", "MTR", "func", "AddTargets", "msg", fmt.Sprintf("targetName: %v", targetAdd))
 
-	for _, targetID := range targetAdd {
-		for _, host := range p.sc.Cfg.Targets {
-			if host.Name+"::"+host.Host != targetID {
+	for _, targetName := range targetAdd {
+		for _, target := range p.sc.Cfg.Targets {
+			if target.Name != targetName {
 				continue
 			}
 
-			if host.Type == "MTR" || host.Type == "ICMP+MTR" {
-				p.AddTarget(host.Name, host.Host)
+			if target.Type == "MTR" || target.Type == "ICMP+MTR" {
+				p.AddTarget(target.Name, target.Host)
 			}
 		}
 	}
@@ -88,7 +88,7 @@ func (p *MTR) AddTarget(name string, addr string) (err error) {
 
 // AddTargetDelayed is AddTarget with a startup delay
 func (p *MTR) AddTargetDelayed(name string, addr string, startupDelay time.Duration) (err error) {
-	level.Debug(p.logger).Log("type", "MTR", "func", "AddTargetDelayed", "msg", fmt.Sprintf("Adding Target: %s (%s)", name, addr))
+	level.Debug(p.logger).Log("type", "MTR", "func", "AddTargetDelayed", "msg", fmt.Sprintf("Adding Target: %s (%s) in %s", name, addr, startupDelay))
 
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
@@ -97,8 +97,8 @@ func (p *MTR) AddTargetDelayed(name string, addr string, startupDelay time.Durat
 	if err != nil {
 		return err
 	}
-	p.removeTarget(target.ID())
-	p.targets[target.ID()] = target
+	p.removeTarget(name)
+	p.targets[name] = target
 	return nil
 }
 
@@ -109,23 +109,23 @@ func (p *MTR) DelTargets() {
 	targetActiveTmp := []string{}
 	for _, v := range p.targets {
 		if v != nil {
-			targetActiveTmp = common.AppendIfMissing(targetActiveTmp, v.ID())
+			targetActiveTmp = common.AppendIfMissing(targetActiveTmp, v.Name())
 		}
 	}
 
 	targetConfigTmp := []string{}
 	for _, v := range p.sc.Cfg.Targets {
-		targetConfigTmp = common.AppendIfMissing(targetConfigTmp, v.Name+"::"+v.Host)
+		targetConfigTmp = common.AppendIfMissing(targetConfigTmp, v.Name)
 	}
 
 	targetDelete := common.CompareList(targetConfigTmp, targetActiveTmp)
-	for _, targetID := range targetDelete {
+	for _, targetName := range targetDelete {
 		for _, t := range p.targets {
 			if t == nil {
 				continue
 			}
-			if t.ID() == targetID {
-				p.RemoveTarget(targetID)
+			if t.Name() == targetName {
+				p.RemoveTarget(targetName)
 			}
 		}
 	}
@@ -160,7 +160,7 @@ func (p *MTR) Export() map[string]*mtr.MtrResult {
 		name := target.Name()
 		metrics := target.Compute()
 		if metrics != nil {
-			// level.Debug(p.logger).Log("msg", fmt.Sprintf("METRICS: %v", metrics), "type", "MTR", "func", "Export")
+			// level.Debug(p.logger).Log("type", "MTR", "func", "Export", "msg", fmt.Sprintf("Name: %s, Metrics: %v", name, metrics))
 			m[name] = metrics
 		}
 	}

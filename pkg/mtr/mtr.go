@@ -66,7 +66,7 @@ func MtrString(ipAddr string, maxHops int, sntSize int, timeout time.Duration) (
 				hopStr = ""
 			}
 
-			buffer.WriteString(fmt.Sprintf("%-3d %-48v  %10.1f%c  %10v  %10.2f  %10.2f  %10.2f  %10.2f\n", hop.TTL, hop.Address, hop.Loss, '%', hop.Snt, common.Time2Float(hop.LastTime), common.Time2Float(hop.AvgTime), common.Time2Float(hop.BestTime), common.Time2Float(hop.WrstTime)))
+			buffer.WriteString(fmt.Sprintf("%-3d %-48v  %10.1f%c  %10v  %10.2f  %10.2f  %10.2f  %10.2f\n", hop.TTL, hop.AddressTo, hop.Loss, '%', hop.Snt, common.Time2Float(hop.LastTime), common.Time2Float(hop.AvgTime), common.Time2Float(hop.BestTime), common.Time2Float(hop.WrstTime)))
 			lastHop = hop.TTL
 		} else {
 			if index != len(out.Hops)-1 {
@@ -133,8 +133,12 @@ func runMtr(destAddr string, options *MtrOptions) (result MtrResult, err error) 
 		}
 
 		hop := common.IcmpHop{TTL: mtrResult.TTL, Snt: options.SntSize()}
-		hop.Address = mtrResult.Host
-		hop.Host = mtrResult.Host
+		if index != 1 {
+			hop.AddressFrom = mtrResults[index-1].Host
+		} else {
+			hop.AddressFrom = mtrResult.Host
+		}
+		hop.AddressTo = mtrResult.Host
 		hop.AvgTime = mtrResult.AvgTime
 		hop.BestTime = mtrResult.BestTime
 		hop.LastTime = mtrResult.LastTime
@@ -146,7 +150,7 @@ func runMtr(destAddr string, options *MtrOptions) (result MtrResult, err error) 
 
 		result.Hops = append(result.Hops, hop)
 
-		if common.IsEqualIP(hop.Host, destAddr) {
+		if common.IsEqualIP(hop.AddressTo, destAddr) {
 			break
 		}
 	}

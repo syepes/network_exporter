@@ -119,10 +119,8 @@ func startServer() {
 	reg := prometheus.NewRegistry()
 	// reg.MustRegister(prometheus.NewGoCollector())
 	// reg.MustRegister(prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}))
-	reg.MustRegister(&collector.MtrCollector{Monitor: monitorMTR})
-	reg.MustRegister(&collector.PingCollector{Monitor: monitorPING})
-	// reg.MustRegister(&pingCollector{monitor: monitorPING})
-	// reg.MustRegister(&mtrCollector{monitor: monitorMTR})
+	reg.MustRegister(&collector.MTR{Monitor: monitorMTR})
+	reg.MustRegister(&collector.PING{Monitor: monitorPING})
 	h := promhttp.HandlerFor(reg, promhttp.HandlerOpts{})
 	http.Handle(metricsPath, h)
 

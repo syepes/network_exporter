@@ -10,7 +10,7 @@ import (
 	"github.com/syepes/ping_exporter/pkg/ping"
 )
 
-// PING is a unit of work
+// PING Object
 type PING struct {
 	logger   log.Logger
 	name     string
@@ -76,13 +76,11 @@ func (t *PING) ping() {
 		level.Error(t.logger).Log("type", "ICMP", "func", "ping", "msg", fmt.Sprintf("%s", err))
 	}
 
-	/*
-		bytes, err2 := json.Marshal(data)
-		if err2 != nil {
-			level.Error(t.logger).Log("type", "ICMP", "func", "ping", "msg", fmt.Sprintf("%s", err2))
-		}
-		level.Debug(t.logger).Log("type", "ICMP", "func", "ping", "msg", fmt.Sprintf("%s", string(bytes)))
-	*/
+	// bytes, err2 := json.Marshal(data)
+	// if err2 != nil {
+	// 	level.Error(t.logger).Log("type", "ICMP", "func", "ping", "msg", fmt.Sprintf("%s", err2))
+	// }
+	// level.Debug(t.logger).Log("type", "ICMP", "func", "ping", "msg", fmt.Sprintf("%s", string(bytes)))
 
 	t.Lock()
 	t.result = data
@@ -98,13 +96,6 @@ func (t *PING) Compute() *ping.PingReturn {
 		return nil
 	}
 	return t.result
-}
-
-// ID returns target ID
-func (t *PING) ID() string {
-	t.RLock()
-	defer t.RUnlock()
-	return t.name + "::" + t.host
 }
 
 // Name returns name

@@ -10,7 +10,7 @@ import (
 	"github.com/syepes/ping_exporter/pkg/mtr"
 )
 
-// MTR is a unit of work
+// MTR Object
 type MTR struct {
 	logger   log.Logger
 	name     string
@@ -78,20 +78,18 @@ func (t *MTR) mtr() {
 		level.Error(t.logger).Log("type", "MTR", "func", "mtr", "msg", fmt.Sprintf("%s", err))
 	}
 
-	/*
-		bytes, err2 := json.Marshal(data)
-		if err2 != nil {
-			level.Error(t.logger).Log("type", "MTR", "func", "mtr", "msg", fmt.Sprintf("%s", err2))
-		}
-		level.Debug(t.logger).Log("type", "MTR", "func", "mtr", "msg", fmt.Sprintf("%s", string(bytes)))
-	*/
+	// bytes, err2 := json.Marshal(data)
+	// if err2 != nil {
+	// 	level.Error(t.logger).Log("type", "MTR", "func", "mtr", "msg", fmt.Sprintf("%s", err2))
+	// }
+	// level.Debug(t.logger).Log("type", "MTR", "func", "mtr", "msg", fmt.Sprintf("%s", string(bytes)))
 
 	t.Lock()
 	t.result = data
 	t.Unlock()
 }
 
-// Compute returns the results of the Ping metrics
+// Compute returns the results of the MTR metrics
 func (t *MTR) Compute() *mtr.MtrResult {
 	t.RLock()
 	defer t.RUnlock()
@@ -100,13 +98,6 @@ func (t *MTR) Compute() *mtr.MtrResult {
 		return nil
 	}
 	return t.result
-}
-
-// ID returns target ID
-func (t *MTR) ID() string {
-	t.RLock()
-	defer t.RUnlock()
-	return t.name + "::" + t.host
 }
 
 // Name returns name

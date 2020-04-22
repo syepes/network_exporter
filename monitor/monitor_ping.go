@@ -15,8 +15,8 @@ import (
 
 // PING manages the goroutines responsible for collecting ICMP data
 type PING struct {
-	sc       *config.SafeConfig
 	logger   log.Logger
+	sc       *config.SafeConfig
 	interval time.Duration
 	timeout  time.Duration
 	count    int
@@ -30,8 +30,8 @@ func NewPing(logger log.Logger, sc *config.SafeConfig) *PING {
 		logger = log.NewNopLogger()
 	}
 	return &PING{
-		sc:       sc,
 		logger:   logger,
+		sc:       sc,
 		interval: sc.Cfg.ICMP.Interval.Duration(),
 		timeout:  sc.Cfg.ICMP.Timeout.Duration(),
 		count:    sc.Cfg.ICMP.Count,
@@ -55,24 +55,24 @@ func (p *PING) AddTargets() {
 
 	targetActiveTmp := []string{}
 	for _, v := range p.targets {
-		targetActiveTmp = common.AppendIfMissing(targetActiveTmp, v.ID())
+		targetActiveTmp = common.AppendIfMissing(targetActiveTmp, v.Name())
 	}
 
 	targetConfigTmp := []string{}
 	for _, v := range p.sc.Cfg.Targets {
-		targetConfigTmp = common.AppendIfMissing(targetConfigTmp, v.Name+"::"+v.Host)
+		targetConfigTmp = common.AppendIfMissing(targetConfigTmp, v.Name)
 	}
 
 	targetAdd := common.CompareList(targetActiveTmp, targetConfigTmp)
-	level.Info(p.logger).Log("type", "ICMP", "func", "AddTargets", "msg", fmt.Sprintf("targetID: %v", targetAdd))
+	level.Info(p.logger).Log("type", "ICMP", "func", "AddTargets", "msg", fmt.Sprintf("targetName: %v", targetAdd))
 
-	for _, targetID := range targetAdd {
-		for _, host := range p.sc.Cfg.Targets {
-			if host.Name+"::"+host.Host != targetID {
+	for _, targetName := range targetAdd {
+		for _, target := range p.sc.Cfg.Targets {
+			if target.Name != targetName {
 				continue
 			}
-			if host.Type == "ICMP" || host.Type == "ICMP+MTR" {
-				p.AddTarget(host.Name, host.Host)
+			if target.Type == "ICMP" || target.Type == "ICMP+MTR" {
+				p.AddTarget(target.Name, target.Host)
 			}
 		}
 	}
@@ -85,7 +85,7 @@ func (p *PING) AddTarget(name string, addr string) (err error) {
 
 // AddTargetDelayed is AddTarget with a startup delay
 func (p *PING) AddTargetDelayed(name string, addr string, startupDelay time.Duration) (err error) {
-	level.Debug(p.logger).Log("type", "ICMP", "func", "AddTargetDelayed", "msg", fmt.Sprintf("Adding Target: %s (%s)", name, addr))
+	level.Debug(p.logger).Log("type", "ICMP", "func", "AddTargetDelayed", "msg", fmt.Sprintf("Adding Target: %s (%s) in %s", name, addr, startupDelay))
 
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
@@ -94,8 +94,8 @@ func (p *PING) AddTargetDelayed(name string, addr string, startupDelay time.Dura
 	if err != nil {
 		return err
 	}
-	p.removeTarget(target.ID())
-	p.targets[target.ID()] = target
+	p.removeTarget(name)
+	p.targets[name] = target
 	return nil
 }
 
@@ -106,23 +106,23 @@ func (p *PING) DelTargets() {
 	targetActiveTmp := []string{}
 	for _, v := range p.targets {
 		if v != nil {
-			targetActiveTmp = common.AppendIfMissing(targetActiveTmp, v.ID())
+			targetActiveTmp = common.AppendIfMissing(targetActiveTmp, v.Name())
 		}
 	}
 
 	targetConfigTmp := []string{}
 	for _, v := range p.sc.Cfg.Targets {
-		targetConfigTmp = common.AppendIfMissing(targetConfigTmp, v.Name+"::"+v.Host)
+		targetConfigTmp = common.AppendIfMissing(targetConfigTmp, v.Name)
 	}
 
 	targetDelete := common.CompareList(targetConfigTmp, targetActiveTmp)
-	for _, targetID := range targetDelete {
+	for _, targetName := range targetDelete {
 		for _, t := range p.targets {
 			if t == nil {
 				continue
 			}
-			if t.ID() == targetID {
-				p.RemoveTarget(targetID)
+			if t.Name() == targetName {
+				p.RemoveTarget(targetName)
 			}
 		}
 	}
@@ -157,7 +157,7 @@ func (p *PING) Export() map[string]*ping.PingReturn {
 		name := target.Name()
 		metrics := target.Compute()
 		if metrics != nil {
-			// level.Debug(p.logger).Log("msg", fmt.Sprintf("ID: %s, METRICS: %v", id, metrics), "type", "ICMP", "func", "Export")
+			// level.Debug(p.logger).Log("type", "ICMP", "func", "Export", "msg", fmt.Sprintf("Name: %s, Metrics: %v", name, metrics))
 			m[name] = metrics
 		}
 	}
