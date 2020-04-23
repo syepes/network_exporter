@@ -1,8 +1,5 @@
 # ping_exporter
 
-================
-
----
 ICMP echo request ("ping") & MTR & TCP Port Prometheus exporter
 
 This exporter gathers either ICMP, MTR or TCP Port stats and exports them via HTTP for Prometheus consumption.
