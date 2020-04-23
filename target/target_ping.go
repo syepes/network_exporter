@@ -18,7 +18,7 @@ type PING struct {
 	interval time.Duration
 	timeout  time.Duration
 	count    int
-	result   *ping.PingReturn
+	result   *ping.PingResult
 	stop     chan struct{}
 	wg       sync.WaitGroup
 	sync.RWMutex
@@ -88,7 +88,7 @@ func (t *PING) ping() {
 }
 
 // Compute returns the results of the Ping metrics
-func (t *PING) Compute() *ping.PingReturn {
+func (t *PING) Compute() *ping.PingResult {
 	t.RLock()
 	defer t.RUnlock()
 

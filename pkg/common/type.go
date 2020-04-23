@@ -19,9 +19,11 @@ type IcmpHop struct {
 	N           int           `json:"n"`
 	TTL         int           `json:"ttl"`
 	Snt         int           `json:"snt"`
+	StdDev      time.Duration `json:"stddev"`
 	LastTime    time.Duration `json:"last"`
+	SumTime     time.Duration `json:"sum"`
 	AvgTime     time.Duration `json:"avg"`
 	BestTime    time.Duration `json:"best"`
-	WrstTime    time.Duration `json:"worst"`
+	WorstTime   time.Duration `json:"worst"`
 	Loss        float32       `json:"loss"`
 }

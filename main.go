@@ -108,6 +108,8 @@ func startConfigRefresh() {
 			monitorPING.DelTargets()
 			monitorMTR.AddTargets()
 			monitorMTR.DelTargets()
+			monitorTCP.AddTargets()
+			monitorTCP.DelTargets()
 		}
 	}
 }

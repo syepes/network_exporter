@@ -8,26 +8,27 @@ const defaultPackerSize = 56
 const defaultCount = 10
 const defaultTTL = 128
 
-// PingReturn Calculated results
-type PingReturn struct {
-	DestAddr string        `json:"dest_address"`
-	Success  bool          `json:"success"`
-	DropRate float64       `json:"drop_rate"`
-	AllTime  time.Duration `json:"all"`
-	BestTime time.Duration `json:"best"`
-	AvgTime  time.Duration `json:"avg"`
-	WrstTime time.Duration `json:"worst"`
-	StdDev   float64       `json:"std_dev"`
+// PingResult Calculated results
+type PingResult struct {
+	Success   bool          `json:"success"`
+	DestAddr  string        `json:"dest_address"`
+	DropRate  float64       `json:"drop_rate"`
+	SumTime   time.Duration `json:"sum"`
+	BestTime  time.Duration `json:"best"`
+	AvgTime   time.Duration `json:"avg"`
+	WorstTime time.Duration `json:"worst"`
+	StdDev    time.Duration `json:"stddev"`
 }
 
-// PingResult ICMP Response
-type PingResult struct {
-	success  bool
-	succSum  int
-	allTime  time.Duration
-	bestTime time.Duration
-	avgTime  time.Duration
-	wrstTime time.Duration
+// PingReturn ICMP Response
+type PingReturn struct {
+	success   bool
+	succSum   int
+	allTime   []time.Duration
+	sumTime   time.Duration
+	bestTime  time.Duration
+	avgTime   time.Duration
+	worstTime time.Duration
 }
 
 // PingOptions ICMP Options

@@ -72,6 +72,10 @@ func (p *TCPPort) AddTargets() {
 			}
 			if target.Type == "TCP" {
 				conn := strings.Split(target.Host, ":")
+				if len(conn) != 2 {
+					level.Warn(p.logger).Log("type", "TCP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping target, could not identify host/port: %v", target.Host))
+					continue
+				}
 				p.AddTarget(target.Name, conn[0], conn[1])
 			}
 		}

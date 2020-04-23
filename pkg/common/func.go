@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+	"math"
 	"net"
 	"runtime"
 	"strconv"
@@ -70,6 +71,22 @@ func IsEqualIP(ips1, ips2 string) bool {
 // Time2Float Convert time to float32
 func Time2Float(t time.Duration) float32 {
 	return (float32)(t/time.Microsecond) / float32(1000)
+}
+
+// StdDev Calculate the Standard deviation
+func StdDev(allTimes []time.Duration, avg time.Duration) time.Duration {
+	if len(allTimes) < 2 {
+		return time.Duration(0)
+	}
+	mean := float64(avg)
+	total := 0.0
+	for _, t := range allTimes {
+		number := float64(t)
+		total += math.Pow(number-mean, 2)
+	}
+	variance := total / float64(len(allTimes)-1)
+	std := math.Sqrt(variance)
+	return time.Duration(std)
 }
 
 // CompareList Compare two lists and return a list with the difference

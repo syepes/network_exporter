@@ -3,7 +3,6 @@ package ping
 import (
 	"bytes"
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/syepes/ping_exporter/pkg/common"
@@ -11,8 +10,8 @@ import (
 )
 
 // Ping ICMP Operation
-func Ping(addr string, count int, interval time.Duration, timeout time.Duration) (*PingReturn, error) {
-	var out PingReturn
+func Ping(addr string, count int, interval time.Duration, timeout time.Duration) (*PingResult, error) {
+	var out PingResult
 	var err error
 
 	pingOptions := &PingOptions{}
@@ -47,28 +46,26 @@ func PingString(addr string, count int, timeout time.Duration, interval time.Dur
 	var buffer bytes.Buffer
 	buffer.WriteString(fmt.Sprintf("Start %v, PING %v (%v)\n", time.Now().Format("2006-01-02 15:04:05"), addr, ipAddrs[0]))
 	begin := time.Now().UnixNano() / 1e6
-	pingReturn := runPing(ipAddrs[0], pingOptions)
+	pingResult := runPing(ipAddrs[0], pingOptions)
 	end := time.Now().UnixNano() / 1e6
 
-	buffer.WriteString(fmt.Sprintf("%v packets transmitted, %v packet loss, time %vms\n", count, pingReturn.DropRate, end-begin))
-	buffer.WriteString(fmt.Sprintf("rtt min/avg/max = %v/%v/%v ms\n", common.Time2Float(pingReturn.WrstTime), common.Time2Float(pingReturn.AvgTime), common.Time2Float(pingReturn.BestTime)))
+	buffer.WriteString(fmt.Sprintf("%v packets transmitted, %v packet loss, time %vms\n", count, pingResult.DropRate, end-begin))
+	buffer.WriteString(fmt.Sprintf("rtt min/avg/max = %v/%v/%v ms\n", common.Time2Float(pingResult.WorstTime), common.Time2Float(pingResult.AvgTime), common.Time2Float(pingResult.BestTime)))
 
 	result = buffer.String()
 
 	return result, nil
 }
 
-func runPing(ipAddr string, option *PingOptions) (pingReturn PingReturn) {
-	pingReturn.DestAddr = ipAddr
+func runPing(ipAddr string, option *PingOptions) (pingResult PingResult) {
+	pingResult.DestAddr = ipAddr
 
 	pid := common.Goid()
 	timeout := option.Timeout()
 	interval := option.Interval()
 	ttl := defaultTTL
-	pingResult := PingResult{}
+	pingReturn := PingReturn{}
 
-	// µsPerMs := 1.0 / float64(time.Millisecond)
-	data := make([]float64, 0, option.Count())
 	seq := 0
 	for cnt := 0; cnt < option.Count(); cnt++ {
 		icmpReturn, err := icmp.Icmp(ipAddr, ttl, pid, timeout, seq)
@@ -76,43 +73,36 @@ func runPing(ipAddr string, option *PingOptions) (pingReturn PingReturn) {
 			continue
 		}
 
-		pingResult.succSum++
-		if pingResult.wrstTime == time.Duration(0) || icmpReturn.Elapsed > pingResult.wrstTime {
-			pingResult.wrstTime = icmpReturn.Elapsed
-		}
-		if pingResult.bestTime == time.Duration(0) || icmpReturn.Elapsed < pingResult.bestTime {
-			pingResult.bestTime = icmpReturn.Elapsed
-		}
-		pingResult.allTime += icmpReturn.Elapsed
-		pingResult.avgTime = time.Duration((int64)(pingResult.allTime/time.Microsecond)/(int64)(pingResult.succSum)) * time.Microsecond
-		pingResult.success = true
+		pingReturn.allTime = append(pingReturn.allTime, icmpReturn.Elapsed)
 
-		data = append(data, float64(icmpReturn.Elapsed))
+		pingReturn.succSum++
+		if pingReturn.worstTime == time.Duration(0) || icmpReturn.Elapsed > pingReturn.worstTime {
+			pingReturn.worstTime = icmpReturn.Elapsed
+		}
+		if pingReturn.bestTime == time.Duration(0) || icmpReturn.Elapsed < pingReturn.bestTime {
+			pingReturn.bestTime = icmpReturn.Elapsed
+		}
+		pingReturn.sumTime += icmpReturn.Elapsed
+		pingReturn.avgTime = time.Duration((int64)(pingReturn.sumTime/time.Microsecond)/(int64)(pingReturn.succSum)) * time.Microsecond
+		pingReturn.success = true
+
 		seq++
 		time.Sleep(interval)
 	}
 
-	if !pingResult.success {
-		pingReturn.Success = false
-		pingReturn.DropRate = 100.0
-
-		return pingReturn
+	if !pingReturn.success {
+		pingResult.Success = false
+		pingResult.DropRate = 100.0
+		return pingResult
 	}
 
-	pingReturn.Success = pingResult.success
-	pingReturn.DropRate = float64(option.Count()-pingResult.succSum) / float64(option.Count())
-	pingReturn.AvgTime = pingResult.avgTime
-	pingReturn.BestTime = pingResult.bestTime
-	pingReturn.WrstTime = pingResult.wrstTime
+	pingResult.Success = pingReturn.success
+	pingResult.DropRate = float64(option.Count()-pingReturn.succSum) / float64(option.Count())
+	pingResult.SumTime = pingReturn.sumTime
+	pingResult.AvgTime = pingReturn.avgTime
+	pingResult.BestTime = pingReturn.bestTime
+	pingResult.WorstTime = pingReturn.worstTime
+	pingResult.StdDev = common.StdDev(pingReturn.allTime, pingReturn.avgTime)
 
-	size := float64(option.Count()) - float64(option.Count()-pingResult.succSum)
-	var sumSquares float64
-
-	for _, rtt := range data {
-		sumSquares += math.Pow(rtt-float64(pingReturn.AvgTime), 2)
-	}
-	stddev := math.Sqrt(sumSquares / size)
-	pingReturn.StdDev = stddev
-
-	return pingReturn
+	return pingResult
 }

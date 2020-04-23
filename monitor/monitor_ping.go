@@ -147,8 +147,8 @@ func (p *PING) removeTarget(key string) {
 }
 
 // Export collects the metrics for each monitored target and returns it as a simple map
-func (p *PING) Export() map[string]*ping.PingReturn {
-	m := make(map[string]*ping.PingReturn)
+func (p *PING) Export() map[string]*ping.PingResult {
+	m := make(map[string]*ping.PingResult)
 
 	p.mtx.RLock()
 	defer p.mtx.RUnlock()

@@ -11,23 +11,30 @@ const defaultTimeout = 5 * time.Second
 const defaultPackerSize = 56
 const defaultSntSize = 10
 
-type MtrReturn struct {
-	Success  bool
-	TTL      int
-	Host     string
-	SuccSum  int
-	LastTime time.Duration
-	AllTime  time.Duration
-	BestTime time.Duration
-	AvgTime  time.Duration
-	WrstTime time.Duration
-}
-
+// MtrResult Calculated results
 type MtrResult struct {
-	DestAddress string           `json:"dest_address"`
-	Hops        []common.IcmpHop `json:"hops"`
+	DestAddr string           `json:"dest_address"`
+	Hops     []common.IcmpHop `json:"hops"`
 }
 
+// MtrReturn MTR Response
+// TODO: Add Jitter
+// RFC 1889 (http://www.ietf.org/rfc/rfc1889.txt) is the RFC for RTP, later superseded by RFC 3550.
+// How interarrival jitter is calculated RFC 3550 (http://www.ietf.org/rfc/rfc3550.txt)
+type MtrReturn struct {
+	success   bool
+	ttl       int
+	host      string
+	succSum   int
+	lastTime  time.Duration
+	allTime   []time.Duration
+	sumTime   time.Duration
+	bestTime  time.Duration
+	avgTime   time.Duration
+	worstTime time.Duration
+}
+
+// MtrOptions MTR Options
 type MtrOptions struct {
 	maxHops    int
 	timeout    time.Duration

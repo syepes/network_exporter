@@ -66,7 +66,7 @@ func MtrString(ipAddr string, maxHops int, sntSize int, timeout time.Duration) (
 				hopStr = ""
 			}
 
-			buffer.WriteString(fmt.Sprintf("%-3d %-48v  %10.1f%c  %10v  %10.2f  %10.2f  %10.2f  %10.2f\n", hop.TTL, hop.AddressTo, hop.Loss, '%', hop.Snt, common.Time2Float(hop.LastTime), common.Time2Float(hop.AvgTime), common.Time2Float(hop.BestTime), common.Time2Float(hop.WrstTime)))
+			buffer.WriteString(fmt.Sprintf("%-3d %-48v  %10.1f%c  %10v  %10.2f  %10.2f  %10.2f  %10.2f\n", hop.TTL, hop.AddressTo, hop.Loss, '%', hop.Snt, common.Time2Float(hop.LastTime), common.Time2Float(hop.AvgTime), common.Time2Float(hop.BestTime), common.Time2Float(hop.WorstTime)))
 			lastHop = hop.TTL
 		} else {
 			if index != len(out.Hops)-1 {
@@ -84,19 +84,19 @@ func MtrString(ipAddr string, maxHops int, sntSize int, timeout time.Duration) (
 // MTR
 func runMtr(destAddr string, options *MtrOptions) (result MtrResult, err error) {
 	result.Hops = []common.IcmpHop{}
-	result.DestAddress = destAddr
+	result.DestAddr = destAddr
 
 	// Avoid interference caused by multiple coroutines initiating mtr
 	pid := common.Goid()
 	timeout := time.Duration(options.Timeout()) * time.Millisecond
-	mtrResults := make([]*MtrReturn, options.MaxHops()+1)
+	mtrReturns := make([]*MtrReturn, options.MaxHops()+1)
 
 	// Verify data packets
 	seq := 0
 	for snt := 0; snt < options.SntSize(); snt++ {
 		for ttl := 1; ttl < options.MaxHops(); ttl++ {
-			if mtrResults[ttl] == nil {
-				mtrResults[ttl] = &MtrReturn{TTL: ttl, Host: "???", SuccSum: 0, Success: false, LastTime: time.Duration(0), AllTime: time.Duration(0), BestTime: time.Duration(0), WrstTime: time.Duration(0), AvgTime: time.Duration(0)}
+			if mtrReturns[ttl] == nil {
+				mtrReturns[ttl] = &MtrReturn{ttl: ttl, host: "???", succSum: 0, success: false, lastTime: time.Duration(0), sumTime: time.Duration(0), bestTime: time.Duration(0), worstTime: time.Duration(0), avgTime: time.Duration(0)}
 			}
 
 			hopReturn, err := icmp.Icmp(destAddr, ttl, pid, timeout, seq)
@@ -104,18 +104,19 @@ func runMtr(destAddr string, options *MtrOptions) (result MtrResult, err error) 
 				continue
 			}
 
-			mtrResults[ttl].SuccSum = mtrResults[ttl].SuccSum + 1
-			mtrResults[ttl].Host = hopReturn.Addr
-			mtrResults[ttl].LastTime = hopReturn.Elapsed
-			if mtrResults[ttl].WrstTime == time.Duration(0) || hopReturn.Elapsed > mtrResults[ttl].WrstTime {
-				mtrResults[ttl].WrstTime = hopReturn.Elapsed
+			mtrReturns[ttl].host = hopReturn.Addr
+			mtrReturns[ttl].lastTime = hopReturn.Elapsed
+			mtrReturns[ttl].allTime = append(mtrReturns[ttl].allTime, hopReturn.Elapsed)
+			mtrReturns[ttl].succSum = mtrReturns[ttl].succSum + 1
+			if mtrReturns[ttl].worstTime == time.Duration(0) || hopReturn.Elapsed > mtrReturns[ttl].worstTime {
+				mtrReturns[ttl].worstTime = hopReturn.Elapsed
 			}
-			if mtrResults[ttl].BestTime == time.Duration(0) || hopReturn.Elapsed < mtrResults[ttl].BestTime {
-				mtrResults[ttl].BestTime = hopReturn.Elapsed
+			if mtrReturns[ttl].bestTime == time.Duration(0) || hopReturn.Elapsed < mtrReturns[ttl].bestTime {
+				mtrReturns[ttl].bestTime = hopReturn.Elapsed
 			}
-			mtrResults[ttl].AllTime += hopReturn.Elapsed
-			mtrResults[ttl].AvgTime = time.Duration((int64)(mtrResults[ttl].AllTime/time.Microsecond)/(int64)(mtrResults[ttl].SuccSum)) * time.Microsecond
-			mtrResults[ttl].Success = true
+			mtrReturns[ttl].sumTime += hopReturn.Elapsed
+			mtrReturns[ttl].avgTime = time.Duration((int64)(mtrReturns[ttl].sumTime/time.Microsecond)/(int64)(mtrReturns[ttl].succSum)) * time.Microsecond
+			mtrReturns[ttl].success = true
 
 			if common.IsEqualIP(hopReturn.Addr, destAddr) {
 				break
@@ -123,30 +124,32 @@ func runMtr(destAddr string, options *MtrOptions) (result MtrResult, err error) 
 		}
 	}
 
-	for index, mtrResult := range mtrResults {
+	for index, mtrReturn := range mtrReturns {
 		if index == 0 {
 			continue
 		}
 
-		if mtrResult == nil {
+		if mtrReturn == nil {
 			break
 		}
 
-		hop := common.IcmpHop{TTL: mtrResult.TTL, Snt: options.SntSize()}
+		hop := common.IcmpHop{TTL: mtrReturn.ttl, Snt: options.SntSize()}
 		if index != 1 {
-			hop.AddressFrom = mtrResults[index-1].Host
+			hop.AddressFrom = mtrReturns[index-1].host
 		} else {
-			hop.AddressFrom = mtrResult.Host
+			hop.AddressFrom = mtrReturn.host
 		}
-		hop.AddressTo = mtrResult.Host
-		hop.AvgTime = mtrResult.AvgTime
-		hop.BestTime = mtrResult.BestTime
-		hop.LastTime = mtrResult.LastTime
-		failSum := options.SntSize() - mtrResult.SuccSum
+		hop.AddressTo = mtrReturn.host
+		hop.Success = mtrReturn.success
+		hop.LastTime = mtrReturn.lastTime
+		hop.SumTime = mtrReturn.sumTime
+		hop.AvgTime = mtrReturn.avgTime
+		hop.BestTime = mtrReturn.bestTime
+		hop.WorstTime = mtrReturn.worstTime
+		hop.StdDev = common.StdDev(mtrReturn.allTime, mtrReturn.avgTime)
+		failSum := options.SntSize() - mtrReturn.succSum
 		loss := (float32)(failSum) / (float32)(options.SntSize()) * 100
 		hop.Loss = float32(loss)
-		hop.WrstTime = mtrResult.WrstTime
-		hop.Success = mtrResult.Success
 
 		result.Hops = append(result.Hops, hop)
 

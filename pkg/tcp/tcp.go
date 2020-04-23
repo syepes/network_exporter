@@ -20,7 +20,7 @@ func Port(addr string, port string, interval time.Duration, timeout time.Duratio
 	// Resolve hostnames
 	ipAddrs, err := common.DestAddrs(addr)
 	if err != nil || len(ipAddrs) == 0 {
-		return nil, fmt.Errorf("Ping Failed due to an error: %v", err)
+		return nil, fmt.Errorf("TCP Port Failed due to an error: %v", err)
 	}
 
 	out.DestAddr = addr
@@ -28,15 +28,24 @@ func Port(addr string, port string, interval time.Duration, timeout time.Duratio
 
 	start := time.Now()
 	conn, err := net.DialTimeout("tcp", net.JoinHostPort(addr, port), tcpOptions.Timeout())
-	elapsed := time.Since(start)
+	out.ConTime = time.Since(start)
+
 	if err != nil {
 		out.Success = false
-		out.ConTime = elapsed
-	}
-	if conn != nil {
+	} else {
 		defer conn.Close()
-		out.Success = true
-		out.ConTime = elapsed
+
+		// Set Deadline timeout
+		if err := conn.SetDeadline(time.Now().Add(tcpOptions.Timeout())); err != nil {
+			out.Success = false
+			return &out, fmt.Errorf("Error setting deadline timout", "err", err)
+		}
+
+		if conn != nil {
+			out.Success = true
+		} else {
+			out.Success = false
+		}
 	}
 
 	return &out, nil
