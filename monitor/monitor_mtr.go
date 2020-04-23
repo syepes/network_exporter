@@ -66,7 +66,7 @@ func (p *MTR) AddTargets() {
 	}
 
 	targetAdd := common.CompareList(targetActiveTmp, targetConfigTmp)
-	level.Info(p.logger).Log("type", "MTR", "func", "AddTargets", "msg", fmt.Sprintf("targetName: %v", targetAdd))
+	// level.Debug(p.logger).Log("type", "MTR", "func", "AddTargets", "msg", fmt.Sprintf("targetName: %v", targetAdd))
 
 	for _, targetName := range targetAdd {
 		for _, target := range p.sc.Cfg.Targets {

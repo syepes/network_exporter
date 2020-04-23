@@ -71,6 +71,8 @@ func main() {
 					monitorPING.DelTargets()
 					monitorMTR.AddTargets()
 					monitorMTR.DelTargets()
+					monitorTCP.AddTargets()
+					monitorTCP.DelTargets()
 				}
 			case <-susr:
 				level.Debug(logger).Log("msg", "Signal: USR1")
@@ -123,8 +125,8 @@ func startServer() {
 	})
 
 	reg := prometheus.NewRegistry()
-	// reg.MustRegister(prometheus.NewGoCollector())
-	// reg.MustRegister(prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}))
+	reg.MustRegister(prometheus.NewGoCollector())
+	reg.MustRegister(prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}))
 	reg.MustRegister(&collector.MTR{Monitor: monitorMTR})
 	reg.MustRegister(&collector.PING{Monitor: monitorPING})
 	reg.MustRegister(&collector.TCP{Monitor: monitorTCP})

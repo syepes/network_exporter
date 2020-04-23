@@ -10,7 +10,7 @@ import (
 )
 
 // Mtr Return traceroute object
-func Mtr(ipAddr string, maxHops int, sntSize int, timeout time.Duration) (*MtrResult, error) {
+func Mtr(host string, maxHops int, sntSize int, timeout time.Duration) (*MtrResult, error) {
 	var out MtrResult
 	var err error
 
@@ -19,7 +19,12 @@ func Mtr(ipAddr string, maxHops int, sntSize int, timeout time.Duration) (*MtrRe
 	options.SetSntSize(sntSize)
 	options.SetTimeout(timeout)
 
-	out, err = runMtr(ipAddr, &options)
+	// Resolve hostnames
+	ipAddrs, err := common.DestAddrs(host)
+	if err != nil || len(ipAddrs) == 0 {
+		return nil, fmt.Errorf("MTR Failed due to an error: %v", err)
+	}
+	out, err = runMtr(ipAddrs[0], &options)
 
 	if err == nil {
 		if len(out.Hops) == 0 {
@@ -33,7 +38,7 @@ func Mtr(ipAddr string, maxHops int, sntSize int, timeout time.Duration) (*MtrRe
 }
 
 // MtrString Console print traceroute operation
-func MtrString(ipAddr string, maxHops int, sntSize int, timeout time.Duration) (result string, err error) {
+func MtrString(host string, maxHops int, sntSize int, timeout time.Duration) (result string, err error) {
 	options := MtrOptions{}
 	options.SetMaxHops(maxHops)
 	options.SetSntSize(sntSize)
@@ -41,8 +46,14 @@ func MtrString(ipAddr string, maxHops int, sntSize int, timeout time.Duration) (
 
 	var out MtrResult
 	var buffer bytes.Buffer
-	buffer.WriteString(fmt.Sprintf("Start: %v, DestAddr: %v\n", time.Now().Format("2006-01-02 15:04:05"), ipAddr))
-	out, err = runMtr(ipAddr, &options)
+	buffer.WriteString(fmt.Sprintf("Start: %v, DestAddr: %v\n", time.Now().Format("2006-01-02 15:04:05"), host))
+
+	// Resolve hostnames
+	ipAddrs, err := common.DestAddrs(host)
+	if err != nil || len(ipAddrs) == 0 {
+		return buffer.String(), fmt.Errorf("MTR Failed due to an error: %v", err)
+	}
+	out, err = runMtr(ipAddrs[0], &options)
 
 	if err == nil {
 		if len(out.Hops) == 0 {
@@ -54,7 +65,7 @@ func MtrString(ipAddr string, maxHops int, sntSize int, timeout time.Duration) (
 		return buffer.String(), err
 	}
 
-	buffer.WriteString(fmt.Sprintf("%-3v %-48v  %10v%c  %10v  %10v  %10v  %10v  %10v\n", "", "HOST", "Loss", '%', "Snt", "Last", "Avg", "Best", "Wrst"))
+	buffer.WriteString(fmt.Sprintf("%-3v %-48v  %10v%c  %10v  %10v  %10v  %10v  %10v\n", "", "HOST", "Loss", '%', "Snt", "Last", "Avg", "Best", "Worst"))
 
 	// Format the output of mtr according to the original linux mtr result
 	var hopStr string

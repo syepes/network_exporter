@@ -72,7 +72,7 @@ func (sc *SafeConfig) ReloadConfig(confFile string) (err error) {
 
 	for _, t := range c.Targets {
 		targetNames = append(targetNames, t.Name)
-		found, _ := regexp.MatchString("ICMP|MTR|ICMP+MTR|TCP", t.Type)
+		found, _ := regexp.MatchString("^ICMP|MTR|ICMP+MTR|TCP$", t.Type)
 		if found == false {
 			return fmt.Errorf("Unknown check type '%s' must be one of (ICMP|MTR|ICMP+MTR|TCP)", t.Type)
 		}
