@@ -14,7 +14,8 @@ import (
 // Config represents configuration for the exporter
 type Config struct {
 	Conf struct {
-		Refresh duration `yaml:"refresh"`
+		Refresh    duration `yaml:"refresh"`
+		Nameserver string   `yaml:"nameserver"`
 	} `yaml:"conf"`
 	ICMP struct {
 		Interval duration `yaml:"interval"`

@@ -12,20 +12,13 @@ import (
 // Ping ICMP Operation
 func Ping(addr string, count int, interval time.Duration, timeout time.Duration) (*PingResult, error) {
 	var out PingResult
-	var err error
 
 	pingOptions := &PingOptions{}
 	pingOptions.SetCount(count)
 	pingOptions.SetTimeout(timeout)
 	pingOptions.SetInterval(interval)
 
-	// Resolve hostnames
-	ipAddrs, err := common.DestAddrs(addr)
-	if err != nil || len(ipAddrs) == 0 {
-		return nil, fmt.Errorf("Ping Failed due to an error: %v", err)
-	}
-
-	out = runPing(ipAddrs[0], pingOptions)
+	out = runPing(addr, pingOptions)
 
 	return &out, nil
 }
@@ -37,16 +30,10 @@ func PingString(addr string, count int, timeout time.Duration, interval time.Dur
 	pingOptions.SetTimeout(timeout)
 	pingOptions.SetInterval(interval)
 
-	// Resolve hostnames
-	ipAddrs, err := common.DestAddrs(addr)
-	if err != nil || len(ipAddrs) == 0 {
-		return result, err
-	}
-
 	var buffer bytes.Buffer
-	buffer.WriteString(fmt.Sprintf("Start %v, PING %v (%v)\n", time.Now().Format("2006-01-02 15:04:05"), addr, ipAddrs[0]))
+	buffer.WriteString(fmt.Sprintf("Start %v, PING %v (%v)\n", time.Now().Format("2006-01-02 15:04:05"), addr, addr))
 	begin := time.Now().UnixNano() / 1e6
-	pingResult := runPing(ipAddrs[0], pingOptions)
+	pingResult := runPing(addr, pingOptions)
 	end := time.Now().UnixNano() / 1e6
 
 	buffer.WriteString(fmt.Sprintf("%v packets transmitted, %v packet loss, time %vms\n", count, pingResult.DropRate, end-begin))

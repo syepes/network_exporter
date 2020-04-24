@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -80,13 +82,15 @@ func main() {
 		}
 	}()
 
-	monitorPING = monitor.NewPing(logger, sc)
+	resolver := getResolver()
+
+	monitorPING = monitor.NewPing(logger, sc, resolver)
 	monitorPING.AddTargets()
 
-	monitorMTR = monitor.NewMTR(logger, sc)
+	monitorMTR = monitor.NewMTR(logger, sc, resolver)
 	monitorMTR.AddTargets()
 
-	monitorTCP = monitor.NewTCPPort(logger, sc)
+	monitorTCP = monitor.NewTCPPort(logger, sc, resolver)
 	monitorTCP.AddTargets()
 
 	go startConfigRefresh()
@@ -135,4 +139,18 @@ func startServer() {
 
 	level.Info(logger).Log("msg", fmt.Sprintf("Listening for %s on %s", metricsPath, *listenAddress))
 	level.Error(logger).Log("msg", "Could not start http", "err", http.ListenAndServe(*listenAddress, nil))
+}
+
+func getResolver() *net.Resolver {
+	if sc.Cfg.Conf.Nameserver == "" {
+		level.Info(logger).Log("msg", "Configured default DNS resolver")
+		return net.DefaultResolver
+	}
+
+	level.Info(logger).Log("msg", "Configured custom DNS resolver")
+	dialer := func(ctx context.Context, network, address string) (net.Conn, error) {
+		d := net.Dialer{Timeout: 3 * time.Second}
+		return d.DialContext(ctx, "udp", sc.Cfg.Conf.Nameserver)
+	}
+	return &net.Resolver{PreferGo: true, Dial: dialer}
 }

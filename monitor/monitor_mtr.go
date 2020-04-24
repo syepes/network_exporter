@@ -2,6 +2,7 @@ package monitor
 
 import (
 	"fmt"
+	"net"
 	"sync"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 type MTR struct {
 	logger   log.Logger
 	sc       *config.SafeConfig
+	resolver *net.Resolver
 	interval time.Duration
 	timeout  time.Duration
 	maxHops  int
@@ -26,13 +28,14 @@ type MTR struct {
 }
 
 // NewMTR creates and configures a new Monitoring MTR instance
-func NewMTR(logger log.Logger, sc *config.SafeConfig) *MTR {
+func NewMTR(logger log.Logger, sc *config.SafeConfig, resolver *net.Resolver) *MTR {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
 	return &MTR{
 		logger:   logger,
 		sc:       sc,
+		resolver: resolver,
 		interval: sc.Cfg.MTR.Interval.Duration(),
 		timeout:  sc.Cfg.MTR.Timeout.Duration(),
 		maxHops:  sc.Cfg.MTR.MaxHops,
@@ -75,25 +78,34 @@ func (p *MTR) AddTargets() {
 			}
 
 			if target.Type == "MTR" || target.Type == "ICMP+MTR" {
-				p.AddTarget(target.Name, target.Host)
+				err := p.AddTarget(target.Name, target.Host)
+				if err != nil {
+					level.Warn(p.logger).Log("type", "MTR", "func", "AddTargets", "msg", fmt.Sprintf("Skipping target: %s", target.Host), "err", err)
+				}
 			}
 		}
 	}
 }
 
 // AddTarget adds a target to the monitored list
-func (p *MTR) AddTarget(name string, addr string) (err error) {
-	return p.AddTargetDelayed(name, addr, 0)
+func (p *MTR) AddTarget(name string, host string) (err error) {
+	return p.AddTargetDelayed(name, host, 0)
 }
 
 // AddTargetDelayed is AddTarget with a startup delay
-func (p *MTR) AddTargetDelayed(name string, addr string, startupDelay time.Duration) (err error) {
-	level.Debug(p.logger).Log("type", "MTR", "func", "AddTargetDelayed", "msg", fmt.Sprintf("Adding Target: %s (%s) in %s", name, addr, startupDelay))
+func (p *MTR) AddTargetDelayed(name string, host string, startupDelay time.Duration) (err error) {
+	level.Debug(p.logger).Log("type", "MTR", "func", "AddTargetDelayed", "msg", fmt.Sprintf("Adding Target: %s (%s) in %s", name, host, startupDelay))
 
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
 
-	target, err := target.NewMTR(p.logger, startupDelay, name, addr, p.interval, p.timeout, p.maxHops, p.sntSize)
+	// Resolve hostnames
+	ipAddrs, err := common.DestAddrs(host, p.resolver)
+	if err != nil || len(ipAddrs) == 0 {
+		return err
+	}
+
+	target, err := target.NewMTR(p.logger, startupDelay, name, ipAddrs[0], p.interval, p.timeout, p.maxHops, p.sntSize)
 	if err != nil {
 		return err
 	}

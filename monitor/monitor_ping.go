@@ -2,6 +2,7 @@ package monitor
 
 import (
 	"fmt"
+	"net"
 	"sync"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 type PING struct {
 	logger   log.Logger
 	sc       *config.SafeConfig
+	resolver *net.Resolver
 	interval time.Duration
 	timeout  time.Duration
 	count    int
@@ -25,13 +27,14 @@ type PING struct {
 }
 
 // NewPing creates and configures a new Monitoring ICMP instance
-func NewPing(logger log.Logger, sc *config.SafeConfig) *PING {
+func NewPing(logger log.Logger, sc *config.SafeConfig, resolver *net.Resolver) *PING {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
 	return &PING{
 		logger:   logger,
 		sc:       sc,
+		resolver: resolver,
 		interval: sc.Cfg.ICMP.Interval.Duration(),
 		timeout:  sc.Cfg.ICMP.Timeout.Duration(),
 		count:    sc.Cfg.ICMP.Count,
@@ -72,25 +75,34 @@ func (p *PING) AddTargets() {
 				continue
 			}
 			if target.Type == "ICMP" || target.Type == "ICMP+MTR" {
-				p.AddTarget(target.Name, target.Host)
+				err := p.AddTarget(target.Name, target.Host)
+				if err != nil {
+					level.Warn(p.logger).Log("type", "ICMP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping target: %s", target.Host), "err", err)
+				}
 			}
 		}
 	}
 }
 
 // AddTarget adds a target to the monitored list
-func (p *PING) AddTarget(name string, addr string) (err error) {
-	return p.AddTargetDelayed(name, addr, 0)
+func (p *PING) AddTarget(name string, host string) (err error) {
+	return p.AddTargetDelayed(name, host, 0)
 }
 
 // AddTargetDelayed is AddTarget with a startup delay
-func (p *PING) AddTargetDelayed(name string, addr string, startupDelay time.Duration) (err error) {
-	level.Debug(p.logger).Log("type", "ICMP", "func", "AddTargetDelayed", "msg", fmt.Sprintf("Adding Target: %s (%s) in %s", name, addr, startupDelay))
+func (p *PING) AddTargetDelayed(name string, host string, startupDelay time.Duration) (err error) {
+	level.Debug(p.logger).Log("type", "ICMP", "func", "AddTargetDelayed", "msg", fmt.Sprintf("Adding Target: %s (%s) in %s", name, host, startupDelay))
 
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
 
-	target, err := target.NewPing(p.logger, startupDelay, name, addr, p.interval, p.timeout, p.count)
+	// Resolve hostnames
+	ipAddrs, err := common.DestAddrs(host, p.resolver)
+	if err != nil || len(ipAddrs) == 0 {
+		return err
+	}
+
+	target, err := target.NewPing(p.logger, startupDelay, name, ipAddrs[0], p.interval, p.timeout, p.count)
 	if err != nil {
 		return err
 	}

@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"net"
 	"time"
-
-	"github.com/syepes/ping_exporter/pkg/common"
 )
 
 // Port ICMP Operation
@@ -16,12 +14,6 @@ func Port(addr string, port string, interval time.Duration, timeout time.Duratio
 	tcpOptions := &TCPPortOptions{}
 	tcpOptions.SetInterval(interval)
 	tcpOptions.SetTimeout(timeout)
-
-	// Resolve hostnames
-	ipAddrs, err := common.DestAddrs(addr)
-	if err != nil || len(ipAddrs) == 0 {
-		return nil, fmt.Errorf("TCP Port Failed due to an error: %v", err)
-	}
 
 	out.DestAddr = addr
 	out.DestPort = port

@@ -11,6 +11,7 @@ This exporter gathers either ICMP, MTR or TCP Port stats and exports them via HT
 - Dynamically Add or Remove targets without affecting the currently running tests
 - Targets can be executed on all hosts or a list of specified ones `probe`
 - Configurable logging levels and format (text or json)
+- Configurable DNS Server
 
 ### Exported metrics
 
@@ -85,6 +86,7 @@ Most of the configuration is set in the YAML based config file:
 ```yaml
 conf:
   refresh: 15m
+  nameserver: 192.168.1.1:54
 
 icmp:
   interval: 3s
@@ -124,6 +126,7 @@ targets:
 
 **Note:** domains are resolved (regularly) to their corresponding A and AAAA records (IPv4 and IPv6).
 By default, `ping_exporter` uses the system resolver to translate domain names to IP addresses.
+You can alos override the DNS resolver address by specifying the `conf.nameserver` configuration setting.
 
 ## Grafana
 

@@ -1,6 +1,7 @@
 package common
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"net"
@@ -11,20 +12,20 @@ import (
 )
 
 // DestAddrs resolve the hostname to all it'ss IP's
-func DestAddrs(addr string) ([]string, error) {
-	addrs, err := net.LookupHost(addr)
+func DestAddrs(host string, resolver *net.Resolver) ([]string, error) {
+	ipAddrs := make([]string, 0)
+
+	addrs, err := resolver.LookupIPAddr(context.Background(), host)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Resolving target: %v", err)
 	}
 
 	// Validate IPs
-	ipAddrs := make([]string, 0)
 	for _, addr := range addrs {
-		ipAddr, err := net.ResolveIPAddr("ip", addr)
+		ipAddr, err := net.ResolveIPAddr("ip", addr.IP.String())
 		if err != nil {
 			continue
 		}
-
 		ipAddrs = append(ipAddrs, ipAddr.IP.String())
 	}
 

@@ -2,6 +2,7 @@ package monitor
 
 import (
 	"fmt"
+	"net"
 	"strings"
 	"sync"
 	"time"
@@ -18,20 +19,22 @@ import (
 type TCPPort struct {
 	logger   log.Logger
 	sc       *config.SafeConfig
+	resolver *net.Resolver
 	interval time.Duration
 	timeout  time.Duration
 	targets  map[string]*target.TCPPort
 	mtx      sync.RWMutex
 }
 
-// NewPing creates and configures a new Monitoring TCP instance
-func NewTCPPort(logger log.Logger, sc *config.SafeConfig) *TCPPort {
+// NewTCPPort creates and configures a new Monitoring TCP instance
+func NewTCPPort(logger log.Logger, sc *config.SafeConfig, resolver *net.Resolver) *TCPPort {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
 	return &TCPPort{
 		logger:   logger,
 		sc:       sc,
+		resolver: resolver,
 		interval: sc.Cfg.TCP.Interval.Duration(),
 		timeout:  sc.Cfg.TCP.Timeout.Duration(),
 		targets:  make(map[string]*target.TCPPort),
@@ -76,25 +79,34 @@ func (p *TCPPort) AddTargets() {
 					level.Warn(p.logger).Log("type", "TCP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping target, could not identify host/port: %v", target.Host))
 					continue
 				}
-				p.AddTarget(target.Name, conn[0], conn[1])
+				err := p.AddTarget(target.Name, conn[0], conn[1])
+				if err != nil {
+					level.Warn(p.logger).Log("type", "TCP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping target: %s", target.Host), "err", err)
+				}
 			}
 		}
 	}
 }
 
 // AddTarget adds a target to the monitored list
-func (p *TCPPort) AddTarget(name string, addr string, port string) (err error) {
-	return p.AddTargetDelayed(name, addr, port, 0)
+func (p *TCPPort) AddTarget(name string, host string, port string) (err error) {
+	return p.AddTargetDelayed(name, host, port, 0)
 }
 
 // AddTargetDelayed is AddTarget with a startup delay
-func (p *TCPPort) AddTargetDelayed(name string, addr string, port string, startupDelay time.Duration) (err error) {
-	level.Debug(p.logger).Log("type", "TCP", "func", "AddTargetDelayed", "msg", fmt.Sprintf("Adding Target: %s (%s:%s) in %s", name, addr, port, startupDelay))
+func (p *TCPPort) AddTargetDelayed(name string, host string, port string, startupDelay time.Duration) (err error) {
+	level.Debug(p.logger).Log("type", "TCP", "func", "AddTargetDelayed", "msg", fmt.Sprintf("Adding Target: %s (%s:%s) in %s", name, host, port, startupDelay))
 
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
 
-	target, err := target.NewTCPPort(p.logger, startupDelay, name, addr, port, p.interval, p.timeout)
+	// Resolve hostnames
+	ipAddrs, err := common.DestAddrs(host, p.resolver)
+	if err != nil || len(ipAddrs) == 0 {
+		return err
+	}
+
+	target, err := target.NewTCPPort(p.logger, startupDelay, name, ipAddrs[0], port, p.interval, p.timeout)
 	if err != nil {
 		return err
 	}
