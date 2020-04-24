@@ -57,8 +57,6 @@ func (p *MTR) Collect(ch chan<- prometheus.Metric) {
 		// fmt.Printf("L: %v\n", l)
 
 		ch <- prometheus.MustNewConstMetric(mtrHopsDesc, prometheus.GaugeValue, float64(len(metric.Hops)))
-		ch <- prometheus.MustNewConstMetric(mtrTargetsDesc, prometheus.GaugeValue, float64(len(targets)))
-
 		for _, hop := range metric.Hops {
 			ll := append(l, strconv.Itoa(hop.TTL))
 			ll = append(ll, hop.AddressTo)
@@ -72,4 +70,5 @@ func (p *MTR) Collect(ch chan<- prometheus.Metric) {
 			ch <- prometheus.MustNewConstMetric(mtrDesc, prometheus.GaugeValue, float64(hop.Loss), append(ll, "loss")...)
 		}
 	}
+	ch <- prometheus.MustNewConstMetric(mtrTargetsDesc, prometheus.GaugeValue, float64(len(targets)))
 }

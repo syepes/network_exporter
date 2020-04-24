@@ -10,6 +10,8 @@ import (
 	"syscall"
 	"time"
 
+	_ "net/http/pprof"
+
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
@@ -22,7 +24,7 @@ import (
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
-const version string = "1.0.0"
+const version string = "1.1.1"
 
 var (
 	listenAddress = kingpin.Flag("web.listen-address", "The address to listen on for HTTP requests").Default(":9427").String()

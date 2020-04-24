@@ -1,0 +1,12 @@
+[Unit]
+Description=Ping Exporter
+After=network.target
+
+[Service]
+User=root
+ExecStart=/usr/local/bin/ping_exporter
+KillMode=process
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

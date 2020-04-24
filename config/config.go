@@ -75,7 +75,7 @@ func (sc *SafeConfig) ReloadConfig(confFile string) (err error) {
 		targetNames = append(targetNames, t.Name)
 		found, _ := regexp.MatchString("^ICMP|MTR|ICMP+MTR|TCP$", t.Type)
 		if found == false {
-			return fmt.Errorf("Unknown check type '%s' must be one of (ICMP|MTR|ICMP+MTR|TCP)", t.Type)
+			return fmt.Errorf("Target '%s' has unknown check type '%s' must be one of (ICMP|MTR|ICMP+MTR|TCP)", t.Name, t.Type)
 		}
 
 		// Filter out the targets that are not assigned to the running host, if the `probe` is not specified don't filter

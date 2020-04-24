@@ -86,7 +86,7 @@ Most of the configuration is set in the YAML based config file:
 ```yaml
 conf:
   refresh: 15m
-  nameserver: 192.168.1.1:54
+  nameserver: 192.168.1.1:53
 
 icmp:
   interval: 3s
