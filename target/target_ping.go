@@ -83,8 +83,8 @@ func (t *PING) ping() {
 	// level.Debug(t.logger).Log("type", "ICMP", "func", "ping", "msg", fmt.Sprintf("%s", string(bytes)))
 
 	t.Lock()
+	defer t.Unlock()
 	t.result = data
-	t.Unlock()
 }
 
 // Compute returns the results of the Ping metrics

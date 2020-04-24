@@ -18,7 +18,7 @@ const (
 )
 
 // Icmp Validate IP and check the version
-func Icmp(destAddr string, ttl, pid int, timeout time.Duration, seq int) (hop common.IcmpReturn, err error) {
+func Icmp(destAddr string, ttl int, pid int, timeout time.Duration, seq int) (hop common.IcmpReturn, err error) {
 	ip := net.ParseIP(destAddr)
 	if ip == nil {
 		return hop, fmt.Errorf("ip: %v is invalid", destAddr)
@@ -31,14 +31,14 @@ func Icmp(destAddr string, ttl, pid int, timeout time.Duration, seq int) (hop co
 	return icmpIpv6("::", &ipAddr, ttl, pid, timeout, seq)
 }
 
-func icmpIpv4(localAddr string, dst net.Addr, ttl, pid int, timeout time.Duration, seq int) (hop common.IcmpReturn, err error) {
+func icmpIpv4(localAddr string, dst net.Addr, ttl int, pid int, timeout time.Duration, seq int) (hop common.IcmpReturn, err error) {
 	hop.Success = false
 	start := time.Now()
 	c, err := icmp.ListenPacket("ip4:icmp", localAddr)
+	defer c.Close()
 	if err != nil {
 		return hop, err
 	}
-	defer c.Close()
 
 	if err = c.IPv4PacketConn().SetTTL(ttl); err != nil {
 		return hop, err
@@ -54,7 +54,8 @@ func icmpIpv4(localAddr string, dst net.Addr, ttl, pid int, timeout time.Duratio
 		Type: ipv4.ICMPTypeEcho,
 		Code: 0,
 		Body: &icmp.Echo{
-			ID: pid, Seq: seq,
+			ID:   pid,
+			Seq:  seq,
 			Data: append(bs, 'x'),
 		},
 	}
@@ -70,6 +71,7 @@ func icmpIpv4(localAddr string, dst net.Addr, ttl, pid int, timeout time.Duratio
 
 	peer, _, err := listenForSpecific4(c, append(bs, 'x'), pid, seq)
 	if err != nil {
+		// fmt.Printf("icmpIpv4: dst: %s, ttl: %d, pid: %d, timeout: %s, seq: %d, err: %v\n", dst.String(), ttl, pid, timeout, seq, err)
 		return hop, err
 	}
 
@@ -103,7 +105,8 @@ func icmpIpv6(localAddr string, dst net.Addr, ttl, pid int, timeout time.Duratio
 		Type: ipv6.ICMPTypeEchoRequest,
 		Code: 0,
 		Body: &icmp.Echo{
-			ID: pid, Seq: seq,
+			ID:   pid,
+			Seq:  seq,
 			Data: append(bs, 'x'),
 		},
 	}
@@ -134,7 +137,7 @@ func listenForSpecific4(conn *icmp.PacketConn, neededBody []byte, needID int, ne
 		b := make([]byte, 1500)
 		n, peer, err := conn.ReadFrom(b)
 		if err != nil {
-			if neterr, ok := err.(*net.OpError); ok {
+			if neterr, ok := err.(*net.OpError); ok || neterr.Temporary() {
 				return "", []byte{}, neterr
 			}
 		}
@@ -207,7 +210,7 @@ func listenForSpecific6(conn *icmp.PacketConn, neededBody []byte, needID int, ne
 		}
 
 		if typ, ok := x.Type.(ipv6.ICMPType); ok && typ == ipv6.ICMPTypeEchoReply {
-			b, _ := x.Body.Marshal(1)
+			b, _ := x.Body.Marshal(protocolICMP)
 			if string(b[4:]) != string(neededBody) || x.Body.(*icmp.Echo).ID != needID {
 				continue
 			}
