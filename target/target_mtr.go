@@ -7,12 +7,14 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/syepes/ping_exporter/pkg/common"
 	"github.com/syepes/ping_exporter/pkg/mtr"
 )
 
 // MTR Object
 type MTR struct {
 	logger   log.Logger
+	icmpID   *common.IcmpID
 	name     string
 	host     string
 	interval time.Duration
@@ -26,12 +28,13 @@ type MTR struct {
 }
 
 // NewMTR starts a new monitoring goroutine
-func NewMTR(logger log.Logger, startupDelay time.Duration, name string, host string, interval time.Duration, timeout time.Duration, maxHops int, sntSize int) (*MTR, error) {
+func NewMTR(logger log.Logger, icmpID *common.IcmpID, startupDelay time.Duration, name string, host string, interval time.Duration, timeout time.Duration, maxHops int, sntSize int) (*MTR, error) {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
 	t := &MTR{
 		logger:   logger,
+		icmpID:   icmpID,
 		name:     name,
 		host:     host,
 		interval: interval,
@@ -73,7 +76,8 @@ func (t *MTR) Stop() {
 }
 
 func (t *MTR) mtr() {
-	data, err := mtr.Mtr(t.host, t.maxHops, t.sntSize, t.timeout)
+	icmpID := int(t.icmpID.Get())
+	data, err := mtr.Mtr(t.host, t.maxHops, t.sntSize, t.timeout, icmpID)
 	if err != nil {
 		level.Error(t.logger).Log("type", "MTR", "func", "mtr", "msg", fmt.Sprintf("%s", err))
 	}

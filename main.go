@@ -21,16 +21,18 @@ import (
 	"github.com/syepes/ping_exporter/collector"
 	"github.com/syepes/ping_exporter/config"
 	"github.com/syepes/ping_exporter/monitor"
+	"github.com/syepes/ping_exporter/pkg/common"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
-const version string = "1.1.2"
+const version string = "1.1.3"
 
 var (
 	listenAddress = kingpin.Flag("web.listen-address", "The address to listen on for HTTP requests").Default(":9427").String()
 	configFile    = kingpin.Flag("config.file", "Exporter configuration file").Default("/ping_exporter.yml").String()
 	sc            = &config.SafeConfig{Cfg: &config.Config{}}
 	logger        log.Logger
+	icmpID        *common.IcmpID // goroutine shared counter
 	monitorPING   *monitor.PING
 	monitorMTR    *monitor.MTR
 	monitorTCP    *monitor.TCPPort
@@ -45,6 +47,7 @@ func init() {
 	kingpin.HelpFlag.Short('h')
 	kingpin.Parse()
 	logger = promlog.New(promlogConfig)
+	icmpID = &common.IcmpID{}
 }
 
 func main() {
@@ -86,10 +89,10 @@ func main() {
 
 	resolver := getResolver()
 
-	monitorPING = monitor.NewPing(logger, sc, resolver)
+	monitorPING = monitor.NewPing(logger, sc, resolver, icmpID)
 	monitorPING.AddTargets()
 
-	monitorMTR = monitor.NewMTR(logger, sc, resolver)
+	monitorMTR = monitor.NewMTR(logger, sc, resolver, icmpID)
 	monitorMTR.AddTargets()
 
 	monitorTCP = monitor.NewTCPPort(logger, sc, resolver)

@@ -19,6 +19,7 @@ type MTR struct {
 	logger   log.Logger
 	sc       *config.SafeConfig
 	resolver *net.Resolver
+	icmpID   *common.IcmpID
 	interval time.Duration
 	timeout  time.Duration
 	maxHops  int
@@ -28,7 +29,7 @@ type MTR struct {
 }
 
 // NewMTR creates and configures a new Monitoring MTR instance
-func NewMTR(logger log.Logger, sc *config.SafeConfig, resolver *net.Resolver) *MTR {
+func NewMTR(logger log.Logger, sc *config.SafeConfig, resolver *net.Resolver, icmpID *common.IcmpID) *MTR {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
@@ -36,6 +37,7 @@ func NewMTR(logger log.Logger, sc *config.SafeConfig, resolver *net.Resolver) *M
 		logger:   logger,
 		sc:       sc,
 		resolver: resolver,
+		icmpID:   icmpID,
 		interval: sc.Cfg.MTR.Interval.Duration(),
 		timeout:  sc.Cfg.MTR.Timeout.Duration(),
 		maxHops:  sc.Cfg.MTR.MaxHops,
@@ -105,7 +107,7 @@ func (p *MTR) AddTargetDelayed(name string, host string, startupDelay time.Durat
 		return err
 	}
 
-	target, err := target.NewMTR(p.logger, startupDelay, name, ipAddrs[0], p.interval, p.timeout, p.maxHops, p.sntSize)
+	target, err := target.NewMTR(p.logger, p.icmpID, startupDelay, name, ipAddrs[0], p.interval, p.timeout, p.maxHops, p.sntSize)
 	if err != nil {
 		return err
 	}

@@ -10,7 +10,7 @@ import (
 )
 
 // Ping ICMP Operation
-func Ping(addr string, count int, interval time.Duration, timeout time.Duration) (*PingResult, error) {
+func Ping(addr string, count int, interval time.Duration, timeout time.Duration, icmpID int) (*PingResult, error) {
 	var out PingResult
 
 	pingOptions := &PingOptions{}
@@ -18,13 +18,13 @@ func Ping(addr string, count int, interval time.Duration, timeout time.Duration)
 	pingOptions.SetTimeout(timeout)
 	pingOptions.SetInterval(interval)
 
-	out = runPing(addr, pingOptions)
+	out = runPing(addr, icmpID, pingOptions)
 
 	return &out, nil
 }
 
 // PingString ICMP Operation
-func PingString(addr string, count int, timeout time.Duration, interval time.Duration) (result string, err error) {
+func PingString(addr string, count int, timeout time.Duration, interval time.Duration, icmpID int) (result string, err error) {
 	pingOptions := &PingOptions{}
 	pingOptions.SetCount(count)
 	pingOptions.SetTimeout(timeout)
@@ -33,7 +33,7 @@ func PingString(addr string, count int, timeout time.Duration, interval time.Dur
 	var buffer bytes.Buffer
 	buffer.WriteString(fmt.Sprintf("Start %v, PING %v (%v)\n", time.Now().Format("2006-01-02 15:04:05"), addr, addr))
 	begin := time.Now().UnixNano() / 1e6
-	pingResult := runPing(addr, pingOptions)
+	pingResult := runPing(addr, icmpID, pingOptions)
 	end := time.Now().UnixNano() / 1e6
 
 	buffer.WriteString(fmt.Sprintf("%v packets transmitted, %v packet loss, time %vms\n", count, pingResult.DropRate, end-begin))
@@ -44,10 +44,11 @@ func PingString(addr string, count int, timeout time.Duration, interval time.Dur
 	return result, nil
 }
 
-func runPing(ipAddr string, option *PingOptions) (pingResult PingResult) {
+func runPing(ipAddr string, icmpID int, option *PingOptions) (pingResult PingResult) {
 	pingResult.DestAddr = ipAddr
 
-	pid := common.Goid()
+	// Avoid collisions/interference caused by multiple coroutines initiating mtr
+	pid := icmpID
 	timeout := option.Timeout()
 	interval := option.Interval()
 	ttl := defaultTTL

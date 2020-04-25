@@ -7,12 +7,14 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/syepes/ping_exporter/pkg/common"
 	"github.com/syepes/ping_exporter/pkg/ping"
 )
 
 // PING Object
 type PING struct {
 	logger   log.Logger
+	icmpID   *common.IcmpID
 	name     string
 	host     string
 	interval time.Duration
@@ -25,12 +27,13 @@ type PING struct {
 }
 
 // NewPing starts a new monitoring goroutine
-func NewPing(logger log.Logger, startupDelay time.Duration, name string, host string, interval time.Duration, timeout time.Duration, count int) (*PING, error) {
+func NewPing(logger log.Logger, icmpID *common.IcmpID, startupDelay time.Duration, name string, host string, interval time.Duration, timeout time.Duration, count int) (*PING, error) {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
 	t := &PING{
 		logger:   logger,
+		icmpID:   icmpID,
 		name:     name,
 		host:     host,
 		interval: interval,
@@ -71,7 +74,8 @@ func (t *PING) Stop() {
 }
 
 func (t *PING) ping() {
-	data, err := ping.Ping(t.host, t.count, t.interval, t.timeout)
+	icmpID := int(t.icmpID.Get())
+	data, err := ping.Ping(t.host, t.count, t.interval, t.timeout, icmpID)
 	if err != nil {
 		level.Error(t.logger).Log("type", "ICMP", "func", "ping", "msg", fmt.Sprintf("%s", err))
 	}

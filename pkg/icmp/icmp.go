@@ -12,6 +12,7 @@ import (
 	"golang.org/x/net/ipv6"
 )
 
+// https://hechao.li/2018/09/27/How-Is-Ping-Deduplexed/
 const (
 	protocolICMP     = 1  // Internet Control Message
 	protocolIPv6ICMP = 58 // ICMP for IPv6
@@ -71,7 +72,6 @@ func icmpIpv4(localAddr string, dst net.Addr, ttl int, pid int, timeout time.Dur
 
 	peer, _, err := listenForSpecific4(c, append(bs, 'x'), pid, seq)
 	if err != nil {
-		// fmt.Printf("icmpIpv4: dst: %s, ttl: %d, pid: %d, timeout: %s, seq: %d, err: %v\n", dst.String(), ttl, pid, timeout, seq, err)
 		return hop, err
 	}
 
@@ -156,6 +156,7 @@ func listenForSpecific4(conn *icmp.PacketConn, neededBody []byte, needID int, ne
 			x, _ := icmp.ParseMessage(protocolICMP, body[20:])
 			switch x.Body.(type) {
 			case *icmp.Echo:
+				// Verification
 				msg := x.Body.(*icmp.Echo)
 				if msg.ID == needID && msg.Seq == needSeq {
 					return peer.String(), []byte{}, nil
@@ -200,6 +201,7 @@ func listenForSpecific6(conn *icmp.PacketConn, neededBody []byte, needID int, ne
 			x, _ := icmp.ParseMessage(protocolIPv6ICMP, body[40:])
 			switch x.Body.(type) {
 			case *icmp.Echo:
+				// Verification
 				msg := x.Body.(*icmp.Echo)
 				if msg.ID == needID && msg.Seq == needSeq {
 					return peer.String(), []byte{}, nil

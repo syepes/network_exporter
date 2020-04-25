@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"math/rand"
 	"net"
 	"time"
 )
@@ -28,27 +27,6 @@ func DestAddrs(host string, resolver *net.Resolver) ([]string, error) {
 	}
 
 	return ipAddrs, nil
-}
-
-// Goid Get specific ID for coroutine
-// TODO: Find a more elegant solution so we don't go over 65500
-func Goid() int {
-	rand.Seed(time.Now().UnixNano())
-	return 1 + rand.Intn(65500-1)
-	// defer func() {
-	// 	if err := recover(); err != nil {
-	// 		fmt.Printf("panic recover:panic info: %v\n", err)
-	// 	}
-	// }()
-
-	// var buf [64]byte
-	// n := runtime.Stack(buf[:], false)
-	// idField := strings.Fields(strings.TrimPrefix(string(buf[:n]), "goroutine "))[0]
-	// id, err := strconv.Atoi(idField)
-	// if err != nil {
-	// 	panic(fmt.Sprintf("cannot get goroutine id: %v", err))
-	// }
-	// return id
 }
 
 // IsEqualIP IP Comparison

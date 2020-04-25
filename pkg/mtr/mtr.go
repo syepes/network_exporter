@@ -10,7 +10,7 @@ import (
 )
 
 // Mtr Return traceroute object
-func Mtr(addr string, maxHops int, sntSize int, timeout time.Duration) (*MtrResult, error) {
+func Mtr(addr string, maxHops int, sntSize int, timeout time.Duration, icmpID int) (*MtrResult, error) {
 	var out MtrResult
 	var err error
 
@@ -19,7 +19,7 @@ func Mtr(addr string, maxHops int, sntSize int, timeout time.Duration) (*MtrResu
 	options.SetSntSize(sntSize)
 	options.SetTimeout(timeout)
 
-	out, err = runMtr(addr, &options)
+	out, err = runMtr(addr, icmpID, &options)
 
 	if err == nil {
 		if len(out.Hops) == 0 {
@@ -33,7 +33,7 @@ func Mtr(addr string, maxHops int, sntSize int, timeout time.Duration) (*MtrResu
 }
 
 // MtrString Console print traceroute operation
-func MtrString(addr string, maxHops int, sntSize int, timeout time.Duration) (result string, err error) {
+func MtrString(addr string, maxHops int, sntSize int, timeout time.Duration, icmpID int) (result string, err error) {
 	options := MtrOptions{}
 	options.SetMaxHops(maxHops)
 	options.SetSntSize(sntSize)
@@ -43,7 +43,7 @@ func MtrString(addr string, maxHops int, sntSize int, timeout time.Duration) (re
 	var buffer bytes.Buffer
 	buffer.WriteString(fmt.Sprintf("Start: %v, DestAddr: %v\n", time.Now().Format("2006-01-02 15:04:05"), addr))
 
-	out, err = runMtr(addr, &options)
+	out, err = runMtr(addr, icmpID, &options)
 
 	if err == nil {
 		if len(out.Hops) == 0 {
@@ -83,12 +83,12 @@ func MtrString(addr string, maxHops int, sntSize int, timeout time.Duration) (re
 }
 
 // MTR
-func runMtr(destAddr string, options *MtrOptions) (result MtrResult, err error) {
+func runMtr(destAddr string, icmpID int, options *MtrOptions) (result MtrResult, err error) {
 	result.Hops = []common.IcmpHop{}
 	result.DestAddr = destAddr
 
-	// Avoid interference caused by multiple coroutines initiating mtr
-	pid := common.Goid()
+	// Avoid collisions/interference caused by multiple coroutines initiating mtr
+	pid := icmpID
 	timeout := time.Duration(options.Timeout()) * time.Millisecond
 	mtrReturns := make([]*MtrReturn, options.MaxHops()+1)
 

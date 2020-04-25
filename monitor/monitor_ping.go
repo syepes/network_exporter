@@ -19,6 +19,7 @@ type PING struct {
 	logger   log.Logger
 	sc       *config.SafeConfig
 	resolver *net.Resolver
+	icmpID   *common.IcmpID
 	interval time.Duration
 	timeout  time.Duration
 	count    int
@@ -27,7 +28,7 @@ type PING struct {
 }
 
 // NewPing creates and configures a new Monitoring ICMP instance
-func NewPing(logger log.Logger, sc *config.SafeConfig, resolver *net.Resolver) *PING {
+func NewPing(logger log.Logger, sc *config.SafeConfig, resolver *net.Resolver, icmpID *common.IcmpID) *PING {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
@@ -35,6 +36,7 @@ func NewPing(logger log.Logger, sc *config.SafeConfig, resolver *net.Resolver) *
 		logger:   logger,
 		sc:       sc,
 		resolver: resolver,
+		icmpID:   icmpID,
 		interval: sc.Cfg.ICMP.Interval.Duration(),
 		timeout:  sc.Cfg.ICMP.Timeout.Duration(),
 		count:    sc.Cfg.ICMP.Count,
@@ -102,7 +104,7 @@ func (p *PING) AddTargetDelayed(name string, host string, startupDelay time.Dura
 		return err
 	}
 
-	target, err := target.NewPing(p.logger, startupDelay, name, ipAddrs[0], p.interval, p.timeout, p.count)
+	target, err := target.NewPing(p.logger, p.icmpID, startupDelay, name, ipAddrs[0], p.interval, p.timeout, p.count)
 	if err != nil {
 		return err
 	}
