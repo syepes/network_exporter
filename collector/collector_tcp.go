@@ -50,12 +50,9 @@ func (p *TCP) Collect(ch chan<- prometheus.Metric) {
 	targets := []string{}
 	for target, metric := range p.metrics {
 		targets = append(targets, target)
-		// fmt.Printf("target: %v\n", target)
-		// fmt.Printf("metric: %v\n", metric)
 		l := strings.SplitN(target, " ", 2)
 		l = append(l, metric.DestAddr)
 		l = append(l, metric.DestPort)
-		// fmt.Printf("L: %v\n", l)
 
 		ch <- prometheus.MustNewConstMetric(tcpTimeDesc, prometheus.GaugeValue, metric.ConTime.Seconds(), l...)
 

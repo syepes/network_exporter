@@ -53,20 +53,60 @@ func Time2Float(t time.Duration) float32 {
 	return (float32)(t/time.Microsecond) / float32(1000)
 }
 
-// StdDev Calculate the Standard deviation
-func StdDev(allTimes []time.Duration, avg time.Duration) time.Duration {
-	if len(allTimes) < 2 {
+// TimeRange finds the range of a slice of durations
+func TimeRange(values []time.Duration) time.Duration {
+	if len(values) <= 1 {
 		return time.Duration(0)
 	}
-	mean := float64(avg)
-	total := 0.0
-	for _, t := range allTimes {
-		number := float64(t)
-		total += math.Pow(number-mean, 2)
+	min := values[0]
+	max := time.Duration(0)
+	for _, v := range values {
+		if v < min {
+			min = v
+		}
+		if v > max {
+			max = v
+		}
 	}
-	variance := total / float64(len(allTimes)-1)
-	std := math.Sqrt(variance)
-	return time.Duration(std)
+	return max - min
+}
+
+// TimeAverage Calculates the average of a slice of durations
+func TimeAverage(values []time.Duration) float64 {
+	l := len(values)
+	if l <= 0 {
+		return float64(0.0)
+	}
+	s := time.Duration(0)
+	for _, d := range values {
+		s += d
+	}
+	return float64(s) / float64(l)
+}
+
+// TimeSquaredDeviation Calculates the squared deviation
+func TimeSquaredDeviation(values []time.Duration) float64 {
+	avg := TimeAverage(values)
+	sd := 0.0
+	for _, v := range values {
+		sd += math.Pow((float64(v) - float64(avg)), 2.0)
+	}
+	return sd
+}
+
+// TimeUncorrectedDeviation Calculates standard deviation without correction
+func TimeUncorrectedDeviation(values []time.Duration) float64 {
+	if len(values) == 0 {
+		return 0.0
+	}
+	sd := TimeSquaredDeviation(values)
+	return math.Sqrt(sd / float64(len(values)))
+}
+
+// TimeCorrectedDeviation Calculates standard deviation using Bessel's correction which uses n-1 in the SD formula to correct bias of small sample size
+func TimeCorrectedDeviation(values []time.Duration) float64 {
+	sd := TimeSquaredDeviation(values)
+	return math.Sqrt(sd / (float64(len(values)) - 1))
 }
 
 // CompareList Compare two lists and return a list with the difference

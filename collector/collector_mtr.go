@@ -50,23 +50,21 @@ func (p *MTR) Collect(ch chan<- prometheus.Metric) {
 	targets := []string{}
 	for target, metric := range p.metrics {
 		targets = append(targets, target)
-		// fmt.Printf("target: %v\n", target)
-		// fmt.Printf("metric: %v\n", metric)
-		// l := strings.SplitN(target, " ", 2)
 		l := []string{target, metric.DestAddr}
-		// fmt.Printf("L: %v\n", l)
 
 		ch <- prometheus.MustNewConstMetric(mtrHopsDesc, prometheus.GaugeValue, float64(len(metric.Hops)))
 		for _, hop := range metric.Hops {
 			ll := append(l, strconv.Itoa(hop.TTL))
 			ll = append(ll, hop.AddressTo)
-			// fmt.Printf("LL: %v\n", ll)
 			ch <- prometheus.MustNewConstMetric(mtrDesc, prometheus.GaugeValue, hop.LastTime.Seconds(), append(ll, "last")...)
 			ch <- prometheus.MustNewConstMetric(mtrDesc, prometheus.GaugeValue, hop.SumTime.Seconds(), append(ll, "sum")...)
 			ch <- prometheus.MustNewConstMetric(mtrDesc, prometheus.GaugeValue, hop.BestTime.Seconds(), append(ll, "best")...)
 			ch <- prometheus.MustNewConstMetric(mtrDesc, prometheus.GaugeValue, hop.AvgTime.Seconds(), append(ll, "mean")...)
 			ch <- prometheus.MustNewConstMetric(mtrDesc, prometheus.GaugeValue, hop.WorstTime.Seconds(), append(ll, "worst")...)
-			ch <- prometheus.MustNewConstMetric(mtrDesc, prometheus.GaugeValue, hop.StdDev.Seconds(), append(ll, "stddev")...)
+			ch <- prometheus.MustNewConstMetric(mtrDesc, prometheus.GaugeValue, hop.SquaredDeviationTime.Seconds(), append(ll, "sd")...)
+			ch <- prometheus.MustNewConstMetric(mtrDesc, prometheus.GaugeValue, hop.UncorrectedSDTime.Seconds(), append(ll, "usd")...)
+			ch <- prometheus.MustNewConstMetric(mtrDesc, prometheus.GaugeValue, hop.CorrectedSDTime.Seconds(), append(ll, "csd")...)
+			ch <- prometheus.MustNewConstMetric(mtrDesc, prometheus.GaugeValue, hop.RangeTime.Seconds(), append(ll, "range")...)
 			ch <- prometheus.MustNewConstMetric(mtrDesc, prometheus.GaugeValue, float64(hop.Loss), append(ll, "loss")...)
 		}
 	}

@@ -90,7 +90,10 @@ func runPing(ipAddr string, icmpID int, option *PingOptions) (pingResult PingRes
 	pingResult.AvgTime = pingReturn.avgTime
 	pingResult.BestTime = pingReturn.bestTime
 	pingResult.WorstTime = pingReturn.worstTime
-	pingResult.StdDev = common.StdDev(pingReturn.allTime, pingReturn.avgTime)
+	pingResult.SquaredDeviationTime = time.Duration(common.TimeSquaredDeviation(pingReturn.allTime))
+	pingResult.UncorrectedSDTime = time.Duration(common.TimeUncorrectedDeviation(pingReturn.allTime))
+	pingResult.CorrectedSDTime = time.Duration(common.TimeCorrectedDeviation(pingReturn.allTime))
+	pingResult.RangeTime = time.Duration(common.TimeRange(pingReturn.allTime))
 
 	return pingResult
 }

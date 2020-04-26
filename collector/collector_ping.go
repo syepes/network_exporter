@@ -51,11 +51,7 @@ func (p *PING) Collect(ch chan<- prometheus.Metric) {
 	targets := []string{}
 	for target, metric := range p.metrics {
 		targets = append(targets, target)
-		// fmt.Printf("target: %v\n", target)
-		// fmt.Printf("metric: %v\n", metric)
-		// l := strings.SplitN(target, " ", 2)
 		l := []string{target, metric.DestAddr}
-		// fmt.Printf("L: %v\n", l)
 
 		if metric.Success == true {
 			ch <- prometheus.MustNewConstMetric(icmpStatusDesc, prometheus.GaugeValue, 1, l...)
@@ -67,7 +63,10 @@ func (p *PING) Collect(ch chan<- prometheus.Metric) {
 		ch <- prometheus.MustNewConstMetric(icmpRttDesc, prometheus.GaugeValue, metric.AvgTime.Seconds(), append(l, "mean")...)
 		ch <- prometheus.MustNewConstMetric(icmpRttDesc, prometheus.GaugeValue, metric.WorstTime.Seconds(), append(l, "worst")...)
 		ch <- prometheus.MustNewConstMetric(icmpRttDesc, prometheus.GaugeValue, metric.SumTime.Seconds(), append(l, "sum")...)
-		ch <- prometheus.MustNewConstMetric(icmpRttDesc, prometheus.GaugeValue, metric.StdDev.Seconds(), append(l, "stddev")...)
+		ch <- prometheus.MustNewConstMetric(icmpRttDesc, prometheus.GaugeValue, metric.SquaredDeviationTime.Seconds(), append(l, "sd")...)
+		ch <- prometheus.MustNewConstMetric(icmpRttDesc, prometheus.GaugeValue, metric.UncorrectedSDTime.Seconds(), append(l, "usd")...)
+		ch <- prometheus.MustNewConstMetric(icmpRttDesc, prometheus.GaugeValue, metric.CorrectedSDTime.Seconds(), append(l, "csd")...)
+		ch <- prometheus.MustNewConstMetric(icmpRttDesc, prometheus.GaugeValue, metric.RangeTime.Seconds(), append(l, "range")...)
 		ch <- prometheus.MustNewConstMetric(icmpLossDesc, prometheus.GaugeValue, metric.DropRate, l...)
 	}
 	ch <- prometheus.MustNewConstMetric(icmpTargetsDesc, prometheus.GaugeValue, float64(len(targets)))

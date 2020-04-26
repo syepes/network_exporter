@@ -147,7 +147,11 @@ func runMtr(destAddr string, icmpID int, options *MtrOptions) (result MtrResult,
 		hop.AvgTime = mtrReturn.avgTime
 		hop.BestTime = mtrReturn.bestTime
 		hop.WorstTime = mtrReturn.worstTime
-		hop.StdDev = common.StdDev(mtrReturn.allTime, mtrReturn.avgTime)
+		hop.SquaredDeviationTime = time.Duration(common.TimeSquaredDeviation(mtrReturn.allTime))
+		hop.UncorrectedSDTime = time.Duration(common.TimeUncorrectedDeviation(mtrReturn.allTime))
+		hop.CorrectedSDTime = time.Duration(common.TimeCorrectedDeviation(mtrReturn.allTime))
+		hop.RangeTime = time.Duration(common.TimeRange(mtrReturn.allTime))
+
 		failSum := options.SntSize() - mtrReturn.succSum
 		loss := (float32)(failSum) / (float32)(options.SntSize()) * 100
 		hop.Loss = float32(loss)
@@ -158,7 +162,7 @@ func runMtr(destAddr string, icmpID int, options *MtrOptions) (result MtrResult,
 			break
 		}
 	}
-	// level.Debug(logger).Log("addr", dest.IP.String(), "msg", fmt.Sprintf("TracerouteResult: %+v", result), "func", "mtr")
+	// level.Debug(logger).Log("addr", dest.IP.String(), "msg", fmt.Sprintf("%+v", result), "func", "mtr")
 
 	return result, nil
 }
