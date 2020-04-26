@@ -20,7 +20,7 @@ type MTR struct {
 	interval time.Duration
 	timeout  time.Duration
 	maxHops  int
-	sntSize  int
+	count    int
 	result   *mtr.MtrResult
 	stop     chan struct{}
 	wg       sync.WaitGroup
@@ -28,7 +28,7 @@ type MTR struct {
 }
 
 // NewMTR starts a new monitoring goroutine
-func NewMTR(logger log.Logger, icmpID *common.IcmpID, startupDelay time.Duration, name string, host string, interval time.Duration, timeout time.Duration, maxHops int, sntSize int) (*MTR, error) {
+func NewMTR(logger log.Logger, icmpID *common.IcmpID, startupDelay time.Duration, name string, host string, interval time.Duration, timeout time.Duration, maxHops int, count int) (*MTR, error) {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
@@ -40,7 +40,7 @@ func NewMTR(logger log.Logger, icmpID *common.IcmpID, startupDelay time.Duration
 		interval: interval,
 		timeout:  timeout,
 		maxHops:  maxHops,
-		sntSize:  sntSize,
+		count:    count,
 		stop:     make(chan struct{}),
 	}
 	t.wg.Add(1)
@@ -77,7 +77,7 @@ func (t *MTR) Stop() {
 
 func (t *MTR) mtr() {
 	icmpID := int(t.icmpID.Get())
-	data, err := mtr.Mtr(t.host, t.maxHops, t.sntSize, t.timeout, icmpID)
+	data, err := mtr.Mtr(t.host, t.maxHops, t.count, t.timeout, icmpID)
 	if err != nil {
 		level.Error(t.logger).Log("type", "MTR", "func", "mtr", "msg", fmt.Sprintf("%s", err))
 	}

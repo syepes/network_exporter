@@ -26,7 +26,7 @@ type Config struct {
 		Interval duration `yaml:"interval"`
 		Timeout  duration `yaml:"timeout"`
 		MaxHops  int      `yaml:"max-hops"`
-		SntSize  int      `yaml:"snt-size"`
+		Count    int      `yaml:"count"`
 	} `yaml:"mtr"`
 	TCP struct {
 		Interval duration `yaml:"interval"`
@@ -102,8 +102,8 @@ func (sc *SafeConfig) ReloadConfig(confFile string) (err error) {
 	if c.MTR.MaxHops < 0 || c.MTR.MaxHops > 65500 {
 		return fmt.Errorf("mtr.max-hops must be between 0 and 65500")
 	}
-	if c.MTR.SntSize < 0 || c.MTR.SntSize > 65500 {
-		return fmt.Errorf("mtr.snt-size must be between 0 and 65500")
+	if c.MTR.Count < 0 || c.MTR.Count > 65500 {
+		return fmt.Errorf("mtr.count must be between 0 and 65500")
 	}
 
 	sc.Lock()

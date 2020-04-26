@@ -10,13 +10,13 @@ import (
 )
 
 // Mtr Return traceroute object
-func Mtr(addr string, maxHops int, sntSize int, timeout time.Duration, icmpID int) (*MtrResult, error) {
+func Mtr(addr string, maxHops int, count int, timeout time.Duration, icmpID int) (*MtrResult, error) {
 	var out MtrResult
 	var err error
 
 	options := MtrOptions{}
 	options.SetMaxHops(maxHops)
-	options.SetSntSize(sntSize)
+	options.SetCount(count)
 	options.SetTimeout(timeout)
 
 	out, err = runMtr(addr, icmpID, &options)
@@ -33,10 +33,10 @@ func Mtr(addr string, maxHops int, sntSize int, timeout time.Duration, icmpID in
 }
 
 // MtrString Console print traceroute operation
-func MtrString(addr string, maxHops int, sntSize int, timeout time.Duration, icmpID int) (result string, err error) {
+func MtrString(addr string, maxHops int, count int, timeout time.Duration, icmpID int) (result string, err error) {
 	options := MtrOptions{}
 	options.SetMaxHops(maxHops)
-	options.SetSntSize(sntSize)
+	options.SetCount(count)
 	options.SetTimeout(timeout)
 
 	var out MtrResult
@@ -94,7 +94,7 @@ func runMtr(destAddr string, icmpID int, options *MtrOptions) (result MtrResult,
 
 	// Verify data packets
 	seq := 0
-	for snt := 0; snt < options.SntSize(); snt++ {
+	for snt := 0; snt < options.Count(); snt++ {
 		for ttl := 1; ttl < options.MaxHops(); ttl++ {
 			if mtrReturns[ttl] == nil {
 				mtrReturns[ttl] = &MtrReturn{ttl: ttl, host: "???", succSum: 0, success: false, lastTime: time.Duration(0), sumTime: time.Duration(0), bestTime: time.Duration(0), worstTime: time.Duration(0), avgTime: time.Duration(0)}
@@ -134,7 +134,7 @@ func runMtr(destAddr string, icmpID int, options *MtrOptions) (result MtrResult,
 			break
 		}
 
-		hop := common.IcmpHop{TTL: mtrReturn.ttl, Snt: options.SntSize()}
+		hop := common.IcmpHop{TTL: mtrReturn.ttl, Snt: options.Count()}
 		if index != 1 {
 			hop.AddressFrom = mtrReturns[index-1].host
 		} else {
@@ -152,8 +152,8 @@ func runMtr(destAddr string, icmpID int, options *MtrOptions) (result MtrResult,
 		hop.CorrectedSDTime = time.Duration(common.TimeCorrectedDeviation(mtrReturn.allTime))
 		hop.RangeTime = time.Duration(common.TimeRange(mtrReturn.allTime))
 
-		failSum := options.SntSize() - mtrReturn.succSum
-		loss := (float32)(failSum) / (float32)(options.SntSize()) * 100
+		failSum := options.Count() - mtrReturn.succSum
+		loss := (float32)(failSum) / (float32)(options.Count()) * 100
 		hop.Loss = float32(loss)
 
 		result.Hops = append(result.Hops, hop)

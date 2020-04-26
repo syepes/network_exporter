@@ -9,7 +9,7 @@ import (
 const defaultMaxHops = 30
 const defaultTimeout = 5 * time.Second
 const defaultPackerSize = 56
-const defaultSntSize = 10
+const defaultCount = 10
 
 // MtrResult Calculated results
 type MtrResult struct {
@@ -39,7 +39,7 @@ type MtrOptions struct {
 	maxHops    int
 	timeout    time.Duration
 	packetSize int
-	sntSize    int
+	count      int
 }
 
 // MaxHops Getter
@@ -68,17 +68,17 @@ func (options *MtrOptions) SetTimeout(timeout time.Duration) {
 	options.timeout = timeout
 }
 
-// SntSize Getter
-func (options *MtrOptions) SntSize() int {
-	if options.sntSize == 0 {
-		options.sntSize = defaultSntSize
+// Count Getter
+func (options *MtrOptions) Count() int {
+	if options.count == 0 {
+		options.count = defaultCount
 	}
-	return options.sntSize
+	return options.count
 }
 
-// SetSntSize Setter
-func (options *MtrOptions) SetSntSize(sntSize int) {
-	options.sntSize = sntSize
+// SetCount Setter
+func (options *MtrOptions) SetCount(count int) {
+	options.count = count
 }
 
 // PacketSize Getter

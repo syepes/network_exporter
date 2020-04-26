@@ -23,7 +23,7 @@ type MTR struct {
 	interval time.Duration
 	timeout  time.Duration
 	maxHops  int
-	sntSize  int
+	count    int
 	targets  map[string]*target.MTR
 	mtx      sync.RWMutex
 }
@@ -41,7 +41,7 @@ func NewMTR(logger log.Logger, sc *config.SafeConfig, resolver *net.Resolver, ic
 		interval: sc.Cfg.MTR.Interval.Duration(),
 		timeout:  sc.Cfg.MTR.Timeout.Duration(),
 		maxHops:  sc.Cfg.MTR.MaxHops,
-		sntSize:  sc.Cfg.MTR.SntSize,
+		count:    sc.Cfg.MTR.Count,
 		targets:  make(map[string]*target.MTR),
 	}
 }
@@ -107,7 +107,7 @@ func (p *MTR) AddTargetDelayed(name string, host string, startupDelay time.Durat
 		return err
 	}
 
-	target, err := target.NewMTR(p.logger, p.icmpID, startupDelay, name, ipAddrs[0], p.interval, p.timeout, p.maxHops, p.sntSize)
+	target, err := target.NewMTR(p.logger, p.icmpID, startupDelay, name, ipAddrs[0], p.interval, p.timeout, p.maxHops, p.count)
 	if err != nil {
 		return err
 	}

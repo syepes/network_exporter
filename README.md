@@ -107,7 +107,7 @@ mtr:
   interval: 3s
   timeout: 500ms
   max-hops: 30
-  snt-size: 3
+  count: 3
 
 targets:
   - name: google-dns1
