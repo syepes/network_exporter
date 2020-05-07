@@ -1,8 +1,8 @@
 # ping_exporter
 
-ICMP echo request ("ping") & MTR & TCP Port Prometheus exporter
+ICMP echo request ("ping") & MTR & TCP Port & HTTP Get Prometheus exporter
 
-This exporter gathers either ICMP, MTR or TCP Port stats and exports them via HTTP for Prometheus consumption.
+This exporter gathers either ICMP, MTR, TCP Port or HTTP Get stats and exports them via HTTP for Prometheus consumption.
 
 ## Features
 
@@ -15,41 +15,54 @@ This exporter gathers either ICMP, MTR or TCP Port stats and exports them via HT
 
 ### Exported metrics
 
-- `ping_up`                          Exporter state
-- `ping_targets`                     Number of active targets
-- `ping_status`:                     Ping Status
-- `ping_rtt_seconds{type=best}`:     Best round trip time in seconds
-- `ping_rtt_seconds{type=worst}`:    Worst round trip time in seconds
-- `ping_rtt_seconds{type=mean}`:     Mean round trip time in seconds
-- `ping_rtt_seconds{type=sum}`:      Sum round trip time in seconds
-- `ping_rtt_seconds{type=sd}`:       Squared deviation in seconds
-- `ping_rtt_seconds{type=usd}`:      Standard deviation without correction in seconds
-- `ping_rtt_seconds{type=csd}`:      Standard deviation with correction (Bessel's) in seconds
-- `ping_rtt_seconds{type=range}`:    Range in seconds
-- `ping_loss_percent`:               Packet loss in percent
+- `ping_up`                                      Exporter state
+- `ping_targets`                                 Number of active targets
+- `ping_status`:                                 Ping Status
+- `ping_rtt_seconds{type=best}`:                 Best round trip time in seconds
+- `ping_rtt_seconds{type=worst}`:                Worst round trip time in seconds
+- `ping_rtt_seconds{type=mean}`:                 Mean round trip time in seconds
+- `ping_rtt_seconds{type=sum}`:                  Sum round trip time in seconds
+- `ping_rtt_seconds{type=sd}`:                   Squared deviation in seconds
+- `ping_rtt_seconds{type=usd}`:                  Standard deviation without correction in seconds
+- `ping_rtt_seconds{type=csd}`:                  Standard deviation with correction (Bessel's) in seconds
+- `ping_rtt_seconds{type=range}`:                Range in seconds
+- `ping_loss_percent`:                           Packet loss in percent
 
 ---
 
-- `mtr_up`                           Exporter state
-- `mtr_targets`                      Number of active targets
-- `mtr_hops`                         Number of route hops
-- `mtr_rtt_seconds{type=last}`:      Last round trip time in seconds
-- `mtr_rtt_seconds{type=best}`:      Best round trip time in seconds
-- `mtr_rtt_seconds{type=worst}`:     Worst round trip time in seconds
-- `mtr_rtt_seconds{type=mean}`:      Mean round trip time in seconds
-- `mtr_rtt_seconds{type=sum}`:       Sum round trip time in seconds
-- `mtr_rtt_seconds{type=sd}`:        Squared deviation in seconds
-- `mtr_rtt_seconds{type=usd}`:       Standard deviation without correction in seconds
-- `mtr_rtt_seconds{type=csd}`:       Standard deviation with correction (Bessel's) in seconds
-- `mtr_rtt_seconds{type=range}`:     Range in seconds
-- `mtr_rtt_seconds{type=loss}`:      Packet loss in percent
+- `mtr_up`                                       Exporter state
+- `mtr_targets`                                  Number of active targets
+- `mtr_hops`                                     Number of route hops
+- `mtr_rtt_seconds{type=last}`:                  Last round trip time in seconds
+- `mtr_rtt_seconds{type=best}`:                  Best round trip time in seconds
+- `mtr_rtt_seconds{type=worst}`:                 Worst round trip time in seconds
+- `mtr_rtt_seconds{type=mean}`:                  Mean round trip time in seconds
+- `mtr_rtt_seconds{type=sum}`:                   Sum round trip time in seconds
+- `mtr_rtt_seconds{type=sd}`:                    Squared deviation in seconds
+- `mtr_rtt_seconds{type=usd}`:                   Standard deviation without correction in seconds
+- `mtr_rtt_seconds{type=csd}`:                   Standard deviation with correction (Bessel's) in seconds
+- `mtr_rtt_seconds{type=range}`:                 Range in seconds
+- `mtr_rtt_seconds{type=loss}`:                  Packet loss in percent
 
 ---
 
-- `tcp_up`                           Exporter state
-- `tcp_targets`                      Number of active targets
-- `tcp_connection_status`            Connection Status
-- `tcp_connection_seconds`           Connection time in seconds
+- `tcp_up`                                       Exporter state
+- `tcp_targets`                                  Number of active targets
+- `tcp_connection_status`                        Connection Status
+- `tcp_connection_seconds`                       Connection time in seconds
+
+---
+
+- `http_get_up`                                  Exporter state
+- `http_get_targets`                             Number of active targets
+- `http_get_status`                              HTTP Status Code and Connection Status
+- `http_get_seconds{type=ContentLength}`:        Downloaded Content in bytes
+- `http_get_seconds{type=DNSLookup}`:            DNSLookup connection drill down time in seconds
+- `http_get_seconds{type=TCPConnection}`:        TCPConnection connection drill down time in seconds
+- `http_get_seconds{type=TLSHandshake}`:         TLSHandshake connection drill down time in seconds
+- `http_get_seconds{type=ServerProcessing}`:     ServerProcessing connection drill down time in seconds
+- `http_get_seconds{type=ContentTransfer}`:      ContentTransfer connection drill down time in seconds
+- `http_get_seconds{type=Total}`:                Total connection time in seconds
 
 Each metric contains the labels:
 
@@ -99,17 +112,27 @@ icmp:
   timeout: 1s
   count: 10
 
-tcp:
-  interval: 3s
-  timeout: 1s
-
 mtr:
   interval: 3s
   timeout: 500ms
   max-hops: 30
   count: 3
 
+tcp:
+  interval: 3s
+  timeout: 1s
+
+http_get:
+  interval: 15m
+  timeout: 5s
+
 targets:
+  - name: internal
+    host: 192.168.0.1
+    type: ICMP
+    probe:
+      - hostname1
+      - hostname2
   - name: google-dns1
     host: 8.8.8.8
     type: ICMP
@@ -122,12 +145,13 @@ targets:
   - name: cloudflare-dns-https
     host: 1.1.1.1:443
     type: TCP
-  - name: internal
-    host: 192.168.0.1
-    type: ICMP
-    probe:
-      - hostname1
-      - hostname2
+  - name: download-file-16M
+    host: http://test-debit.free.fr/16384.rnd
+    type: HTTPGet
+  - name: download-file-16M-proxy
+    host: http://test-debit.free.fr/16384.rnd
+    type: HTTPGet
+    proxy: http://localhost:3128
 ```
 
 **Note:** domains are resolved (regularly) to their corresponding A and AAAA records (IPv4 and IPv6).

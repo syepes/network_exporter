@@ -28,14 +28,15 @@ import (
 const version string = "1.2.1"
 
 var (
-	listenAddress = kingpin.Flag("web.listen-address", "The address to listen on for HTTP requests").Default(":9427").String()
-	configFile    = kingpin.Flag("config.file", "Exporter configuration file").Default("/ping_exporter.yml").String()
-	sc            = &config.SafeConfig{Cfg: &config.Config{}}
-	logger        log.Logger
-	icmpID        *common.IcmpID // goroutine shared counter
-	monitorPING   *monitor.PING
-	monitorMTR    *monitor.MTR
-	monitorTCP    *monitor.TCPPort
+	listenAddress  = kingpin.Flag("web.listen-address", "The address to listen on for HTTP requests").Default(":9427").String()
+	configFile     = kingpin.Flag("config.file", "Exporter configuration file").Default("/ping_exporter.yml").String()
+	sc             = &config.SafeConfig{Cfg: &config.Config{}}
+	logger         log.Logger
+	icmpID         *common.IcmpID // goroutine shared counter
+	monitorPING    *monitor.PING
+	monitorMTR     *monitor.MTR
+	monitorTCP     *monitor.TCPPort
+	monitorHTTPGet *monitor.HTTPGet
 
 	indexHTML = `<!doctype html><html><head> <meta charset="UTF-8"><title>Ping Exporter (Version ` + version + `)</title></head><body><h1>Ping Exporter</h1><p><a href="%s">Metrics</a></p></body></html>`
 )
@@ -80,6 +81,8 @@ func main() {
 					monitorMTR.DelTargets()
 					monitorTCP.AddTargets()
 					monitorTCP.DelTargets()
+					monitorHTTPGet.AddTargets()
+					monitorHTTPGet.DelTargets()
 				}
 			case <-susr:
 				level.Debug(logger).Log("msg", "Signal: USR1")
@@ -97,6 +100,9 @@ func main() {
 
 	monitorTCP = monitor.NewTCPPort(logger, sc, resolver)
 	monitorTCP.AddTargets()
+
+	monitorHTTPGet = monitor.NewHTTPGet(logger, sc, resolver)
+	monitorHTTPGet.AddTargets()
 
 	go startConfigRefresh()
 
@@ -121,6 +127,8 @@ func startConfigRefresh() {
 			monitorMTR.DelTargets()
 			monitorTCP.AddTargets()
 			monitorTCP.DelTargets()
+			monitorHTTPGet.AddTargets()
+			monitorHTTPGet.DelTargets()
 		}
 	}
 }
@@ -139,6 +147,7 @@ func startServer() {
 	reg.MustRegister(&collector.MTR{Monitor: monitorMTR})
 	reg.MustRegister(&collector.PING{Monitor: monitorPING})
 	reg.MustRegister(&collector.TCP{Monitor: monitorTCP})
+	reg.MustRegister(&collector.HTTPGet{Monitor: monitorHTTPGet})
 	h := promhttp.HandlerFor(reg, promhttp.HandlerOpts{})
 	http.Handle(metricsPath, h)
 

@@ -14,33 +14,48 @@ import (
 // Config represents configuration for the exporter
 type Config struct {
 	Conf struct {
-		Refresh    duration `yaml:"refresh"`
-		Nameserver string   `yaml:"nameserver"`
-	} `yaml:"conf"`
+		Refresh    duration `yaml:"refresh" json:"refresh"`
+		Nameserver string   `yaml:"nameserver" json:"nameserver"`
+	} `yaml:"conf" json:"conf"`
 	ICMP struct {
-		Interval duration `yaml:"interval"`
-		Timeout  duration `yaml:"timeout"`
-		Count    int      `yaml:"count"`
-	} `yaml:"icmp"`
+		Interval duration `yaml:"interval" json:"interval"`
+		Timeout  duration `yaml:"timeout" json:"timeout"`
+		Count    int      `yaml:"count" json:"count"`
+	} `yaml:"icmp" json:"icmp"`
 	MTR struct {
-		Interval duration `yaml:"interval"`
-		Timeout  duration `yaml:"timeout"`
-		MaxHops  int      `yaml:"max-hops"`
-		Count    int      `yaml:"count"`
-	} `yaml:"mtr"`
+		Interval duration `yaml:"interval" json:"interval"`
+		Timeout  duration `yaml:"timeout" json:"timeout"`
+		MaxHops  int      `yaml:"max-hops" json:"max-hops"`
+		Count    int      `yaml:"count" json:"count"`
+	} `yaml:"mtr" json:"mtr"`
 	TCP struct {
-		Interval duration `yaml:"interval"`
-		Timeout  duration `yaml:"timeout"`
-	} `yaml:"tcp"`
+		Interval duration `yaml:"interval" json:"interval"`
+		Timeout  duration `yaml:"timeout" json:"timeout"`
+	} `yaml:"tcp" json:"tcp"`
+	HTTPGet struct {
+		Interval duration `yaml:"interval" json:"interval"`
+		Timeout  duration `yaml:"timeout" json:"timeout"`
+	} `yaml:"http_get" json:"http_get"`
 	Targets []struct {
-		Name  string   `yaml:"name"`
-		Host  string   `yaml:"host"`
-		Type  string   `yaml:"type"`
-		Probe []string `yaml:"probe"`
-	} `yaml:"targets"`
+		Name   string   `yaml:"name" json:"name"`
+		Host   string   `yaml:"host" json:"host"`
+		Type   string   `yaml:"type" json:"type"`
+		Proxy  string   `yaml:"proxy" json:"proxy"`
+		Probe  []string `yaml:"probe" json:"probe"`
+		Labels extraKV  `yaml:"labels,omitempty" json:"labels,omitempty"`
+	} `yaml:"targets" json:"targets"`
 }
 
 type duration time.Duration
+
+type extraKV struct {
+	Kv map[string]string `yaml:"kv,omitempty" json:"kv,omitempty"`
+}
+
+// UnmarshalYAML is used to unmarshal into map[string]string
+func (b *extraKV) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	return unmarshal(&b.Kv)
+}
 
 // SafeConfig Safe configuration reload
 type SafeConfig struct {
@@ -73,9 +88,9 @@ func (sc *SafeConfig) ReloadConfig(confFile string) (err error) {
 
 	for _, t := range c.Targets {
 		targetNames = append(targetNames, t.Name)
-		found, _ := regexp.MatchString("^ICMP|MTR|ICMP+MTR|TCP$", t.Type)
+		found, _ := regexp.MatchString("^ICMP|MTR|ICMP+MTR|TCP|HTTPGet$", t.Type)
 		if found == false {
-			return fmt.Errorf("Target '%s' has unknown check type '%s' must be one of (ICMP|MTR|ICMP+MTR|TCP)", t.Name, t.Type)
+			return fmt.Errorf("Target '%s' has unknown check type '%s' must be one of (ICMP|MTR|ICMP+MTR|TCP|HTTPGet)", t.Name, t.Type)
 		}
 
 		// Filter out the targets that are not assigned to the running host, if the `probe` is not specified don't filter
