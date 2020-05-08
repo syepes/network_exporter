@@ -173,7 +173,7 @@ func (p *TCPPort) Export() map[string]*tcp.TCPPortReturn {
 		name := target.Name()
 		metrics := target.Compute()
 		if metrics != nil {
-			// level.Debug(p.logger).Log("type", "TCP", "func", "Export", "msg", fmt.Sprintf("Name: %s, Metrics: %v", name, metrics))
+			// level.Debug(p.logger).Log("type", "TCP", "func", "Export", "msg", fmt.Sprintf("Name: %s, Metrics: %+v", name, metrics))
 			m[name] = metrics
 		}
 	}

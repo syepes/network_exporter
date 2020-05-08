@@ -12,6 +12,7 @@ import (
 var (
 	httpLabelNames  = []string{"name", "target"}
 	httpTimeDesc    = prometheus.NewDesc("http_get_seconds", "HTTP Get Drill Down time in seconds", append(httpLabelNames, "type"), nil)
+	httpSizeDesc    = prometheus.NewDesc("http_get_content_bytes", "HTTP Get Content Size in bytes", httpLabelNames, nil)
 	httpStatusDesc  = prometheus.NewDesc("http_get_status", "HTTP Get Status", httpLabelNames, nil)
 	httpTargetsDesc = prometheus.NewDesc("http_get_targets", "Number of active targets", nil, nil)
 	httpStateDesc   = prometheus.NewDesc("http_get_up", "Exporter state", nil, nil)
@@ -27,6 +28,7 @@ type HTTPGet struct {
 // Describe prom
 func (p *HTTPGet) Describe(ch chan<- *prometheus.Desc) {
 	ch <- httpTimeDesc
+	ch <- httpSizeDesc
 	ch <- httpStatusDesc
 	ch <- httpTargetsDesc
 	ch <- httpStateDesc
@@ -59,7 +61,7 @@ func (p *HTTPGet) Collect(ch chan<- prometheus.Metric) {
 			ch <- prometheus.MustNewConstMetric(httpStatusDesc, prometheus.GaugeValue, 0, l...)
 		}
 
-		ch <- prometheus.MustNewConstMetric(httpTimeDesc, prometheus.GaugeValue, float64(metric.ContentLength), append(l, "ContentLength")...)
+		ch <- prometheus.MustNewConstMetric(httpSizeDesc, prometheus.GaugeValue, float64(metric.ContentLength), l...)
 		ch <- prometheus.MustNewConstMetric(httpTimeDesc, prometheus.GaugeValue, metric.DNSLookup.Seconds(), append(l, "DNSLookup")...)
 		ch <- prometheus.MustNewConstMetric(httpTimeDesc, prometheus.GaugeValue, metric.TCPConnection.Seconds(), append(l, "TCPConnection")...)
 		ch <- prometheus.MustNewConstMetric(httpTimeDesc, prometheus.GaugeValue, metric.TLSHandshake.Seconds(), append(l, "TLSHandshake")...)

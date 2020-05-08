@@ -97,7 +97,11 @@ func (p *HTTPGet) AddTarget(name string, url string, proxy string) (err error) {
 
 // AddTargetDelayed is AddTarget with a startup delay
 func (p *HTTPGet) AddTargetDelayed(name string, urlStr string, proxy string, startupDelay time.Duration) (err error) {
-	level.Debug(p.logger).Log("type", "HTTPGet", "func", "AddTargetDelayed", "msg", fmt.Sprintf("Adding Target: %s (%s) with proxy (%s) in %s", name, urlStr, proxy, startupDelay))
+	if proxy != "" {
+		level.Debug(p.logger).Log("type", "HTTPGet", "func", "AddTargetDelayed", "msg", fmt.Sprintf("Adding Target: %s (%s) with proxy (%s) in %s", name, urlStr, proxy, startupDelay))
+	} else {
+		level.Debug(p.logger).Log("type", "HTTPGet", "func", "AddTargetDelayed", "msg", fmt.Sprintf("Adding Target: %s (%s) in %s", name, urlStr, startupDelay))
+	}
 
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
@@ -183,7 +187,7 @@ func (p *HTTPGet) Export() map[string]*http.HTTPReturn {
 		name := target.Name()
 		metrics := target.Compute()
 		if metrics != nil {
-			// level.Debug(p.logger).Log("type", "HTTPGet", "func", "Export", "msg", fmt.Sprintf("Name: %s, Metrics: %v", name, metrics))
+			// level.Debug(p.logger).Log("type", "HTTPGet", "func", "Export", "msg", fmt.Sprintf("Name: %s, Metrics: %+v", name, metrics))
 			m[name] = metrics
 		}
 	}

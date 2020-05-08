@@ -176,11 +176,6 @@ func NewClientTrace() (trace *httptrace.ClientTrace, ht *HTTPTrace) {
 			ht.IdleTime = info.IdleTime
 			ht.GotConnect = time.Now()
 		},
-		GotFirstResponseByte: func() {
-			ht.Lock()
-			defer ht.Unlock()
-			ht.GotFirstResponseByte = time.Now()
-		},
 		TLSHandshakeStart: func() {
 			ht.Lock()
 			defer ht.Unlock()
@@ -192,6 +187,11 @@ func NewClientTrace() (trace *httptrace.ClientTrace, ht *HTTPTrace) {
 			ht.TLSResume = info.DidResume
 			ht.Protocol = info.NegotiatedProtocol
 			ht.TLSHandshakeDone = time.Now()
+		},
+		GotFirstResponseByte: func() {
+			ht.Lock()
+			defer ht.Unlock()
+			ht.GotFirstResponseByte = time.Now()
 		},
 	}
 
@@ -210,6 +210,9 @@ func (ht *HTTPTrace) Stats() (stats *HTTPTimelineStats) {
 	stats = &HTTPTimelineStats{}
 	ht.RLock()
 	defer ht.RUnlock()
+
+	// fmt.Printf("HTTPTrace: %+v\n", ht)
+
 	if !ht.DNSStart.IsZero() && !ht.DNSDone.IsZero() {
 		stats.DNSLookup = ht.DNSDone.Sub(ht.DNSStart)
 	}

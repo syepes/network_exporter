@@ -174,7 +174,7 @@ func (p *MTR) Export() map[string]*mtr.MtrResult {
 		name := target.Name()
 		metrics := target.Compute()
 		if metrics != nil {
-			// level.Debug(p.logger).Log("type", "MTR", "func", "Export", "msg", fmt.Sprintf("Name: %s, Metrics: %v", name, metrics))
+			// level.Debug(p.logger).Log("type", "MTR", "func", "Export", "msg", fmt.Sprintf("Name: %s, Metrics: %+v", name, metrics))
 			m[name] = metrics
 		}
 	}

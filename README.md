@@ -56,7 +56,7 @@ This exporter gathers either ICMP, MTR, TCP Port or HTTP Get stats and exports t
 - `http_get_up`                                  Exporter state
 - `http_get_targets`                             Number of active targets
 - `http_get_status`                              HTTP Status Code and Connection Status
-- `http_get_seconds{type=ContentLength}`:        Downloaded Content in bytes
+- `http_get_content_bytes`                       HTTP Get Content Size in bytes
 - `http_get_seconds{type=DNSLookup}`:            DNSLookup connection drill down time in seconds
 - `http_get_seconds{type=TCPConnection}`:        TCPConnection connection drill down time in seconds
 - `http_get_seconds{type=TLSHandshake}`:         TLSHandshake connection drill down time in seconds
@@ -145,11 +145,11 @@ targets:
   - name: cloudflare-dns-https
     host: 1.1.1.1:443
     type: TCP
-  - name: download-file-16M
-    host: http://test-debit.free.fr/16384.rnd
+  - name: download-file-64M
+    host: http://test-debit.free.fr/65536.rnd
     type: HTTPGet
-  - name: download-file-16M-proxy
-    host: http://test-debit.free.fr/16384.rnd
+  - name: download-file-64M-proxy
+    host: http://test-debit.free.fr/65536.rnd
     type: HTTPGet
     proxy: http://localhost:3128
 ```
