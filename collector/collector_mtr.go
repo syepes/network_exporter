@@ -12,7 +12,7 @@ import (
 var (
 	mtrLabelNames  = []string{"name", "target", "ttl", "path"}
 	mtrDesc        = prometheus.NewDesc("mtr_rtt_seconds", "Round Trip Time in seconds", append(mtrLabelNames, "type"), nil)
-	mtrHopsDesc    = prometheus.NewDesc("mtr_hops", "Number of route hops", nil, nil)
+	mtrHopsDesc    = prometheus.NewDesc("mtr_hops", "Number of route hops", []string{"name", "target"}, nil)
 	mtrTargetsDesc = prometheus.NewDesc("mtr_targets", "Number of active targets", nil, nil)
 	mtrStateDesc   = prometheus.NewDesc("mtr_up", "Exporter state", nil, nil)
 	mtrMutex       = &sync.Mutex{}
@@ -52,7 +52,7 @@ func (p *MTR) Collect(ch chan<- prometheus.Metric) {
 		targets = append(targets, target)
 		l := []string{target, metric.DestAddr}
 
-		ch <- prometheus.MustNewConstMetric(mtrHopsDesc, prometheus.GaugeValue, float64(len(metric.Hops)))
+		ch <- prometheus.MustNewConstMetric(mtrHopsDesc, prometheus.GaugeValue, float64(len(metric.Hops)), l...)
 		for _, hop := range metric.Hops {
 			ll := append(l, strconv.Itoa(hop.TTL))
 			ll = append(ll, hop.AddressTo)
