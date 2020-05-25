@@ -89,7 +89,10 @@ To run the ping_exporter as a Docker container by builing your own image or usin
 
 ```console
 docker build -t syepes/ping_exporter .
-docker run -p 9427:9427 -v ./ping_exporter.yml:/ping_exporter.yml:ro --name ping_exporter syepes/ping_exporter
+# Default mode
+docker run -p 9427:9427 -v $PWD/ping_exporter.yml:/ping_exporter.yml:ro --name ping_exporter syepes/ping_exporter
+# Debug level
+docker run -p 9427:9427 -v $PWD/ping_exporter.yml:/ping_exporter.yml:ro --name ping_exporter syepes/ping_exporter /app/ping_exporter --log.level=debug
 ```
 
 ## Configuration
