@@ -170,7 +170,7 @@ This deployment example will permit you to have as many Ping Stations as many as
 
 [Deployment example](https://github.com/syepes/ping_exporter/blob/master/dist/deploy/)
 
-![deployment](https://raw.githubusercontent.com/syepes/ping_exporter/master/dist/deployment.png)
+![deployment](https://raw.githubusercontent.com/syepes/ping_exporter/master/dist/deployment.jpg)
 
 [Grafana Dashboard](https://github.com/syepes/ping_exporter/blob/master/dist/deploy/cfg/provisioning/dashboards/ping_exporter.json)
 
