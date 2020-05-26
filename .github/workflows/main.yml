@@ -1,6 +1,9 @@
 name: build
 
-on: [push]
+on:
+  push:
+    branches: master
+    tags:
 
 jobs:
   build:
@@ -9,13 +12,14 @@ jobs:
 
     steps:
       - name: checkout
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2
 
-      - name: install buildx
+      - name: set up Docker Buildx
         id: buildx
         uses: crazy-max/ghaction-docker-buildx@v1
         with:
-          version: latest
+          buildx-version: latest
+          qemu-version: latest
 
       - name: login to docker hub
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin

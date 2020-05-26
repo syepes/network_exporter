@@ -10,9 +10,5 @@ install:
 prepare: install
 	docker buildx create --use
 
-prepare-old: install
-	docker context create old-style
-	docker buildx create old-style --use
-
 build-push:
-	docker buildx build --push --platform linux/arm/v7,linux/arm64/v8,linux/386,linux/amd64 -t ${IMAGE_NAME}:${VERSION} .
+	docker buildx build --push --platform linux/386,linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8,linux/s390x -t ${IMAGE_NAME}:${VERSION} .
