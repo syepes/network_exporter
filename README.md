@@ -1,7 +1,7 @@
 # ping_exporter
 
 [![Github Action](https://github.com/syepes/ping_exporter/workflows/build/badge.svg)](https://github.com/syepes/ping_exporter/actions)
-[![Docker Pulls](https://img.shields.io/docker/pulls/syepes/ping_exporter.svg?maxAge=604800)][https://hub.docker.com/r/syepes/ping_exporter]
+[![Docker Pulls](https://img.shields.io/docker/pulls/syepes/ping_exporter.svg?maxAge=604800)](https://hub.docker.com/r/syepes/ping_exporter)
 
 ICMP echo request ("ping") & MTR & TCP Port & HTTP Get Prometheus exporter
 
