@@ -1,0 +1,39 @@
+conf:
+  refresh: 30m
+  #nameserver: 192.168.1.1:53
+
+icmp:
+  interval: 15s
+  timeout: 5s
+  count: 10
+
+mtr:
+  interval: 15s
+  timeout: 500ms
+  max-hops: 30
+  count: 3
+
+tcp:
+  interval: 15s
+  timeout: 1s
+
+http_get:
+  interval: 10m
+  timeout: 5s
+
+targets:
+  - name: internal
+    host: 192.168.1.1
+    type: ICMP
+  - name: google-dns1
+    host: 8.8.8.8
+    type: ICMP
+  - name: cloudflare-dns
+    host: 1.1.1.1
+    type: ICMP+MTR
+  - name: cloudflare-dns-https
+    host: 1.1.1.1:443
+    type: TCP
+  - name: download-file-64M
+    host: http://test-debit.free.fr/65536.rnd
+    type: HTTPGet

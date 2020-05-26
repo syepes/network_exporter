@@ -1,0 +1,91 @@
+version: "3.5"
+
+networks:
+  data:
+    driver: bridge
+
+volumes:
+  grafanadata: {}
+
+services:
+  central_grafana:
+    image: grafana/grafana:latest
+    container_name: central_grafana
+    hostname: central_grafana
+    restart: always
+    stop_grace_period: 5m
+    networks:
+      - data
+    ports:
+      - 3000:3000
+    environment:
+      - TZ=Europe/Paris
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafanadata:/var/lib/grafana
+      - ./cfg/provisioning/:/etc/grafana/provisioning/
+  central_vm:
+    image: victoriametrics/victoria-metrics:latest
+    container_name: central_vm
+    hostname: central_vm
+    restart: always
+    stop_grace_period: 5m
+    networks:
+      - data
+    ports:
+      - 8428:8428
+    volumes:
+      - ./data/central-vm/:/storage
+    command:
+      - "-storageDataPath=/storage"
+      - "-loggerLevel=INFO"
+      - "-httpListenAddr=:8428"
+      - "-retentionPeriod=24"
+      - "-memory.allowedPercent=70"
+      - "-influxSkipSingleField"
+      - "-selfScrapeInterval=30s"
+
+  station1_agt:
+    image: victoriametrics/vmagent
+    container_name: station1_agt
+    hostname: station1_agt
+    restart: always
+    stop_grace_period: 5m
+    networks:
+      - data
+    ports:
+      - 8429:8429/tcp
+    volumes:
+      - ./cfg/station1_agt.yml:/vmagent_prometheus.yml
+      - ./data/station1_agt:/storage
+    command:
+      - "-promscrape.config=/vmagent_prometheus.yml"
+      - "-remoteWrite.tmpDataPath=/storage"
+      - "-loggerLevel=INFO"
+      - "-memory.allowedPercent=70"
+      - "-insert.maxQueueDuration=360m0s"
+      - "-remoteWrite.url=http://central_vm:8428/api/v1/write"
+  station1_exporter:
+    image: syepes/ping_exporter
+    container_name: station1_exporter
+    hostname: station1_exporter
+    restart: always
+    stop_grace_period: 5m
+    privileged: true
+    networks:
+      - data
+    ports:
+      - 9427:9427/tcp
+    sysctls:
+      net.ipv4.ping_group_range: "0 429496729"
+      net.ipv4.ip_unprivileged_port_start: 0
+    cap_add:
+      - NET_RAW
+      - SYS_PTRACE
+    volumes:
+      - ./cfg/:/app/cfg/
+    command:
+      - "/app/ping_exporter"
+      - "--log.level=info"
+      - "--config.file=/app/cfg/ping_exporter.yml"

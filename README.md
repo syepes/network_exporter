@@ -1,5 +1,8 @@
 # ping_exporter
 
+[![Github Action](https://github.com/syepes/ping_exporter/workflows/build/badge.svg)](https://github.com/syepes/ping_exporter/actions)
+[![Docker Pulls](https://img.shields.io/docker/pulls/syepes/ping_exporter.svg?maxAge=604800)][https://hub.docker.com/r/syepes/ping_exporter]
+
 ICMP echo request ("ping") & MTR & TCP Port & HTTP Get Prometheus exporter
 
 This exporter gathers either ICMP, MTR, TCP Port or HTTP Get stats and exports them via HTTP for Prometheus consumption.
@@ -161,11 +164,17 @@ targets:
 By default, `ping_exporter` uses the system resolver to translate domain names to IP addresses.
 You can alos override the DNS resolver address by specifying the `conf.nameserver` configuration setting.
 
-## Grafana
+## Deployment
 
-[Grafana Dashboard](https://github.com/syepes/ping_exporter/blob/master/dist/ping_exporter.json)
+This deployment example will permit you to have as many Ping Stations as many as you wish (LAN or WIFI Devices) and at the same time decoupling the data collection from the storage and visualization.
 
-![gradana](https://raw.githubusercontent.com/syepes/ping_exporter/master/dist/ping_exporter.png)
+[Deployment example](https://github.com/syepes/ping_exporter/blob/master/dist/deploy/)
+
+![deployment](https://raw.githubusercontent.com/syepes/ping_exporter/master/dist/deployment.png)
+
+[Grafana Dashboard](https://github.com/syepes/ping_exporter/blob/master/dist/deploy/cfg/provisioning/dashboards/ping_exporter.json)
+
+![gradana](https://raw.githubusercontent.com/syepes/ping_exporter/master/dist/ping_exporter.gif)
 
 ## Contribute
 
