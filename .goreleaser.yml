@@ -31,7 +31,7 @@ nfpms:
     homepage: "https://github.com/syepes/ping_exporter"
     maintainer: Sebastian YEPES
     description: "Ping prometheus exporter"
-    license: MIT
+    license: Apache 2.0 License
     formats:
       - deb
       - rpm

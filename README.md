@@ -3,9 +3,11 @@
 [![Github Action](https://github.com/syepes/ping_exporter/workflows/build/badge.svg)](https://github.com/syepes/ping_exporter/actions)
 [![Docker Pulls](https://img.shields.io/docker/pulls/syepes/ping_exporter.svg?maxAge=604800)](https://hub.docker.com/r/syepes/ping_exporter)
 
-ICMP echo request ("ping") & MTR & TCP Port & HTTP Get Prometheus exporter
+ICMP & MTR & TCP Port & HTTP Get Prometheus exporter
 
 This exporter gathers either ICMP, MTR, TCP Port or HTTP Get stats and exports them via HTTP for Prometheus consumption.
+
+![gradana](https://raw.githubusercontent.com/syepes/ping_exporter/master/dist/ping_exporter.gif)
 
 ## Features
 
@@ -81,7 +83,7 @@ Each metric contains the labels:
 
 ```console
 $ goreleaser release --skip-publish --snapshot --rm-dist
-$ ls -l artifacts/ping_exporter_*64
+$ ls -l artifacts/ping_exporter_*6?
 # If you want to run it with a non root user
 $ sudo setcap cap_net_raw=+ep artifacts/ping_exporter_linux_amd64/ping_exporter
 ```
@@ -111,7 +113,7 @@ Most of the configuration is set in the YAML based config file:
 ```yaml
 conf:
   refresh: 15m
-  nameserver: 192.168.1.1:53
+  nameserver: 192.168.0.1:53
 
 icmp:
   interval: 3s
@@ -160,21 +162,18 @@ targets:
     proxy: http://localhost:3128
 ```
 
-**Note:** domains are resolved (regularly) to their corresponding A and AAAA records (IPv4 and IPv6).
-By default, `ping_exporter` uses the system resolver to translate domain names to IP addresses.
+**Note:** Domain names are resolved (regularly) to their corresponding A and AAAA records (IPv4 and IPv6).
+By default if not configured, `ping_exporter` uses the system resolver to translate domain names to IP addresses.
 You can alos override the DNS resolver address by specifying the `conf.nameserver` configuration setting.
 
 ## Deployment
 
-This deployment example will permit you to have as many Ping Stations as many as you wish (LAN or WIFI Devices) and at the same time decoupling the data collection from the storage and visualization.
+This deployment example will permit you to have as many Ping Stations as you need (LAN or WIFI) devices but at the same time decoupling the data collection from the storage and visualization.
+This [docker compose](https://docs.docker.com/compose/) will deploy and configure all the components plus setup Grafana with the Datasource and [Dashboard](https://github.com/syepes/ping_exporter/blob/master/dist/deploy/cfg/provisioning/dashboards/ping_exporter.json)
 
 [Deployment example](https://github.com/syepes/ping_exporter/blob/master/dist/deploy/)
 
-![deployment](https://raw.githubusercontent.com/syepes/ping_exporter/master/dist/deployment.jpg)
-
-[Grafana Dashboard](https://github.com/syepes/ping_exporter/blob/master/dist/deploy/cfg/provisioning/dashboards/ping_exporter.json)
-
-![gradana](https://raw.githubusercontent.com/syepes/ping_exporter/master/dist/ping_exporter.gif)
+![Deployment architecture](https://raw.githubusercontent.com/syepes/ping_exporter/master/dist/deployment.jpg)
 
 ## Contribute
 

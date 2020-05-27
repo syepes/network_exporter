@@ -10,6 +10,7 @@ require (
 	github.com/prometheus/procfs v0.0.11 // indirect
 	golang.org/x/net v0.0.0-20200520182314-0ba52f642ac2
 	golang.org/x/sys v0.0.0-20200523222454-059865788121 // indirect
+	google.golang.org/protobuf v1.24.0 // indirect
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/yaml.v3 v3.0.0-20200506231410-2ff61e1afc86
 )
