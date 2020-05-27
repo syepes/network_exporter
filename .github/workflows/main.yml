@@ -3,6 +3,8 @@ name: build
 on:
   push:
     branches: master
+    tags:
+      - "*"
     paths-ignore:
       - "dist/**"
       - "**.md"
@@ -26,17 +28,17 @@ jobs:
       - name: login to docker hub
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
-      - name: find repo names
+      - name: repo info
         id: vars
         run: |
-          echo ::set-output name=repo_name::${GITHUB_REF#refs/*/}
-          echo ::set-output name=repo_branch::${GITHUB_REF#refs/heads/}
-          echo ::set-output name=repo_tag::${GITHUB_REF#refs/tags/}
+          echo ::set-output name=repo_tag::${GITHUB_REF#refs/*/}
 
       - name: build and push (tag)
+        if: startsWith( github.ref, 'refs/tags/')
         run: make build-push
         env:
           VERSION: ${{steps.vars.outputs.repo_tag}}
 
       - name: build and push (master)
+        if: "github.ref == 'refs/heads/master'"
         run: make build-push
