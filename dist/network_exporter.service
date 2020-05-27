@@ -1,10 +1,10 @@
 [Unit]
-Description=Ping Exporter
+Description=Network Exporter
 After=network.target
 
 [Service]
 User=root
-ExecStart=/usr/local/bin/ping_exporter
+ExecStart=/usr/local/bin/network_exporter
 KillMode=process
 Restart=on-failure
 

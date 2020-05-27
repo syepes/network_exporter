@@ -5,8 +5,8 @@ import (
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/syepes/ping_exporter/monitor"
-	"github.com/syepes/ping_exporter/pkg/mtr"
+	"github.com/syepes/network_exporter/monitor"
+	"github.com/syepes/network_exporter/pkg/mtr"
 )
 
 var (

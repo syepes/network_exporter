@@ -7,8 +7,8 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/syepes/ping_exporter/pkg/common"
-	"github.com/syepes/ping_exporter/pkg/mtr"
+	"github.com/syepes/network_exporter/pkg/common"
+	"github.com/syepes/network_exporter/pkg/mtr"
 )
 
 // MTR Object

@@ -9,10 +9,10 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/syepes/ping_exporter/config"
-	"github.com/syepes/ping_exporter/pkg/common"
-	"github.com/syepes/ping_exporter/pkg/http"
-	"github.com/syepes/ping_exporter/target"
+	"github.com/syepes/network_exporter/config"
+	"github.com/syepes/network_exporter/pkg/common"
+	"github.com/syepes/network_exporter/pkg/http"
+	"github.com/syepes/network_exporter/target"
 )
 
 // HTTPGet manages the goroutines responsible for collecting HTTPGet data

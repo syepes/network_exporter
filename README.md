@@ -1,13 +1,13 @@
-# ping_exporter
+# network_exporter
 
-[![Github Action](https://github.com/syepes/ping_exporter/workflows/build/badge.svg)](https://github.com/syepes/ping_exporter/actions)
-[![Docker Pulls](https://img.shields.io/docker/pulls/syepes/ping_exporter.svg?maxAge=604800)](https://hub.docker.com/r/syepes/ping_exporter)
+[![Github Action](https://github.com/syepes/network_exporter/workflows/build/badge.svg)](https://github.com/syepes/network_exporter/actions)
+[![Docker Pulls](https://img.shields.io/docker/pulls/syepes/network_exporter.svg?maxAge=604800)](https://hub.docker.com/r/syepes/network_exporter)
 
 ICMP & MTR & TCP Port & HTTP Get Prometheus exporter
 
 This exporter gathers either ICMP, MTR, TCP Port or HTTP Get stats and exports them via HTTP for Prometheus consumption.
 
-![gradana](https://raw.githubusercontent.com/syepes/ping_exporter/master/dist/ping_exporter.gif)
+![gradana](https://raw.githubusercontent.com/syepes/network_exporter/master/dist/network_exporter.gif)
 
 ## Features
 
@@ -83,21 +83,21 @@ Each metric contains the labels:
 
 ```console
 $ goreleaser release --skip-publish --snapshot --rm-dist
-$ ls -l artifacts/ping_exporter_*6?
+$ ls -l artifacts/network_exporter_*6?
 # If you want to run it with a non root user
-$ sudo setcap cap_net_raw=+ep artifacts/ping_exporter_linux_amd64/ping_exporter
+$ sudo setcap cap_net_raw=+ep artifacts/network_exporter_linux_amd64/network_exporter
 ```
 
 ### Building with Docker
 
-To run the ping_exporter as a Docker container by builing your own image or using <https://hub.docker.com/r/syepes/ping_exporter>
+To run the network_exporter as a Docker container by builing your own image or using <https://hub.docker.com/r/syepes/network_exporter>
 
 ```console
-docker build -t syepes/ping_exporter .
+docker build -t syepes/network_exporter .
 # Default mode
-docker run -p 9427:9427 -v $PWD/ping_exporter.yml:/ping_exporter.yml:ro --name ping_exporter syepes/ping_exporter
+docker run -p 9427:9427 -v $PWD/network_exporter.yml:/network_exporter.yml:ro --name network_exporter syepes/network_exporter
 # Debug level
-docker run -p 9427:9427 -v $PWD/ping_exporter.yml:/ping_exporter.yml:ro --name ping_exporter syepes/ping_exporter /app/ping_exporter --log.level=debug
+docker run -p 9427:9427 -v $PWD/network_exporter.yml:/network_exporter.yml:ro --name network_exporter syepes/network_exporter /app/network_exporter --log.level=debug
 ```
 
 ## Configuration
@@ -105,7 +105,7 @@ docker run -p 9427:9427 -v $PWD/ping_exporter.yml:/ping_exporter.yml:ro --name p
 To see all available configuration flags:
 
 ```console
-./ping_exporter -h
+./network_exporter -h
 ```
 
 Most of the configuration is set in the YAML based config file:
@@ -163,17 +163,17 @@ targets:
 ```
 
 **Note:** Domain names are resolved (regularly) to their corresponding A and AAAA records (IPv4 and IPv6).
-By default if not configured, `ping_exporter` uses the system resolver to translate domain names to IP addresses.
+By default if not configured, `network_exporter` uses the system resolver to translate domain names to IP addresses.
 You can alos override the DNS resolver address by specifying the `conf.nameserver` configuration setting.
 
 ## Deployment
 
 This deployment example will permit you to have as many Ping Stations as you need (LAN or WIFI) devices but at the same time decoupling the data collection from the storage and visualization.
-This [docker compose](https://docs.docker.com/compose/) will deploy and configure all the components plus setup Grafana with the Datasource and [Dashboard](https://github.com/syepes/ping_exporter/blob/master/dist/deploy/cfg/provisioning/dashboards/ping_exporter.json)
+This [docker compose](https://docs.docker.com/compose/) will deploy and configure all the components plus setup Grafana with the Datasource and [Dashboard](https://github.com/syepes/network_exporter/blob/master/dist/deploy/cfg/provisioning/dashboards/network_exporter.json)
 
-[Deployment example](https://github.com/syepes/ping_exporter/blob/master/dist/deploy/)
+[Deployment example](https://github.com/syepes/network_exporter/blob/master/dist/deploy/)
 
-![Deployment architecture](https://raw.githubusercontent.com/syepes/ping_exporter/master/dist/deployment.jpg)
+![Deployment architecture](https://raw.githubusercontent.com/syepes/network_exporter/master/dist/deployment.jpg)
 
 ## Contribute
 

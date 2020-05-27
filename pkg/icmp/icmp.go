@@ -6,7 +6,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/syepes/ping_exporter/pkg/common"
+	"github.com/syepes/network_exporter/pkg/common"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"

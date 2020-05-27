@@ -9,10 +9,10 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/syepes/ping_exporter/config"
-	"github.com/syepes/ping_exporter/pkg/common"
-	"github.com/syepes/ping_exporter/pkg/tcp"
-	"github.com/syepes/ping_exporter/target"
+	"github.com/syepes/network_exporter/config"
+	"github.com/syepes/network_exporter/pkg/common"
+	"github.com/syepes/network_exporter/pkg/tcp"
+	"github.com/syepes/network_exporter/target"
 )
 
 // TCPPort manages the goroutines responsible for collecting TCP data

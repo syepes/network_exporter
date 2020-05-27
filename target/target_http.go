@@ -7,7 +7,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/syepes/ping_exporter/pkg/http"
+	"github.com/syepes/network_exporter/pkg/http"
 )
 
 // HTTPGet Object

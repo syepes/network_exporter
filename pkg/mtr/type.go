@@ -3,7 +3,7 @@ package mtr
 import (
 	"time"
 
-	"github.com/syepes/ping_exporter/pkg/common"
+	"github.com/syepes/network_exporter/pkg/common"
 )
 
 const defaultMaxHops = 30

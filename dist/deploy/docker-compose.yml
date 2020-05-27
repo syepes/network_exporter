@@ -67,7 +67,7 @@ services:
       - "-insert.maxQueueDuration=360m0s"
       - "-remoteWrite.url=http://central_vm:8428/api/v1/write"
   station1_exporter:
-    image: syepes/ping_exporter
+    image: syepes/network_exporter
     container_name: station1_exporter
     hostname: station1_exporter
     restart: always
@@ -86,6 +86,6 @@ services:
     volumes:
       - ./cfg/:/app/cfg/
     command:
-      - "/app/ping_exporter"
+      - "/app/network_exporter"
       - "--log.level=info"
-      - "--config.file=/app/cfg/ping_exporter.yml"
+      - "--config.file=/app/cfg/network_exporter.yml"

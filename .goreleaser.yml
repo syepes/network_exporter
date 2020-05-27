@@ -1,4 +1,4 @@
-project_name: ping_exporter
+project_name: network_exporter
 dist: artifacts
 before:
   hooks:
@@ -15,7 +15,7 @@ builds:
       - arm
     main: .
     ldflags: -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
-    binary: ping_exporter
+    binary: network_exporter
 archives:
   - format: tar.gz
     name_template: "{{ .ProjectName }}-{{ .Version }}.{{ .Os }}-{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
@@ -28,7 +28,7 @@ snapshot:
   name_template: SNAPSHOT-{{ .Commit }}
 nfpms:
   - vendor: Sebastian YEPES
-    homepage: "https://github.com/syepes/ping_exporter"
+    homepage: "https://github.com/syepes/network_exporter"
     maintainer: Sebastian YEPES
     description: "Ping prometheus exporter"
     license: Apache 2.0 License

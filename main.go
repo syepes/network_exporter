@@ -18,10 +18,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/promlog"
 	"github.com/prometheus/common/promlog/flag"
-	"github.com/syepes/ping_exporter/collector"
-	"github.com/syepes/ping_exporter/config"
-	"github.com/syepes/ping_exporter/monitor"
-	"github.com/syepes/ping_exporter/pkg/common"
+	"github.com/syepes/network_exporter/collector"
+	"github.com/syepes/network_exporter/config"
+	"github.com/syepes/network_exporter/monitor"
+	"github.com/syepes/network_exporter/pkg/common"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
@@ -29,7 +29,7 @@ const version string = "1.3.1"
 
 var (
 	listenAddress  = kingpin.Flag("web.listen-address", "The address to listen on for HTTP requests").Default(":9427").String()
-	configFile     = kingpin.Flag("config.file", "Exporter configuration file").Default("/ping_exporter.yml").String()
+	configFile     = kingpin.Flag("config.file", "Exporter configuration file").Default("/network_exporter.yml").String()
 	sc             = &config.SafeConfig{Cfg: &config.Config{}}
 	logger         log.Logger
 	icmpID         *common.IcmpID // goroutine shared counter
@@ -52,7 +52,7 @@ func init() {
 }
 
 func main() {
-	level.Info(logger).Log("msg", "Starting ping_exporter", "version", version)
+	level.Info(logger).Log("msg", "Starting network_exporter", "version", version)
 
 	level.Info(logger).Log("msg", "Loading config")
 	if err := sc.ReloadConfig(*configFile); err != nil {

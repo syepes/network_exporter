@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/syepes/ping_exporter/pkg/common"
+	"github.com/syepes/network_exporter/pkg/common"
 	yaml "gopkg.in/yaml.v3"
 )
 

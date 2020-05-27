@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/syepes/ping_exporter/pkg/common"
-	"github.com/syepes/ping_exporter/pkg/icmp"
+	"github.com/syepes/network_exporter/pkg/common"
+	"github.com/syepes/network_exporter/pkg/icmp"
 )
 
 // Ping ICMP Operation

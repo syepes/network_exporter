@@ -1,5 +1,5 @@
 BUILDX_VER=v0.4.1
-IMAGE_NAME=syepes/ping_exporter
+IMAGE_NAME=syepes/network_exporter
 VERSION?=latest
 
 install:

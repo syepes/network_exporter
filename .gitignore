@@ -9,5 +9,5 @@ temp/
 *.swp
 main
 __debug_bin
-ping_exporter
-ping_exporter.exe
+network_exporter
+network_exporter.exe
