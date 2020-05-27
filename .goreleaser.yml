@@ -30,7 +30,7 @@ nfpms:
   - vendor: Sebastian YEPES
     homepage: "https://github.com/syepes/network_exporter"
     maintainer: Sebastian YEPES
-    description: "Ping prometheus exporter"
+    description: "Network Prometheus Exporter"
     license: Apache 2.0 License
     formats:
       - deb
