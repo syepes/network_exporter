@@ -17,7 +17,7 @@
   "gnetId": null,
   "graphTooltip": 2,
   "id": 4,
-  "iteration": 1590514473170,
+  "iteration": 1590697755979,
   "links": [],
   "panels": [
     {
@@ -667,10 +667,10 @@
               "values": true
             }
           },
-          "pluginVersion": "7.0.0",
+          "pluginVersion": "7.0.1",
           "targets": [
             {
-              "expr": "mtr_hops{name=~\"$name_mtr\"}",
+              "expr": "mtr_hops{host=~\"$station\",name=~\"$name_mtr\"}",
               "format": "time_series",
               "hide": false,
               "instant": true,
@@ -960,7 +960,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "idelta(mtr_hops{name=~\"$name_mtr\"}[$__interval]) > 0",
+              "expr": "changes(mtr_hops{name=~\"$name_mtr\"}[$__interval]) > 0",
               "format": "time_series",
               "hide": false,
               "instant": false,
@@ -1075,7 +1075,7 @@
             "h": 10,
             "w": 2,
             "x": 0,
-            "y": 44
+            "y": 3
           },
           "id": 34,
           "options": {
@@ -1090,10 +1090,10 @@
               "values": true
             }
           },
-          "pluginVersion": "7.0.0",
+          "pluginVersion": "7.0.1",
           "targets": [
             {
-              "expr": "tcp_connection_status{name=~\"$name_tcp\"}",
+              "expr": "tcp_connection_status{host=~\"$station\",name=~\"$name_tcp\"}",
               "format": "time_series",
               "hide": false,
               "instant": true,
@@ -1127,7 +1127,7 @@
             "h": 10,
             "w": 22,
             "x": 2,
-            "y": 44
+            "y": 3
           },
           "hiddenSeries": false,
           "id": 33,
@@ -1165,7 +1165,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "avg_over_time(tcp_connection_seconds{name=~\"$name_tcp\"}[$__interval])",
+              "expr": "avg_over_time(tcp_connection_seconds{host=~\"$station\",name=~\"$name_tcp\"}[$__interval])",
               "hide": false,
               "interval": "",
               "intervalFactor": 1,
@@ -1248,7 +1248,7 @@
             "h": 7,
             "w": 24,
             "x": 0,
-            "y": 45
+            "y": 14
           },
           "hiddenSeries": false,
           "id": 21,
@@ -1354,7 +1354,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 52
+            "y": 21
           },
           "hiddenSeries": false,
           "id": 25,
@@ -1464,7 +1464,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 52
+            "y": 21
           },
           "hiddenSeries": false,
           "id": 26,
@@ -2013,8 +2013,8 @@
         "allValue": null,
         "current": {
           "selected": true,
-          "text": "network_exporter",
-          "value": "network_exporter"
+          "text": "lan",
+          "value": "lan"
         },
         "datasource": "$datasource",
         "definition": "label_values(ping_loss_percent, host)",
@@ -2038,9 +2038,9 @@
       {
         "allValue": null,
         "current": {
-          "selected": true,
-          "text": "cloudflare-dns",
-          "value": "cloudflare-dns"
+          "selected": false,
+          "text": "google-dns1",
+          "value": "google-dns1"
         },
         "datasource": "$datasource",
         "definition": "label_values(ping_loss_percent{host=~\"$station\"}, name)",
@@ -2064,7 +2064,7 @@
       {
         "allValue": null,
         "current": {
-          "selected": true,
+          "selected": false,
           "text": "cloudflare-dns",
           "value": "cloudflare-dns"
         },
@@ -2116,9 +2116,10 @@
       {
         "allValue": null,
         "current": {
+          "isNone": true,
           "selected": true,
-          "text": "download-file-64M",
-          "value": "download-file-64M"
+          "text": "None",
+          "value": ""
         },
         "datasource": "$datasource",
         "definition": "label_values(http_get_status{host=~\"$station\"}, name)",
@@ -2172,5 +2173,5 @@
   "timezone": "",
   "title": "PingStation",
   "uid": "GGIdNh9Wz",
-  "version": 20
+  "version": 23
 }
