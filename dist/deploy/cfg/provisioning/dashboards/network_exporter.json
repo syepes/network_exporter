@@ -277,7 +277,7 @@
             },
             {
               "decimals": 2,
-              "format": "percentunit",
+              "format": "percent",
               "label": null,
               "logBase": 1,
               "max": null,
@@ -373,7 +373,7 @@
           "yaxes": [
             {
               "decimals": 2,
-              "format": "percentunit",
+              "format": "`percent`",
               "label": null,
               "logBase": 1,
               "max": null,
@@ -470,7 +470,7 @@
           "yaxes": [
             {
               "decimals": 2,
-              "format": "percentunit",
+              "format": "percent",
               "label": null,
               "logBase": 1,
               "max": "1",
