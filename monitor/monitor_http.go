@@ -53,7 +53,7 @@ func (p *HTTPGet) Stop() {
 
 // AddTargets adds newly added targets from the configuration
 func (p *HTTPGet) AddTargets() {
-	level.Debug(p.logger).Log("type", "HTTPGet", "func", "AddTargets", "msg", fmt.Sprintf("Current Targets: %d, cfg: %d", len(p.targets), len(p.sc.Cfg.Targets)))
+	level.Debug(p.logger).Log("type", "HTTPGet", "func", "AddTargets", "msg", fmt.Sprintf("Current Targets: %d, cfg: %d", len(p.targets), countTargets(p.sc, "HTTPGet")))
 
 	targetActiveTmp := []string{}
 	for _, v := range p.targets {
@@ -131,7 +131,7 @@ func (p *HTTPGet) AddTargetDelayed(name string, urlStr string, proxy string, sta
 
 // DelTargets deletes/stops the removed targets from the configuration
 func (p *HTTPGet) DelTargets() {
-	level.Debug(p.logger).Log("type", "HTTPGet", "func", "DelTargets", "msg", fmt.Sprintf("Current Targets: %d, cfg: %d", len(p.targets), len(p.sc.Cfg.Targets)))
+	level.Debug(p.logger).Log("type", "HTTPGet", "func", "DelTargets", "msg", fmt.Sprintf("Current Targets: %d, cfg: %d", len(p.targets), countTargets(p.sc, "HTTPGet")))
 
 	targetActiveTmp := []string{}
 	for _, v := range p.targets {

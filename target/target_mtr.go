@@ -1,6 +1,7 @@
 package target
 
 import (
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -82,11 +83,11 @@ func (t *MTR) mtr() {
 		level.Error(t.logger).Log("type", "MTR", "func", "mtr", "msg", fmt.Sprintf("%s", err))
 	}
 
-	// bytes, err2 := json.Marshal(data)
-	// if err2 != nil {
-	// 	level.Error(t.logger).Log("type", "MTR", "func", "mtr", "msg", fmt.Sprintf("%s", err2))
-	// }
-	// level.Debug(t.logger).Log("type", "MTR", "func", "mtr", "msg", fmt.Sprintf("%s", string(bytes)))
+	bytes, err2 := json.Marshal(data)
+	if err2 != nil {
+		level.Error(t.logger).Log("type", "MTR", "func", "mtr", "msg", fmt.Sprintf("%s", err2))
+	}
+	level.Debug(t.logger).Log("type", "MTR", "func", "mtr", "msg", fmt.Sprintf("%s", string(bytes)))
 
 	t.Lock()
 	t.result = data

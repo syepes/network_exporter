@@ -58,7 +58,7 @@ func (p *MTR) Stop() {
 
 // AddTargets adds newly added targets from the configuration
 func (p *MTR) AddTargets() {
-	level.Debug(p.logger).Log("type", "MTR", "func", "AddTargets", "msg", fmt.Sprintf("Current Targets: %d, cfg: %d", len(p.targets), len(p.sc.Cfg.Targets)))
+	level.Debug(p.logger).Log("type", "MTR", "func", "AddTargets", "msg", fmt.Sprintf("Current Targets: %d, cfg: %d", len(p.targets), countTargets(p.sc, "MTR")))
 
 	targetActiveTmp := []string{}
 	for _, v := range p.targets {
@@ -118,7 +118,7 @@ func (p *MTR) AddTargetDelayed(name string, host string, startupDelay time.Durat
 
 // DelTargets deletes/stops the removed targets from the configuration
 func (p *MTR) DelTargets() {
-	level.Debug(p.logger).Log("type", "MTR", "func", "DelTargets", "msg", fmt.Sprintf("Current Targets: %d, cfg: %d", len(p.targets), len(p.sc.Cfg.Targets)))
+	level.Debug(p.logger).Log("type", "MTR", "func", "DelTargets", "msg", fmt.Sprintf("Current Targets: %d, cfg: %d", len(p.targets), countTargets(p.sc, "MTR")))
 
 	targetActiveTmp := []string{}
 	for _, v := range p.targets {

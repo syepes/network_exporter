@@ -53,7 +53,7 @@ func (p *TCPPort) Stop() {
 
 // AddTargets adds newly added targets from the configuration
 func (p *TCPPort) AddTargets() {
-	level.Debug(p.logger).Log("type", "TCP", "func", "AddTargets", "msg", fmt.Sprintf("Current Targets: %d, cfg: %d", len(p.targets), len(p.sc.Cfg.Targets)))
+	level.Debug(p.logger).Log("type", "TCP", "func", "AddTargets", "msg", fmt.Sprintf("Current Targets: %d, cfg: %d", len(p.targets), countTargets(p.sc, "TCP")))
 
 	targetActiveTmp := []string{}
 	for _, v := range p.targets {
@@ -117,7 +117,7 @@ func (p *TCPPort) AddTargetDelayed(name string, host string, port string, startu
 
 // DelTargets deletes/stops the removed targets from the configuration
 func (p *TCPPort) DelTargets() {
-	level.Debug(p.logger).Log("type", "TCP", "func", "DelTargets", "msg", fmt.Sprintf("Current Targets: %d, cfg: %d", len(p.targets), len(p.sc.Cfg.Targets)))
+	level.Debug(p.logger).Log("type", "TCP", "func", "DelTargets", "msg", fmt.Sprintf("Current Targets: %d, cfg: %d", len(p.targets), countTargets(p.sc, "TCP")))
 
 	targetActiveTmp := []string{}
 	for _, v := range p.targets {

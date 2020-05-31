@@ -1,6 +1,7 @@
 package target
 
 import (
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -76,18 +77,18 @@ func (t *TCPPort) portCheck() {
 		level.Error(t.logger).Log("type", "TCP", "func", "port", "msg", fmt.Sprintf("%s", err))
 	}
 
-	// bytes, err2 := json.Marshal(data)
-	// if err2 != nil {
-	// 	level.Error(t.logger).Log("type", "TCP", "func", "port", "msg", fmt.Sprintf("%s", err2))
-	// }
-	// level.Debug(t.logger).Log("type", "TCP", "func", "port", "msg", fmt.Sprintf("%s", string(bytes)))
+	bytes, err2 := json.Marshal(data)
+	if err2 != nil {
+		level.Error(t.logger).Log("type", "TCP", "func", "port", "msg", fmt.Sprintf("%s", err2))
+	}
+	level.Debug(t.logger).Log("type", "TCP", "func", "port", "msg", fmt.Sprintf("%s", string(bytes)))
 
 	t.Lock()
 	t.result = data
 	t.Unlock()
 }
 
-// Compute returns the results of the Ping metrics
+// Compute returns the results of the TCP metrics
 func (t *TCPPort) Compute() *tcp.TCPPortReturn {
 	t.RLock()
 	defer t.RUnlock()

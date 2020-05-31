@@ -25,7 +25,7 @@ import (
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
-const version string = "1.3.2"
+const version string = "1.3.3"
 
 var (
 	listenAddress  = kingpin.Flag("web.listen-address", "The address to listen on for HTTP requests").Default(":9427").String()
@@ -38,7 +38,7 @@ var (
 	monitorTCP     *monitor.TCPPort
 	monitorHTTPGet *monitor.HTTPGet
 
-	indexHTML = `<!doctype html><html><head> <meta charset="UTF-8"><title>Ping Exporter (Version ` + version + `)</title></head><body><h1>Ping Exporter</h1><p><a href="%s">Metrics</a></p></body></html>`
+	indexHTML = `<!doctype html><html><head> <meta charset="UTF-8"><title>Network Exporter (Version ` + version + `)</title></head><body><h1>Network Exporter</h1><p><a href="%s">Metrics</a></p></body></html>`
 )
 
 func init() {
@@ -86,6 +86,10 @@ func main() {
 				}
 			case <-susr:
 				level.Debug(logger).Log("msg", "Signal: USR1")
+				fmt.Printf("PING: %+v\n", monitorPING)
+				fmt.Printf("MTR: %+v\n", monitorMTR)
+				fmt.Printf("TCP: %+v\n", monitorTCP)
+				fmt.Printf("HTTPGet: %+v\n", monitorHTTPGet)
 			}
 		}
 	}()

@@ -1,6 +1,7 @@
 package target
 
 import (
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -80,11 +81,11 @@ func (t *PING) ping() {
 		level.Error(t.logger).Log("type", "ICMP", "func", "ping", "msg", fmt.Sprintf("%s", err))
 	}
 
-	// bytes, err2 := json.Marshal(data)
-	// if err2 != nil {
-	// 	level.Error(t.logger).Log("type", "ICMP", "func", "ping", "msg", fmt.Sprintf("%s", err2))
-	// }
-	// level.Debug(t.logger).Log("type", "ICMP", "func", "ping", "msg", fmt.Sprintf("%s", string(bytes)))
+	bytes, err2 := json.Marshal(data)
+	if err2 != nil {
+		level.Error(t.logger).Log("type", "ICMP", "func", "ping", "msg", fmt.Sprintf("%s", err2))
+	}
+	level.Debug(t.logger).Log("type", "ICMP", "func", "ping", "msg", fmt.Sprintf("%s", string(bytes)))
 
 	t.Lock()
 	defer t.Unlock()

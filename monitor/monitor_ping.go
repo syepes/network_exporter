@@ -56,7 +56,7 @@ func (p *PING) Stop() {
 
 // AddTargets adds newly added targets from the configuration
 func (p *PING) AddTargets() {
-	level.Debug(p.logger).Log("type", "ICMP", "func", "AddTargets", "msg", fmt.Sprintf("Current Targets: %d, cfg: %d", len(p.targets), len(p.sc.Cfg.Targets)))
+	level.Debug(p.logger).Log("type", "ICMP", "func", "AddTargets", "msg", fmt.Sprintf("Current Targets: %d, cfg: %d", len(p.targets), countTargets(p.sc, "ICMP")))
 
 	targetActiveTmp := []string{}
 	for _, v := range p.targets {
@@ -115,7 +115,7 @@ func (p *PING) AddTargetDelayed(name string, host string, startupDelay time.Dura
 
 // DelTargets deletes/stops the removed targets from the configuration
 func (p *PING) DelTargets() {
-	level.Debug(p.logger).Log("type", "ICMP", "func", "DelTargets", "msg", fmt.Sprintf("Current Targets: %d, cfg: %d", len(p.targets), len(p.sc.Cfg.Targets)))
+	level.Debug(p.logger).Log("type", "ICMP", "func", "DelTargets", "msg", fmt.Sprintf("Current Targets: %d, cfg: %d", len(p.targets), countTargets(p.sc, "ICMP")))
 
 	targetActiveTmp := []string{}
 	for _, v := range p.targets {

@@ -118,13 +118,13 @@ conf:
 icmp:
   interval: 3s
   timeout: 1s
-  count: 10
+  count: 6
 
 mtr:
   interval: 3s
   timeout: 500ms
   max-hops: 30
-  count: 3
+  count: 6
 
 tcp:
   interval: 3s

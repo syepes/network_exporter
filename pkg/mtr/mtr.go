@@ -89,7 +89,7 @@ func runMtr(destAddr string, icmpID int, options *MtrOptions) (result MtrResult,
 
 	// Avoid collisions/interference caused by multiple coroutines initiating mtr
 	pid := icmpID
-	timeout := time.Duration(options.Timeout()) * time.Millisecond
+	timeout := options.Timeout()
 	mtrReturns := make([]*MtrReturn, options.MaxHops()+1)
 
 	// Verify data packets
@@ -97,7 +97,7 @@ func runMtr(destAddr string, icmpID int, options *MtrOptions) (result MtrResult,
 	for snt := 0; snt < options.Count(); snt++ {
 		for ttl := 1; ttl < options.MaxHops(); ttl++ {
 			if mtrReturns[ttl] == nil {
-				mtrReturns[ttl] = &MtrReturn{ttl: ttl, host: "???", succSum: 0, success: false, lastTime: time.Duration(0), sumTime: time.Duration(0), bestTime: time.Duration(0), worstTime: time.Duration(0), avgTime: time.Duration(0)}
+				mtrReturns[ttl] = &MtrReturn{ttl: ttl, host: "unknown", succSum: 0, success: false, lastTime: time.Duration(0), sumTime: time.Duration(0), bestTime: time.Duration(0), worstTime: time.Duration(0), avgTime: time.Duration(0)}
 			}
 
 			hopReturn, err := icmp.Icmp(destAddr, ttl, pid, timeout, seq)
@@ -162,7 +162,7 @@ func runMtr(destAddr string, icmpID int, options *MtrOptions) (result MtrResult,
 			break
 		}
 	}
-	// level.Debug(logger).Log("addr", dest.IP.String(), "msg", fmt.Sprintf("%+v", result), "func", "mtr")
 
+	// fmt.Printf("Mtr.result %+v\n", result)
 	return result, nil
 }

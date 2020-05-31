@@ -1,6 +1,7 @@
 package icmp
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"net"
@@ -70,7 +71,7 @@ func icmpIpv4(localAddr string, dst net.Addr, ttl int, pid int, timeout time.Dur
 		return hop, err
 	}
 
-	peer, _, err := listenForSpecific4(c, append(bs, 'x'), pid, seq)
+	peer, _, err := listenForSpecific4(c, append(bs, 'x'), pid, seq, wb)
 	if err != nil {
 		return hop, err
 	}
@@ -132,7 +133,7 @@ func icmpIpv6(localAddr string, dst net.Addr, ttl, pid int, timeout time.Duratio
 }
 
 // Listen IPv4 icmp returned packet and verify the content
-func listenForSpecific4(conn *icmp.PacketConn, neededBody []byte, needID int, needSeq int) (string, []byte, error) {
+func listenForSpecific4(conn *icmp.PacketConn, neededBody []byte, needID int, needSeq int, sent []byte) (string, []byte, error) {
 	for {
 		b := make([]byte, 1500)
 		n, peer, err := conn.ReadFrom(b)
@@ -150,23 +151,25 @@ func listenForSpecific4(conn *icmp.PacketConn, neededBody []byte, needID int, ne
 			continue
 		}
 
-		if typ, ok := x.Type.(ipv4.ICMPType); ok && typ.String() == "time exceeded" {
+		if pkg_type, ok := x.Type.(ipv4.ICMPType); ok && pkg_type.String() == "time exceeded" {
 			body := x.Body.(*icmp.TimeExceeded).Data
-
-			x, _ := icmp.ParseMessage(protocolICMP, body[20:])
-			switch x.Body.(type) {
-			case *icmp.Echo:
-				// Verification
-				msg := x.Body.(*icmp.Echo)
-				if msg.ID == needID && msg.Seq == needSeq {
-					return peer.String(), []byte{}, nil
+			index := bytes.Index(body, sent[:4])
+			if index > 0 {
+				x, _ := icmp.ParseMessage(protocolICMP, body[index:])
+				switch x.Body.(type) {
+				case *icmp.Echo:
+					// Verification
+					msg := x.Body.(*icmp.Echo)
+					if msg.ID == needID && msg.Seq == needSeq {
+						return peer.String(), []byte{}, nil
+					}
+				default:
+					// ignore
 				}
-			default:
-				// ignore
 			}
 		}
 
-		if typ, ok := x.Type.(ipv4.ICMPType); ok && typ.String() == "echo reply" {
+		if pkg_type, ok := x.Type.(ipv4.ICMPType); ok && pkg_type.String() == "echo reply" {
 			b, _ := x.Body.Marshal(protocolICMP)
 			if string(b[4:]) != string(neededBody) || x.Body.(*icmp.Echo).ID != needID {
 				continue
@@ -211,7 +214,7 @@ func listenForSpecific6(conn *icmp.PacketConn, neededBody []byte, needID int, ne
 			}
 		}
 
-		if typ, ok := x.Type.(ipv6.ICMPType); ok && typ == ipv6.ICMPTypeEchoReply {
+		if pkg_type, ok := x.Type.(ipv6.ICMPType); ok && pkg_type == ipv6.ICMPTypeEchoReply {
 			b, _ := x.Body.Marshal(protocolICMP)
 			if string(b[4:]) != string(neededBody) || x.Body.(*icmp.Echo).ID != needID {
 				continue
