@@ -1,3 +1,5 @@
+go 1.16
+
 module github.com/syepes/network_exporter
 
 require (
@@ -13,5 +15,3 @@ require (
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 )
-
-go 1.14
