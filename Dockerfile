@@ -1,6 +1,6 @@
 FROM golang:alpine as builder
 RUN go get -d -v github.com/syepes/network_exporter
-WORKDIR /go/src/github.com/syepes/network_exporter
+RUN cd /go/pkg/mod/github.com/syepes/network_exporter*
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o app .
 
 FROM alpine:latest
