@@ -1,7 +1,6 @@
 FROM golang:alpine as builder
 RUN go get -d -v github.com/syepes/network_exporter
-RUN cd /go/pkg/mod/github.com/syepes/network_exporter*
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o app .
+RUN cd /go/pkg/mod/github.com/syepes/network_exporter* && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o app .
 
 FROM alpine:latest
 RUN apk --no-cache add ca-certificates
