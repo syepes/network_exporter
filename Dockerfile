@@ -5,6 +5,6 @@ RUN cd /go/pkg/mod/github.com/syepes/network_exporter* && CGO_ENABLED=0 GOOS=lin
 FROM alpine:latest
 RUN apk --no-cache add ca-certificates
 WORKDIR /app
-COPY --from=builder /go/src/github.com/syepes/network_exporter/app network_exporter
+COPY --from=builder /go/pkg/mod/github.com/syepes/network_exporter*/app network_exporter
 CMD /app/network_exporter
 EXPOSE 9427
