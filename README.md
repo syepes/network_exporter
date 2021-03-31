@@ -20,54 +20,56 @@ This exporter gathers either ICMP, MTR, TCP Port or HTTP Get stats and exports t
 
 ### Exported metrics
 
-- `ping_up`                                      Exporter state
-- `ping_targets`                                 Number of active targets
-- `ping_status`:                                 Ping Status
-- `ping_rtt_seconds{type=best}`:                 Best round trip time in seconds
-- `ping_rtt_seconds{type=worst}`:                Worst round trip time in seconds
-- `ping_rtt_seconds{type=mean}`:                 Mean round trip time in seconds
-- `ping_rtt_seconds{type=sum}`:                  Sum round trip time in seconds
-- `ping_rtt_seconds{type=sd}`:                   Squared deviation in seconds
-- `ping_rtt_seconds{type=usd}`:                  Standard deviation without correction in seconds
-- `ping_rtt_seconds{type=csd}`:                  Standard deviation with correction (Bessel's) in seconds
-- `ping_rtt_seconds{type=range}`:                Range in seconds
-- `ping_loss_percent`:                           Packet loss in percent
+- `ping_up`                                        Exporter state
+- `ping_targets`                                   Number of active targets
+- `ping_status`:                                   Ping Status
+- `ping_rtt_seconds{type=best}`:                   Best round trip time in seconds
+- `ping_rtt_seconds{type=worst}`:                  Worst round trip time in seconds
+- `ping_rtt_seconds{type=mean}`:                   Mean round trip time in seconds
+- `ping_rtt_seconds{type=sum}`:                    Sum round trip time in seconds
+- `ping_rtt_seconds{type=sd}`:                     Squared deviation in seconds
+- `ping_rtt_seconds{type=usd}`:                    Standard deviation without correction in seconds
+- `ping_rtt_seconds{type=csd}`:                    Standard deviation with correction (Bessel's) in seconds
+- `ping_rtt_seconds{type=range}`:                  Range in seconds
+- `ping_loss_percent`:                             Packet loss in percent
 
 ---
 
-- `mtr_up`                                       Exporter state
-- `mtr_targets`                                  Number of active targets
-- `mtr_hops`                                     Number of route hops
-- `mtr_rtt_seconds{type=last}`:                  Last round trip time in seconds
-- `mtr_rtt_seconds{type=best}`:                  Best round trip time in seconds
-- `mtr_rtt_seconds{type=worst}`:                 Worst round trip time in seconds
-- `mtr_rtt_seconds{type=mean}`:                  Mean round trip time in seconds
-- `mtr_rtt_seconds{type=sum}`:                   Sum round trip time in seconds
-- `mtr_rtt_seconds{type=sd}`:                    Squared deviation in seconds
-- `mtr_rtt_seconds{type=usd}`:                   Standard deviation without correction in seconds
-- `mtr_rtt_seconds{type=csd}`:                   Standard deviation with correction (Bessel's) in seconds
-- `mtr_rtt_seconds{type=range}`:                 Range in seconds
-- `mtr_rtt_seconds{type=loss}`:                  Packet loss in percent
+- `mtr_up`                                         Exporter state
+- `mtr_targets`                                    Number of active targets
+- `mtr_hops`                                       Number of route hops
+- `mtr_rtt_seconds{type=last}`:                    Last round trip time in seconds
+- `mtr_rtt_seconds{type=best}`:                    Best round trip time in seconds
+- `mtr_rtt_seconds{type=worst}`:                   Worst round trip time in seconds
+- `mtr_rtt_seconds{type=mean}`:                    Mean round trip time in seconds
+- `mtr_rtt_seconds{type=sum}`:                     Sum round trip time in seconds
+- `mtr_rtt_seconds{type=sd}`:                      Squared deviation in seconds
+- `mtr_rtt_seconds{type=usd}`:                     Standard deviation without correction in seconds
+- `mtr_rtt_seconds{type=csd}`:                     Standard deviation with correction (Bessel's) in seconds
+- `mtr_rtt_seconds{type=range}`:                   Range in seconds
+- `mtr_rtt_seconds{type=loss}`:                    Packet loss in percent
 
 ---
 
-- `tcp_up`                                       Exporter state
-- `tcp_targets`                                  Number of active targets
-- `tcp_connection_status`                        Connection Status
-- `tcp_connection_seconds`                       Connection time in seconds
+- `tcp_up`                                         Exporter state
+- `tcp_targets`                                    Number of active targets
+- `tcp_connection_status`                          Connection Status
+- `tcp_connection_seconds`                         Connection time in seconds
 
 ---
 
-- `http_get_up`                                  Exporter state
-- `http_get_targets`                             Number of active targets
-- `http_get_status`                              HTTP Status Code and Connection Status
-- `http_get_content_bytes`                       HTTP Get Content Size in bytes
-- `http_get_seconds{type=DNSLookup}`:            DNSLookup connection drill down time in seconds
-- `http_get_seconds{type=TCPConnection}`:        TCPConnection connection drill down time in seconds
-- `http_get_seconds{type=TLSHandshake}`:         TLSHandshake connection drill down time in seconds
-- `http_get_seconds{type=ServerProcessing}`:     ServerProcessing connection drill down time in seconds
-- `http_get_seconds{type=ContentTransfer}`:      ContentTransfer connection drill down time in seconds
-- `http_get_seconds{type=Total}`:                Total connection time in seconds
+- `http_get_up`                                    Exporter state
+- `http_get_targets`                               Number of active targets
+- `http_get_status`                                HTTP Status Code and Connection Status
+- `http_get_content_bytes`                         HTTP Get Content Size in bytes
+- `http_get_seconds{type=DNSLookup}`:              DNSLookup connection drill down time in seconds
+- `http_get_seconds{type=TCPConnection}`:          TCPConnection connection drill down time in seconds
+- `http_get_seconds{type=TLSHandshake}`:           TLSHandshake connection drill down time in seconds
+- `http_get_seconds{type=TLSEarliestCertExpiry}`:  TLSEarliestCertExpiry cert expiration time in epoch
+- `http_get_seconds{type=TLSLastChainExpiry}`:     TLSLastChainExpiry cert expiration time in epoch
+- `http_get_seconds{type=ServerProcessing}`:       ServerProcessing connection drill down time in seconds
+- `http_get_seconds{type=ContentTransfer}`:        ContentTransfer connection drill down time in seconds
+- `http_get_seconds{type=Total}`:                  Total connection time in seconds
 
 Each metric contains the labels:
 

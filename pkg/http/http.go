@@ -60,7 +60,12 @@ func HTTPGet(destURL string, timeout time.Duration) (*HTTPReturn, error) {
 	out.ContentLength = resp.ContentLength
 	out.DNSLookup = stats.DNSLookup
 	out.TCPConnection = stats.TCPConnection
-	out.TLSHandshake = stats.TCPConnection
+	out.TLSHandshake = stats.TLSHandshake
+	if resp.TLS != nil {
+		out.TLSVersion = getTLSVersion(resp.TLS)
+		out.TLSEarliestCertExpiry = getEarliestCertExpiry(resp.TLS)
+		out.TLSLastChainExpiry = getLastChainExpiry(resp.TLS)
+	}
 	out.ServerProcessing = stats.ServerProcessing
 	out.ContentTransfer = stats.ContentTransfer
 	out.Total = stats.Total
@@ -124,7 +129,12 @@ func HTTPGetProxy(destURL string, timeout time.Duration, proxyURL string) (*HTTP
 	out.ContentLength = resp.ContentLength
 	out.DNSLookup = stats.DNSLookup
 	out.TCPConnection = stats.TCPConnection
-	out.TLSHandshake = stats.TCPConnection
+	out.TLSHandshake = stats.TLSHandshake
+	if resp.TLS != nil {
+		out.TLSVersion = getTLSVersion(resp.TLS)
+		out.TLSEarliestCertExpiry = getEarliestCertExpiry(resp.TLS)
+		out.TLSLastChainExpiry = getLastChainExpiry(resp.TLS)
+	}
 	out.ServerProcessing = stats.ServerProcessing
 	out.ContentTransfer = stats.ContentTransfer
 	out.Total = stats.Total
@@ -234,4 +244,46 @@ func (ht *HTTPTrace) Stats() (stats *HTTPTimelineStats) {
 	stats.Total = ht.Done.Sub(ht.Start)
 
 	return
+}
+
+func getTLSVersion(state *tls.ConnectionState) string {
+	switch state.Version {
+	case tls.VersionTLS10:
+		return "TLS 1.0"
+	case tls.VersionTLS11:
+		return "TLS 1.1"
+	case tls.VersionTLS12:
+		return "TLS 1.2"
+	case tls.VersionTLS13:
+		return "TLS 1.3"
+	default:
+		return "unknown"
+	}
+}
+
+func getEarliestCertExpiry(state *tls.ConnectionState) time.Time {
+	earliest := time.Time{}
+	for _, cert := range state.PeerCertificates {
+		if (earliest.IsZero() || cert.NotAfter.Before(earliest)) && !cert.NotAfter.IsZero() {
+			earliest = cert.NotAfter
+		}
+	}
+	return earliest
+}
+
+func getLastChainExpiry(state *tls.ConnectionState) time.Time {
+	lastChainExpiry := time.Time{}
+	for _, chain := range state.VerifiedChains {
+		earliestCertExpiry := time.Time{}
+		for _, cert := range chain {
+			if (earliestCertExpiry.IsZero() || cert.NotAfter.Before(earliestCertExpiry)) && !cert.NotAfter.IsZero() {
+				earliestCertExpiry = cert.NotAfter
+			}
+		}
+		if lastChainExpiry.IsZero() || lastChainExpiry.Before(earliestCertExpiry) {
+			lastChainExpiry = earliestCertExpiry
+		}
+
+	}
+	return lastChainExpiry
 }

@@ -65,6 +65,12 @@ func (p *HTTPGet) Collect(ch chan<- prometheus.Metric) {
 		ch <- prometheus.MustNewConstMetric(httpTimeDesc, prometheus.GaugeValue, metric.DNSLookup.Seconds(), append(l, "DNSLookup")...)
 		ch <- prometheus.MustNewConstMetric(httpTimeDesc, prometheus.GaugeValue, metric.TCPConnection.Seconds(), append(l, "TCPConnection")...)
 		ch <- prometheus.MustNewConstMetric(httpTimeDesc, prometheus.GaugeValue, metric.TLSHandshake.Seconds(), append(l, "TLSHandshake")...)
+		if !metric.TLSEarliestCertExpiry.IsZero() {
+			ch <- prometheus.MustNewConstMetric(httpTimeDesc, prometheus.GaugeValue, float64(metric.TLSEarliestCertExpiry.Unix()), append(l, "TLSEarliestCertExpiry")...)
+		}
+		if !metric.TLSLastChainExpiry.IsZero() {
+			ch <- prometheus.MustNewConstMetric(httpTimeDesc, prometheus.GaugeValue, float64(metric.TLSLastChainExpiry.Unix()), append(l, "TLSLastChainExpiry")...)
+		}
 		ch <- prometheus.MustNewConstMetric(httpTimeDesc, prometheus.GaugeValue, metric.ServerProcessing.Seconds(), append(l, "ServerProcessing")...)
 		ch <- prometheus.MustNewConstMetric(httpTimeDesc, prometheus.GaugeValue, metric.ContentTransfer.Seconds(), append(l, "ContentTransfer")...)
 		ch <- prometheus.MustNewConstMetric(httpTimeDesc, prometheus.GaugeValue, metric.Total.Seconds(), append(l, "Total")...)
