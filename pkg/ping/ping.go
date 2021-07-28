@@ -80,7 +80,7 @@ func runPing(ipAddr string, icmpID int, option *PingOptions) (pingResult PingRes
 
 	if !pingReturn.success {
 		pingResult.Success = false
-		pingResult.DropRate = 100.0
+		pingResult.DropRate = 1.0
 		return pingResult
 	}
 
