@@ -12,38 +12,51 @@ import (
 )
 
 // Config represents configuration for the exporter
+
+type Targets []struct {
+	Name   string   `yaml:"name" json:"name"`
+	Host   string   `yaml:"host" json:"host"`
+	Type   string   `yaml:"type" json:"type"`
+	Proxy  string   `yaml:"proxy" json:"proxy"`
+	Probe  []string `yaml:"probe" json:"probe"`
+	Labels extraKV  `yaml:"labels,omitempty" json:"labels,omitempty"`
+} 
+
+type HTTPGet struct {
+	Interval duration `yaml:"interval" json:"interval"`
+	Timeout  duration `yaml:"timeout" json:"timeout"`
+}
+
+type TCP struct {
+	Interval duration `yaml:"interval" json:"interval"`
+	Timeout  duration `yaml:"timeout" json:"timeout"`
+} 
+
+type MTR struct {
+	Interval duration `yaml:"interval" json:"interval"`
+	Timeout  duration `yaml:"timeout" json:"timeout"`
+	MaxHops  int      `yaml:"max-hops" json:"max-hops"`
+	Count    int      `yaml:"count" json:"count"`
+} 
+
+type ICMP struct {
+	Interval duration `yaml:"interval" json:"interval"`
+	Timeout  duration `yaml:"timeout" json:"timeout"`
+	Count    int      `yaml:"count" json:"count"`
+} 
+
+type Conf struct {
+	Refresh    duration `yaml:"refresh" json:"refresh"`
+	Nameserver string   `yaml:"nameserver" json:"nameserver"`
+} 
+
 type Config struct {
-	Conf struct {
-		Refresh    duration `yaml:"refresh" json:"refresh"`
-		Nameserver string   `yaml:"nameserver" json:"nameserver"`
-	} `yaml:"conf" json:"conf"`
-	ICMP struct {
-		Interval duration `yaml:"interval" json:"interval"`
-		Timeout  duration `yaml:"timeout" json:"timeout"`
-		Count    int      `yaml:"count" json:"count"`
-	} `yaml:"icmp" json:"icmp"`
-	MTR struct {
-		Interval duration `yaml:"interval" json:"interval"`
-		Timeout  duration `yaml:"timeout" json:"timeout"`
-		MaxHops  int      `yaml:"max-hops" json:"max-hops"`
-		Count    int      `yaml:"count" json:"count"`
-	} `yaml:"mtr" json:"mtr"`
-	TCP struct {
-		Interval duration `yaml:"interval" json:"interval"`
-		Timeout  duration `yaml:"timeout" json:"timeout"`
-	} `yaml:"tcp" json:"tcp"`
-	HTTPGet struct {
-		Interval duration `yaml:"interval" json:"interval"`
-		Timeout  duration `yaml:"timeout" json:"timeout"`
-	} `yaml:"http_get" json:"http_get"`
-	Targets []struct {
-		Name   string   `yaml:"name" json:"name"`
-		Host   string   `yaml:"host" json:"host"`
-		Type   string   `yaml:"type" json:"type"`
-		Proxy  string   `yaml:"proxy" json:"proxy"`
-		Probe  []string `yaml:"probe" json:"probe"`
-		Labels extraKV  `yaml:"labels,omitempty" json:"labels,omitempty"`
-	} `yaml:"targets" json:"targets"`
+	Conf    `yaml:"conf" json:"conf"`
+	ICMP    `yaml:"icmp" json:"icmp"`
+	MTR     `yaml:"mtr" json:"mtr"`
+	TCP     `yaml:"tcp" json:"tcp"`
+	HTTPGet `yaml:"http_get" json:"http_get"`
+	Targets `yaml:"targets" json:"targets"`
 }
 
 type duration time.Duration
@@ -83,24 +96,55 @@ func (sc *SafeConfig) ReloadConfig(confFile string) (err error) {
 	}
 
 	// Validate and Filter config
-	targets := c.Targets[:0]
+	targets := Targets{}
 	var targetNames []string
 
 	for _, t := range c.Targets {
-		targetNames = append(targetNames, t.Name)
-		found, _ := regexp.MatchString("^ICMP|MTR|ICMP+MTR|TCP|HTTPGet$", t.Type)
-		if found == false {
-			return fmt.Errorf("Target '%s' has unknown check type '%s' must be one of (ICMP|MTR|ICMP+MTR|TCP|HTTPGet)", t.Name, t.Type)
-		}
+		if common.SrvRecordCheck(t.Host) {
+			found, _ := regexp.MatchString("^ICMP|MTR|ICMP+MTR|TCP|HTTPGet$", t.Type)
+			if found == false {
+				return fmt.Errorf("Target '%s' has unknown check type '%s' must be one of (ICMP|MTR|ICMP+MTR|TCP|HTTPGet)", t.Name, t.Type)
+			}
+			
+			srv_record_hosts, err := common.SrvRecordHosts(t.Host) 
+			if err != nil {
+				return fmt.Errorf((fmt.Sprintf("Error processing SRV target: %s", t.Host)))
+			}
 
-		// Filter out the targets that are not assigned to the running host, if the `probe` is not specified don't filter
-		if t.Probe == nil {
-			targets = append(targets, t)
+			for _, srv_host := range srv_record_hosts {
+				targetNames = append(targetNames, srv_host)
+				sub_target := t
+				sub_target.Name = srv_host
+				sub_target.Host = srv_host
+
+				// Filter out the targets that are not assigned to the running host, if the `probe` is not specified don't filter
+				if sub_target.Probe == nil {
+					targets = append(targets, sub_target)
+				} else {
+					for _, p := range sub_target.Probe {
+						if p == hostname {
+							targets = append(targets, sub_target)
+							continue
+						}
+					}
+				}
+			}
 		} else {
-			for _, p := range t.Probe {
-				if p == hostname {
-					targets = append(targets, t)
-					continue
+			targetNames = append(targetNames, t.Name)
+			found, _ := regexp.MatchString("^ICMP|MTR|ICMP+MTR|TCP|HTTPGet$", t.Type)
+			if found == false {
+				return fmt.Errorf("Target '%s' has unknown check type '%s' must be one of (ICMP|MTR|ICMP+MTR|TCP|HTTPGet)", t.Name, t.Type)
+			}
+
+			// Filter out the targets that are not assigned to the running host, if the `probe` is not specified don't filter
+			if t.Probe == nil {
+				targets = append(targets, t)
+			} else {
+				for _, p := range t.Probe {
+					if p == hostname {
+						targets = append(targets, t)
+						continue
+					}
 				}
 			}
 		}
