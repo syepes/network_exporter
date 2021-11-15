@@ -5,8 +5,30 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"strings"
 	"time"
 )
+
+func SrvRecordCheck(record string) bool {
+	record_split := strings.Split(record, ".")
+	if strings.HasPrefix(record_split[0], "_") && strings.HasPrefix(record_split[1], "_") {
+		return true
+	} else {
+		return false
+	}
+}
+
+func SrvRecordHosts(record string) ([]string, error) {
+	_, members, err := net.LookupSRV("", "", record)
+	if err != nil {
+		return nil, fmt.Errorf("Resolving target: %v", err)
+	}
+	hosts := []string{}
+	for _, host := range members {
+		hosts = append(hosts, host.Target)
+	}
+	return hosts, nil
+}
 
 // DestAddrs resolve the hostname to all it'ss IP's
 func DestAddrs(host string, resolver *net.Resolver) ([]string, error) {

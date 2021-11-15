@@ -166,7 +166,38 @@ targets:
 
 **Note:** Domain names are resolved (regularly) to their corresponding A and AAAA records (IPv4 and IPv6).
 By default if not configured, `network_exporter` uses the system resolver to translate domain names to IP addresses.
-You can alos override the DNS resolver address by specifying the `conf.nameserver` configuration setting.
+You can also override the DNS resolver address by specifying the `conf.nameserver` configuration setting.
+
+**SRV records:**  
+If host filed of a target contains SRV record of standard format `_<service>._<protocol>.<domain>`, it will be resolved and all it's A records will be added as separate targets with name and host of the this A record.   
+Every filed of parent target with SRV record will be inherited by sub targets except `name` and `host`
+
+SRV record
+```
+_connectivity-check._icmp.example.com. 86400 IN SRV 10 5 8 server.example.com.
+_connectivity-check._icmp.example.com. 86400 IN SRV 10 5 8 server2.example.com.
+_connectivity-check._icmp.example.com. 86400 IN SRV 10 5 8 server3.example.com.
+```
+Configuration reference
+```
+  - name: test-srv-record
+    host: _connectivity-check._icmp.example.com
+    type: ICMP
+```
+
+Will be resolved to 3 separate targets:
+```
+  - name: server.example.com
+    host: server.example.com
+    type: ICMP
+  - name: server2.example.com
+    host: server.example.com
+    type: ICMP
+  - name: server3.example.com
+    host: server3.example.com
+    type: ICMP
+```
+  
 
 ## Deployment
 
