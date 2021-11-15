@@ -53,7 +53,7 @@ func (p *PING) Collect(ch chan<- prometheus.Metric) {
 		targets = append(targets, target)
 		l := []string{target, metric.DestAddr}
 
-		if metric.Success == true {
+		if metric.Success {
 			ch <- prometheus.MustNewConstMetric(icmpStatusDesc, prometheus.GaugeValue, 1, l...)
 		} else {
 			ch <- prometheus.MustNewConstMetric(icmpStatusDesc, prometheus.GaugeValue, 0, l...)

@@ -55,7 +55,7 @@ func (p *HTTPGet) Collect(ch chan<- prometheus.Metric) {
 		l := strings.SplitN(target, " ", 2)
 		l = append(l, metric.DestAddr)
 
-		if metric.Success == true {
+		if metric.Success {
 			ch <- prometheus.MustNewConstMetric(httpStatusDesc, prometheus.GaugeValue, float64(metric.Status), l...)
 		} else {
 			ch <- prometheus.MustNewConstMetric(httpStatusDesc, prometheus.GaugeValue, 0, l...)

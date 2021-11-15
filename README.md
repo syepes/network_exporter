@@ -168,9 +168,9 @@ targets:
 By default if not configured, `network_exporter` uses the system resolver to translate domain names to IP addresses.
 You can also override the DNS resolver address by specifying the `conf.nameserver` configuration setting.
 
-**SRV records:**  
-If host filed of a target contains SRV record of standard format `_<service>._<protocol>.<domain>`, it will be resolved and all it's A records will be added as separate targets with name and host of the this A record.   
-Every filed of parent target with SRV record will be inherited by sub targets except `name` and `host`
+**SRV records:**
+If the host field of a target contains a SRV record with the format `_<service>._<protocol>.<domain>` it will be resolved, all it's A records will be added (dynamically) as separate targets with name and host of the this A record.
+Every field of the parent target with a SRV record will be inherited by sub targets except `name` and `host`
 
 SRV record
 ```
@@ -197,7 +197,7 @@ Will be resolved to 3 separate targets:
     host: server3.example.com
     type: ICMP
 ```
-  
+
 
 ## Deployment
 

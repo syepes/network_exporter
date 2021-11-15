@@ -56,7 +56,7 @@ func (p *TCP) Collect(ch chan<- prometheus.Metric) {
 
 		ch <- prometheus.MustNewConstMetric(tcpTimeDesc, prometheus.GaugeValue, metric.ConTime.Seconds(), l...)
 
-		if metric.Success == true {
+		if metric.Success {
 			ch <- prometheus.MustNewConstMetric(tcpStatusDesc, prometheus.GaugeValue, 1, l...)
 		} else {
 			ch <- prometheus.MustNewConstMetric(tcpStatusDesc, prometheus.GaugeValue, 0, l...)

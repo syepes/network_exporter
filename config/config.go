@@ -20,7 +20,7 @@ type Targets []struct {
 	Proxy  string   `yaml:"proxy" json:"proxy"`
 	Probe  []string `yaml:"probe" json:"probe"`
 	Labels extraKV  `yaml:"labels,omitempty" json:"labels,omitempty"`
-} 
+}
 
 type HTTPGet struct {
 	Interval duration `yaml:"interval" json:"interval"`
@@ -30,25 +30,25 @@ type HTTPGet struct {
 type TCP struct {
 	Interval duration `yaml:"interval" json:"interval"`
 	Timeout  duration `yaml:"timeout" json:"timeout"`
-} 
+}
 
 type MTR struct {
 	Interval duration `yaml:"interval" json:"interval"`
 	Timeout  duration `yaml:"timeout" json:"timeout"`
 	MaxHops  int      `yaml:"max-hops" json:"max-hops"`
 	Count    int      `yaml:"count" json:"count"`
-} 
+}
 
 type ICMP struct {
 	Interval duration `yaml:"interval" json:"interval"`
 	Timeout  duration `yaml:"timeout" json:"timeout"`
 	Count    int      `yaml:"count" json:"count"`
-} 
+}
 
 type Conf struct {
 	Refresh    duration `yaml:"refresh" json:"refresh"`
 	Nameserver string   `yaml:"nameserver" json:"nameserver"`
-} 
+}
 
 type Config struct {
 	Conf    `yaml:"conf" json:"conf"`
@@ -102,11 +102,11 @@ func (sc *SafeConfig) ReloadConfig(confFile string) (err error) {
 	for _, t := range c.Targets {
 		if common.SrvRecordCheck(t.Host) {
 			found, _ := regexp.MatchString("^ICMP|MTR|ICMP+MTR|TCP|HTTPGet$", t.Type)
-			if found == false {
+			if !found {
 				return fmt.Errorf("Target '%s' has unknown check type '%s' must be one of (ICMP|MTR|ICMP+MTR|TCP|HTTPGet)", t.Name, t.Type)
 			}
-			
-			srv_record_hosts, err := common.SrvRecordHosts(t.Host) 
+
+			srv_record_hosts, err := common.SrvRecordHosts(t.Host)
 			if err != nil {
 				return fmt.Errorf((fmt.Sprintf("Error processing SRV target: %s", t.Host)))
 			}
@@ -132,7 +132,7 @@ func (sc *SafeConfig) ReloadConfig(confFile string) (err error) {
 		} else {
 			targetNames = append(targetNames, t.Name)
 			found, _ := regexp.MatchString("^ICMP|MTR|ICMP+MTR|TCP|HTTPGet$", t.Type)
-			if found == false {
+			if !found {
 				return fmt.Errorf("Target '%s' has unknown check type '%s' must be one of (ICMP|MTR|ICMP+MTR|TCP|HTTPGet)", t.Name, t.Type)
 			}
 

@@ -37,10 +37,10 @@ func icmpIpv4(localAddr string, dst net.Addr, ttl int, pid int, timeout time.Dur
 	hop.Success = false
 	start := time.Now()
 	c, err := icmp.ListenPacket("ip4:icmp", localAddr)
-	defer c.Close()
 	if err != nil {
 		return hop, err
 	}
+	defer c.Close()
 
 	if err = c.IPv4PacketConn().SetTTL(ttl); err != nil {
 		return hop, err

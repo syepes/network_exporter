@@ -175,7 +175,7 @@ func HasListDuplicates(m []string) (string, error) {
 	tmp := map[string]bool{}
 
 	for v := range m {
-		if tmp[m[v]] == true {
+		if tmp[m[v]] {
 			return m[v], fmt.Errorf("Found duplicated record: %s", m[v])
 		}
 		tmp[m[v]] = true
