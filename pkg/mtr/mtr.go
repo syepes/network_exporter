@@ -153,8 +153,8 @@ func runMtr(destAddr string, icmpID int, options *MtrOptions) (result MtrResult,
 		hop.RangeTime = time.Duration(common.TimeRange(mtrReturn.allTime))
 
 		failSum := options.Count() - mtrReturn.succSum
-		loss := (float32)(failSum) / (float32)(options.Count()) * 100
-		hop.Loss = float32(loss)
+		loss := (float64)(failSum) / (float64)(options.Count())
+		hop.Loss = float64(loss)
 
 		result.Hops = append(result.Hops, hop)
 

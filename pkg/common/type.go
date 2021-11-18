@@ -53,5 +53,5 @@ type IcmpHop struct {
 	UncorrectedSDTime    time.Duration `json:"usd"`
 	CorrectedSDTime      time.Duration `json:"csd"`
 	RangeTime            time.Duration `json:"range"`
-	Loss                 float32       `json:"loss"`
+	Loss                 float64       `json:"loss"`
 }

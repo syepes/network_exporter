@@ -8,21 +8,33 @@
         "hide": true,
         "iconColor": "rgba(0, 211, 255, 1)",
         "name": "Annotations & Alerts",
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
         "type": "dashboard"
       }
     ]
   },
   "description": "https://github.com/syepes/network_exporter/",
   "editable": true,
+  "fiscalYearStartMonth": 0,
   "gnetId": null,
   "graphTooltip": 2,
-  "id": 4,
-  "iteration": 1590697755979,
+  "id": 16,
+  "iteration": 1637269954840,
   "links": [],
+  "liveNow": false,
   "panels": [
     {
       "collapsed": true,
       "datasource": null,
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -40,7 +52,7 @@
           "description": "- SD: Squared deviation\n- USD: Standard deviation without correction\n- CSD: Standard deviation with correction (Bessel's)\n- RANGE: Max-Min value range",
           "fieldConfig": {
             "defaults": {
-              "custom": {}
+              "links": []
             },
             "overrides": []
           },
@@ -67,9 +79,10 @@
           "linewidth": 1,
           "nullPointMode": "null",
           "options": {
-            "dataLinks": []
+            "alertThreshold": true
           },
           "percentage": false,
+          "pluginVersion": "8.2.3",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -128,6 +141,7 @@
           },
           "yaxes": [
             {
+              "$$hashKey": "object:214",
               "decimals": 3,
               "format": "none",
               "label": null,
@@ -137,6 +151,7 @@
               "show": true
             },
             {
+              "$$hashKey": "object:215",
               "format": "none",
               "label": null,
               "logBase": 1,
@@ -161,7 +176,7 @@
           "decimals": 2,
           "fieldConfig": {
             "defaults": {
-              "custom": {}
+              "links": []
             },
             "overrides": []
           },
@@ -192,9 +207,10 @@
           "linewidth": 3,
           "nullPointMode": "null",
           "options": {
-            "dataLinks": []
+            "alertThreshold": true
           },
           "percentage": false,
+          "pluginVersion": "8.2.3",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -267,6 +283,7 @@
           },
           "yaxes": [
             {
+              "$$hashKey": "object:75",
               "decimals": null,
               "format": "s",
               "label": "",
@@ -276,8 +293,9 @@
               "show": true
             },
             {
+              "$$hashKey": "object:76",
               "decimals": 2,
-              "format": "percent",
+              "format": "percentunit",
               "label": null,
               "logBase": 1,
               "max": null,
@@ -300,7 +318,7 @@
           "description": "",
           "fieldConfig": {
             "defaults": {
-              "custom": {}
+              "links": []
             },
             "overrides": []
           },
@@ -333,9 +351,10 @@
           "linewidth": 1,
           "nullPointMode": "null",
           "options": {
-            "dataLinks": []
+            "alertThreshold": true
           },
           "percentage": false,
+          "pluginVersion": "8.2.3",
           "pointradius": 2,
           "points": true,
           "renderer": "flot",
@@ -372,8 +391,9 @@
           },
           "yaxes": [
             {
+              "$$hashKey": "object:108",
               "decimals": 2,
-              "format": "`percent`",
+              "format": "percentunit",
               "label": null,
               "logBase": 1,
               "max": null,
@@ -381,6 +401,7 @@
               "show": true
             },
             {
+              "$$hashKey": "object:109",
               "format": "short",
               "label": null,
               "logBase": 1,
@@ -402,7 +423,7 @@
           "datasource": "$datasource",
           "fieldConfig": {
             "defaults": {
-              "custom": {}
+              "links": []
             },
             "overrides": []
           },
@@ -431,9 +452,10 @@
           "linewidth": 1,
           "nullPointMode": "connected",
           "options": {
-            "dataLinks": []
+            "alertThreshold": true
           },
           "percentage": false,
+          "pluginVersion": "8.2.3",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -499,7 +521,7 @@
           "datasource": "$datasource",
           "fieldConfig": {
             "defaults": {
-              "custom": {}
+              "links": []
             },
             "overrides": []
           },
@@ -530,9 +552,10 @@
           "linewidth": 3,
           "nullPointMode": "connected",
           "options": {
-            "dataLinks": []
+            "alertThreshold": true
           },
           "percentage": false,
+          "pluginVersion": "8.2.3",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -617,6 +640,10 @@
     {
       "collapsed": true,
       "datasource": null,
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -630,10 +657,6 @@
           "description": "Number of network HOPS",
           "fieldConfig": {
             "defaults": {
-              "custom": {
-                "align": null,
-                "displayMode": "color-background"
-              },
               "mappings": [],
               "thresholds": {
                 "mode": "absolute",
@@ -664,10 +687,13 @@
               "calcs": [
                 "mean"
               ],
+              "fields": "",
               "values": true
-            }
+            },
+            "text": {},
+            "textMode": "auto"
           },
-          "pluginVersion": "7.0.1",
+          "pluginVersion": "8.2.3",
           "targets": [
             {
               "expr": "mtr_hops{host=~\"$station\",name=~\"$name_mtr\"}",
@@ -694,7 +720,7 @@
           "description": "Mean Response time",
           "fieldConfig": {
             "defaults": {
-              "custom": {}
+              "links": []
             },
             "overrides": []
           },
@@ -725,9 +751,10 @@
           "linewidth": 3,
           "nullPointMode": "connected",
           "options": {
-            "dataLinks": []
+            "alertThreshold": true
           },
           "percentage": false,
+          "pluginVersion": "8.2.3",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -767,6 +794,7 @@
           },
           "yaxes": [
             {
+              "$$hashKey": "object:251",
               "format": "s",
               "label": null,
               "logBase": 1,
@@ -775,6 +803,7 @@
               "show": true
             },
             {
+              "$$hashKey": "object:252",
               "format": "s",
               "label": null,
               "logBase": 1,
@@ -798,7 +827,7 @@
           "description": "Packet loss in percent",
           "fieldConfig": {
             "defaults": {
-              "custom": {}
+              "links": []
             },
             "overrides": []
           },
@@ -829,9 +858,10 @@
           "linewidth": 3,
           "nullPointMode": "connected",
           "options": {
-            "dataLinks": []
+            "alertThreshold": true
           },
           "percentage": false,
+          "pluginVersion": "8.2.3",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -871,8 +901,9 @@
           },
           "yaxes": [
             {
+              "$$hashKey": "object:284",
               "decimals": 2,
-              "format": "percent",
+              "format": "percentunit",
               "label": null,
               "logBase": 1,
               "max": null,
@@ -880,6 +911,7 @@
               "show": true
             },
             {
+              "$$hashKey": "object:285",
               "format": "s",
               "label": null,
               "logBase": 1,
@@ -903,20 +935,7 @@
           "description": "Number of network HOPS Changes",
           "fieldConfig": {
             "defaults": {
-              "custom": {
-                "align": null,
-                "displayMode": "color-background"
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  }
-                ]
-              },
+              "links": [],
               "unit": "none"
             },
             "overrides": []
@@ -947,10 +966,10 @@
           "linewidth": 1,
           "nullPointMode": "null",
           "options": {
-            "dataLinks": []
+            "alertThreshold": true
           },
           "percentage": false,
-          "pluginVersion": "7.0.0",
+          "pluginVersion": "8.2.3",
           "pointradius": 2,
           "points": true,
           "renderer": "flot",
@@ -991,7 +1010,7 @@
           "yaxes": [
             {
               "decimals": 0,
-              "format": "short",
+              "format": "none",
               "label": null,
               "logBase": 1,
               "max": null,
@@ -1019,6 +1038,10 @@
     {
       "collapsed": true,
       "datasource": null,
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -1031,27 +1054,17 @@
           "datasource": "$datasource",
           "fieldConfig": {
             "defaults": {
-              "custom": {
-                "displayMode": "color-background"
-              },
               "mappings": [
                 {
-                  "from": "",
-                  "id": 0,
-                  "operator": "",
-                  "text": "DOWN",
-                  "to": "",
-                  "type": 1,
-                  "value": "0"
-                },
-                {
-                  "from": "",
-                  "id": 1,
-                  "operator": "",
-                  "text": "UP",
-                  "to": "",
-                  "type": 1,
-                  "value": "1"
+                  "options": {
+                    "0": {
+                      "text": "DOWN"
+                    },
+                    "1": {
+                      "text": "UP"
+                    }
+                  },
+                  "type": "value"
                 }
               ],
               "thresholds": {
@@ -1087,10 +1100,13 @@
               "calcs": [
                 "mean"
               ],
+              "fields": "",
               "values": true
-            }
+            },
+            "text": {},
+            "textMode": "auto"
           },
-          "pluginVersion": "7.0.1",
+          "pluginVersion": "8.2.3",
           "targets": [
             {
               "expr": "tcp_connection_status{host=~\"$station\",name=~\"$name_tcp\"}",
@@ -1117,7 +1133,7 @@
           "description": "Response time",
           "fieldConfig": {
             "defaults": {
-              "custom": {}
+              "links": []
             },
             "overrides": []
           },
@@ -1148,9 +1164,10 @@
           "linewidth": 3,
           "nullPointMode": "connected",
           "options": {
-            "dataLinks": []
+            "alertThreshold": true
           },
           "percentage": false,
+          "pluginVersion": "8.2.3",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -1221,6 +1238,10 @@
     {
       "collapsed": true,
       "datasource": null,
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -1238,7 +1259,7 @@
           "description": "Download Drilldown",
           "fieldConfig": {
             "defaults": {
-              "custom": {}
+              "links": []
             },
             "overrides": []
           },
@@ -1248,7 +1269,7 @@
             "h": 7,
             "w": 24,
             "x": 0,
-            "y": 14
+            "y": 4
           },
           "hiddenSeries": false,
           "id": 21,
@@ -1265,9 +1286,10 @@
           "linewidth": 1,
           "nullPointMode": "connected",
           "options": {
-            "dataLinks": []
+            "alertThreshold": true
           },
           "percentage": false,
+          "pluginVersion": "8.2.3",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -1344,7 +1366,7 @@
           "description": "Total Download time",
           "fieldConfig": {
             "defaults": {
-              "custom": {}
+              "links": []
             },
             "overrides": []
           },
@@ -1354,7 +1376,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 21
+            "y": 11
           },
           "hiddenSeries": false,
           "id": 25,
@@ -1375,9 +1397,10 @@
           "linewidth": 1,
           "nullPointMode": "connected",
           "options": {
-            "dataLinks": []
+            "alertThreshold": true
           },
           "percentage": false,
+          "pluginVersion": "8.2.3",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -1454,7 +1477,7 @@
           "description": "Download Speed",
           "fieldConfig": {
             "defaults": {
-              "custom": {}
+              "links": []
             },
             "overrides": []
           },
@@ -1464,7 +1487,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 21
+            "y": 11
           },
           "hiddenSeries": false,
           "id": 26,
@@ -1487,9 +1510,10 @@
           "linewidth": 1,
           "nullPointMode": "connected",
           "options": {
-            "dataLinks": []
+            "alertThreshold": true
           },
           "percentage": false,
+          "pluginVersion": "8.2.3",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -1564,6 +1588,10 @@
     {
       "collapsed": true,
       "datasource": null,
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -1575,18 +1603,12 @@
         {
           "columns": [],
           "datasource": "$datasource",
-          "fieldConfig": {
-            "defaults": {
-              "custom": {}
-            },
-            "overrides": []
-          },
           "fontSize": "100%",
           "gridPos": {
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 46
+            "y": 5
           },
           "id": 18,
           "pageSize": null,
@@ -1681,7 +1703,7 @@
           "decimals": 0,
           "fieldConfig": {
             "defaults": {
-              "custom": {}
+              "links": []
             },
             "overrides": []
           },
@@ -1691,7 +1713,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 46
+            "y": 5
           },
           "hiddenSeries": false,
           "id": 19,
@@ -1711,9 +1733,10 @@
           "linewidth": 1,
           "nullPointMode": "connected",
           "options": {
-            "dataLinks": []
+            "alertThreshold": true
           },
           "percentage": false,
+          "pluginVersion": "8.2.3",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -1797,7 +1820,7 @@
           "datasource": "$datasource",
           "fieldConfig": {
             "defaults": {
-              "custom": {}
+              "links": []
             },
             "overrides": []
           },
@@ -1807,7 +1830,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 54
+            "y": 13
           },
           "hiddenSeries": false,
           "id": 16,
@@ -1824,9 +1847,10 @@
           "linewidth": 1,
           "nullPointMode": "connected",
           "options": {
-            "dataLinks": []
+            "alertThreshold": true
           },
           "percentage": false,
+          "pluginVersion": "8.2.3",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -1891,7 +1915,7 @@
           "datasource": "$datasource",
           "fieldConfig": {
             "defaults": {
-              "custom": {}
+              "links": []
             },
             "overrides": []
           },
@@ -1901,7 +1925,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 54
+            "y": 13
           },
           "hiddenSeries": false,
           "id": 17,
@@ -1918,9 +1942,10 @@
           "linewidth": 1,
           "nullPointMode": "connected",
           "options": {
-            "dataLinks": []
+            "alertThreshold": true
           },
           "percentage": false,
+          "pluginVersion": "8.2.3",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -1983,7 +2008,7 @@
     }
   ],
   "refresh": false,
-  "schemaVersion": 25,
+  "schemaVersion": 31,
   "style": "dark",
   "tags": [
     "VictoriaMetrics",
@@ -1997,7 +2022,9 @@
           "text": "Prometheus",
           "value": "Prometheus"
         },
-        "hide": 2,
+        "description": null,
+        "error": null,
+        "hide": 0,
         "includeAll": false,
         "label": null,
         "multi": false,
@@ -2018,19 +2045,23 @@
         },
         "datasource": "$datasource",
         "definition": "label_values(ping_loss_percent, host)",
+        "description": null,
+        "error": null,
         "hide": 0,
         "includeAll": false,
         "label": "Station",
         "multi": false,
         "name": "station",
         "options": [],
-        "query": "label_values(ping_loss_percent, host)",
+        "query": {
+          "query": "label_values(ping_loss_percent, host)",
+          "refId": "local-station-Variable-Query"
+        },
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
         "sort": 1,
         "tagValuesQuery": "",
-        "tags": [],
         "tagsQuery": "",
         "type": "query",
         "useTags": false
@@ -2039,24 +2070,28 @@
         "allValue": null,
         "current": {
           "selected": false,
-          "text": "google-dns1",
-          "value": "google-dns1"
+          "text": "cloudflare-dns",
+          "value": "cloudflare-dns"
         },
         "datasource": "$datasource",
         "definition": "label_values(ping_loss_percent{host=~\"$station\"}, name)",
+        "description": null,
+        "error": null,
         "hide": 0,
         "includeAll": false,
         "label": "Target ICMP",
         "multi": false,
         "name": "name_icmp",
         "options": [],
-        "query": "label_values(ping_loss_percent{host=~\"$station\"}, name)",
+        "query": {
+          "query": "label_values(ping_loss_percent{host=~\"$station\"}, name)",
+          "refId": "Prometheus-name_icmp-Variable-Query"
+        },
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
         "sort": 1,
         "tagValuesQuery": "",
-        "tags": [],
         "tagsQuery": "",
         "type": "query",
         "useTags": false
@@ -2070,19 +2105,23 @@
         },
         "datasource": "$datasource",
         "definition": "label_values(mtr_hops{host=~\"$station\"}, name)",
+        "description": null,
+        "error": null,
         "hide": 0,
         "includeAll": false,
         "label": "Target MTR",
         "multi": false,
         "name": "name_mtr",
         "options": [],
-        "query": "label_values(mtr_hops{host=~\"$station\"}, name)",
+        "query": {
+          "query": "label_values(mtr_hops{host=~\"$station\"}, name)",
+          "refId": "Prometheus-name_mtr-Variable-Query"
+        },
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
         "sort": 1,
         "tagValuesQuery": "",
-        "tags": [],
         "tagsQuery": "",
         "type": "query",
         "useTags": false
@@ -2090,25 +2129,29 @@
       {
         "allValue": null,
         "current": {
-          "selected": true,
+          "selected": false,
           "text": "cloudflare-dns-https",
           "value": "cloudflare-dns-https"
         },
         "datasource": "$datasource",
         "definition": "label_values(tcp_connection_status{host=~\"$station\"}, name)",
+        "description": null,
+        "error": null,
         "hide": 0,
         "includeAll": false,
         "label": "Target TCP",
         "multi": false,
         "name": "name_tcp",
         "options": [],
-        "query": "label_values(tcp_connection_status{host=~\"$station\"}, name)",
+        "query": {
+          "query": "label_values(tcp_connection_status{host=~\"$station\"}, name)",
+          "refId": "Prometheus-name_tcp-Variable-Query"
+        },
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
         "sort": 1,
         "tagValuesQuery": "",
-        "tags": [],
         "tagsQuery": "",
         "type": "query",
         "useTags": false
@@ -2116,26 +2159,29 @@
       {
         "allValue": null,
         "current": {
-          "isNone": true,
-          "selected": true,
-          "text": "None",
-          "value": ""
+          "selected": false,
+          "text": "download-file-64M",
+          "value": "download-file-64M"
         },
         "datasource": "$datasource",
         "definition": "label_values(http_get_status{host=~\"$station\"}, name)",
+        "description": null,
+        "error": null,
         "hide": 0,
         "includeAll": false,
         "label": "Target HTTP",
         "multi": false,
         "name": "name_http",
         "options": [],
-        "query": "label_values(http_get_status{host=~\"$station\"}, name)",
+        "query": {
+          "query": "label_values(http_get_status{host=~\"$station\"}, name)",
+          "refId": "Prometheus-name_http-Variable-Query"
+        },
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
         "sort": 1,
         "tagValuesQuery": "",
-        "tags": [],
         "tagsQuery": "",
         "type": "query",
         "useTags": false
@@ -2173,5 +2219,5 @@
   "timezone": "",
   "title": "PingStation",
   "uid": "GGIdNh9Wz",
-  "version": 23
+  "version": 24
 }
