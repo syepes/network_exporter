@@ -119,7 +119,7 @@ To see all available configuration flags:
 ```
 
 Most of the configuration is set in the YAML based config file:
-- should be edited before building the docker container - network_exporter.yml
+- network_exporter.yml should be edited before building the docker container
 
 ```yaml
 conf:
