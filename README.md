@@ -84,7 +84,6 @@ Each metric contains the labels:
 ### Prerequisites for Linux
 ```
 apt update
-apt install mtr
 apt install docker
 apt install docker.io
 touch network_exporter.yml
