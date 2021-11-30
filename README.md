@@ -81,6 +81,13 @@ Each metric contains the labels:
 
 ## Building and running the software
 
+### Prerequisites for Linux
+```
+apt update
+apt install docker
+apt install docker.io
+touch network_exporter.yml
+```
 ### Local Build
 
 ```console
@@ -111,6 +118,7 @@ To see all available configuration flags:
 ```
 
 Most of the configuration is set in the YAML based config file:
+- network_exporter.yml should be edited before building the docker container
 
 ```yaml
 conf:
