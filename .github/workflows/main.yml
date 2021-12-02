@@ -11,7 +11,7 @@ on:
 
 jobs:
   build:
-    name: build images and push
+    name: build images
     runs-on: ubuntu-latest
 
     steps:
