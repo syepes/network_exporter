@@ -42,3 +42,22 @@ jobs:
       - name: build and push (master)
         if: "github.ref == 'refs/heads/master'"
         run: make build-push
+
+  releases-matrix:
+    name: Binary Release
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, windows, darwin]
+        goarch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: wangyoucao577/go-release-action@v1.22
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          goos: ${{ matrix.goos }}
+          goarch: ${{ matrix.goarch }}
+          project_path: "./network_exporter"
+          binary_name: "network_exporter"
+          ldflags: "-s -w"
+          extra_files: README.md LICENSE.md
