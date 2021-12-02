@@ -2,9 +2,9 @@ name: build
 
 on:
   push:
-    branches: master
-    tags:
-      - "*"
+    branches:
+      - master
+      - main
     paths-ignore:
       - "dist/**"
       - "**.md"
@@ -33,31 +33,6 @@ jobs:
         run: |
           echo ::set-output name=repo_tag::${GITHUB_REF#refs/*/}
 
-      - name: build and push (tag)
-        if: startsWith( github.ref, 'refs/tags/')
-        run: make build-push
-        env:
-          VERSION: ${{steps.vars.outputs.repo_tag}}
-
-      - name: build and push (master)
+      - name: build (master)
         if: "github.ref == 'refs/heads/master'"
-        run: make build-push
-
-  releases-matrix:
-    name: Binary Release
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        goos: [linux, windows, darwin]
-        goarch: [amd64, arm64]
-    steps:
-      - uses: actions/checkout@v2
-      - uses: wangyoucao577/go-release-action@v1.22
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          goos: ${{ matrix.goos }}
-          goarch: ${{ matrix.goarch }}
-          project_path: "./network_exporter"
-          binary_name: "network_exporter"
-          ldflags: "-s -w"
-          extra_files: README.md LICENSE.md
+        run: make build

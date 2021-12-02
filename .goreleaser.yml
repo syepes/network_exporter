@@ -13,6 +13,12 @@ builds:
       - amd64
       - arm64
       - arm
+    targets:
+      - linux_arm
+      - linux_arm64
+      - linux_amd64
+      - darwin_amd64
+      - darwin_arm64
     main: .
     ldflags: -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
     binary: network_exporter
@@ -20,9 +26,17 @@ archives:
   - format: tar.gz
     name_template: "{{ .ProjectName }}-{{ .Version }}.{{ .Os }}-{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
     replacements:
-      darwin: Darwin
+      darwin: macOS
       linux: Linux
+      windows: Windows
       amd64: x86_64
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE.md
+      - network_exporter.yml
     wrap_in_directory: true
 snapshot:
   name_template: SNAPSHOT-{{ .Commit }}
