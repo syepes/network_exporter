@@ -9,6 +9,7 @@ builds:
     goos:
       - linux
       - darwin
+      - windows
     goarch:
       - amd64
       - arm64
@@ -19,6 +20,7 @@ builds:
       - linux_amd64
       - darwin_amd64
       - darwin_arm64
+      - windows_amd64
     main: .
     ldflags: -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
     binary: network_exporter

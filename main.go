@@ -6,8 +6,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	_ "net/http/pprof"
@@ -26,7 +24,7 @@ import (
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
-const version string = "1.3.8"
+const version string = "1.4.0"
 
 var (
 	listenAddress  = kingpin.Flag("web.listen-address", "The address to listen on for HTTP requests").Default(":9427").String()
@@ -61,39 +59,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Signal handling
-	hup := make(chan os.Signal, 1)
-	signal.Notify(hup, syscall.SIGHUP)
-	susr := make(chan os.Signal, 1)
-	signal.Notify(susr, syscall.SIGUSR1)
-	go func() {
-		for {
-			select {
-			case <-hup:
-				level.Debug(logger).Log("msg", "Signal: HUP")
-				level.Info(logger).Log("msg", "ReLoading config")
-				if err := sc.ReloadConfig(*configFile); err != nil {
-					level.Error(logger).Log("msg", "Reloading config skipped", "err", err)
-					continue
-				} else {
-					monitorPING.AddTargets()
-					monitorPING.DelTargets()
-					monitorMTR.AddTargets()
-					monitorMTR.DelTargets()
-					monitorTCP.AddTargets()
-					monitorTCP.DelTargets()
-					monitorHTTPGet.AddTargets()
-					monitorHTTPGet.DelTargets()
-				}
-			case <-susr:
-				level.Debug(logger).Log("msg", "Signal: USR1")
-				fmt.Printf("PING: %+v\n", monitorPING)
-				fmt.Printf("MTR: %+v\n", monitorMTR)
-				fmt.Printf("TCP: %+v\n", monitorTCP)
-				fmt.Printf("HTTPGet: %+v\n", monitorHTTPGet)
-			}
-		}
-	}()
+	reloadSignal()
 
 	resolver := getResolver()
 
