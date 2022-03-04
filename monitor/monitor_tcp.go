@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/syepes/network_exporter/config"
 	"github.com/syepes/network_exporter/pkg/common"
 	"github.com/syepes/network_exporter/pkg/tcp"
@@ -79,7 +79,7 @@ func (p *TCPPort) AddTargets() {
 					level.Warn(p.logger).Log("type", "TCP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping target, could not identify host/port: %v", target.Host))
 					continue
 				}
-				err := p.AddTarget(target.Name, conn[0], conn[1])
+				err := p.AddTarget(target.Name, conn[0], conn[1], target.Labels.Kv)
 				if err != nil {
 					level.Warn(p.logger).Log("type", "TCP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping target: %s", target.Host), "err", err)
 				}
@@ -89,12 +89,12 @@ func (p *TCPPort) AddTargets() {
 }
 
 // AddTarget adds a target to the monitored list
-func (p *TCPPort) AddTarget(name string, host string, port string) (err error) {
-	return p.AddTargetDelayed(name, host, port, 0)
+func (p *TCPPort) AddTarget(name string, host string, port string, labels map[string]string) (err error) {
+	return p.AddTargetDelayed(name, host, port, labels, 0)
 }
 
 // AddTargetDelayed is AddTarget with a startup delay
-func (p *TCPPort) AddTargetDelayed(name string, host string, port string, startupDelay time.Duration) (err error) {
+func (p *TCPPort) AddTargetDelayed(name string, host string, port string, labels map[string]string, startupDelay time.Duration) (err error) {
 	level.Debug(p.logger).Log("type", "TCP", "func", "AddTargetDelayed", "msg", fmt.Sprintf("Adding Target: %s (%s:%s) in %s", name, host, port, startupDelay))
 
 	p.mtx.Lock()
@@ -106,7 +106,7 @@ func (p *TCPPort) AddTargetDelayed(name string, host string, port string, startu
 		return err
 	}
 
-	target, err := target.NewTCPPort(p.logger, startupDelay, name, ipAddrs[0], port, p.interval, p.timeout)
+	target, err := target.NewTCPPort(p.logger, startupDelay, name, ipAddrs[0], port, p.interval, p.timeout, labels)
 	if err != nil {
 		return err
 	}
@@ -162,8 +162,8 @@ func (p *TCPPort) removeTarget(key string) {
 	delete(p.targets, key)
 }
 
-// Export collects the metrics for each monitored target and returns it as a simple map
-func (p *TCPPort) Export() map[string]*tcp.TCPPortReturn {
+// ExportMetrics collects the metrics for each monitored target and returns it as a simple map
+func (p *TCPPort) ExportMetrics() map[string]*tcp.TCPPortReturn {
 	m := make(map[string]*tcp.TCPPortReturn)
 
 	p.mtx.RLock()
@@ -172,10 +172,29 @@ func (p *TCPPort) Export() map[string]*tcp.TCPPortReturn {
 	for _, target := range p.targets {
 		name := target.Name()
 		metrics := target.Compute()
+
 		if metrics != nil {
-			// level.Debug(p.logger).Log("type", "TCP", "func", "Export", "msg", fmt.Sprintf("Name: %s, Metrics: %+v", name, metrics))
+			// level.Debug(p.logger).Log("type", "TCP", "func", "ExportMetrics", "msg", fmt.Sprintf("Name: %s, Metrics: %+v, Labels: %+v", name, metrics, target.Labels()))
 			m[name] = metrics
 		}
 	}
 	return m
+}
+
+// ExportLabels target labels
+func (p *TCPPort) ExportLabels() map[string]map[string]string {
+	l := make(map[string]map[string]string)
+
+	p.mtx.RLock()
+	defer p.mtx.RUnlock()
+
+	for _, target := range p.targets {
+		name := target.Name()
+		labels := target.Labels()
+
+		if labels != nil {
+			l[name] = labels
+		}
+	}
+	return l
 }

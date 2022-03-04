@@ -22,6 +22,7 @@ var (
 type TCP struct {
 	Monitor *monitor.TCPPort
 	metrics map[string]*tcp.TCPPortReturn
+	labels  map[string]map[string]string
 }
 
 // Describe prom
@@ -37,8 +38,12 @@ func (p *TCP) Collect(ch chan<- prometheus.Metric) {
 	tcpMutex.Lock()
 	defer tcpMutex.Unlock()
 
-	if m := p.Monitor.Export(); len(m) > 0 {
+	if m := p.Monitor.ExportMetrics(); len(m) > 0 {
 		p.metrics = m
+	}
+
+	if l := p.Monitor.ExportLabels(); len(l) > 0 {
+		p.labels = l
 	}
 
 	if len(p.metrics) > 0 {
@@ -53,6 +58,10 @@ func (p *TCP) Collect(ch chan<- prometheus.Metric) {
 		l := strings.SplitN(target, " ", 2)
 		l = append(l, metric.DestAddr)
 		l = append(l, metric.DestPort)
+		l2 := prometheus.Labels(p.labels[target])
+
+		tcpTimeDesc    = prometheus.NewDesc("tcp_connection_seconds", "Connection time in seconds", tcpLabelNames, l2)
+		tcpStatusDesc  = prometheus.NewDesc("tcp_connection_status", "Connection Status", tcpLabelNames, l2)
 
 		ch <- prometheus.MustNewConstMetric(tcpTimeDesc, prometheus.GaugeValue, metric.ConTime.Seconds(), l...)
 

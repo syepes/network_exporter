@@ -71,7 +71,7 @@ This exporter gathers either ICMP, MTR, TCP Port or HTTP Get stats and exports t
 - `http_get_seconds{type=ContentTransfer}`:        ContentTransfer connection drill down time in seconds
 - `http_get_seconds{type=Total}`:                  Total connection time in seconds
 
-Each metric contains the labels:
+Each metric contains the below labels and additionally the ones added in the configuration file.
 
 - `name` (ALL: The target name)
 - `target` (ALL: the target IP Address)
@@ -82,12 +82,14 @@ Each metric contains the labels:
 ## Building and running the software
 
 ### Prerequisites for Linux
-```
+
+```console
 apt update
 apt install docker
 apt install docker.io
 touch network_exporter.yml
 ```
+
 ### Local Build
 
 ```console
@@ -117,14 +119,16 @@ To see all available configuration flags:
 ./network_exporter -h
 ```
 
-Most of the configuration is set in the YAML based config file:
-- network_exporter.yml should be edited before building the docker container
+The configuration (YAML) is mainly separated into three sections Main, Protocols and Targets.
+The file `network_exporter.yml` can be either edited before building the docker container or changed it runtime.
 
 ```yaml
+# Main Config
 conf:
   refresh: 15m
   nameserver: 192.168.0.1:53
 
+# Specific Protocol settings
 icmp:
   interval: 3s
   timeout: 1s
@@ -144,6 +148,7 @@ http_get:
   interval: 15m
   timeout: 5s
 
+# Target list and settings
 targets:
   - name: internal
     host: 192.168.0.1
@@ -151,6 +156,9 @@ targets:
     probe:
       - hostname1
       - hostname2
+    labels:
+      dc: home
+      rack: a1
   - name: google-dns1
     host: 8.8.8.8
     type: ICMP
@@ -181,20 +189,24 @@ If the host field of a target contains a SRV record with the format `_<service>.
 Every field of the parent target with a SRV record will be inherited by sub targets except `name` and `host`
 
 SRV record
-```
+
+```console
 _connectivity-check._icmp.example.com. 86400 IN SRV 10 5 8 server.example.com.
 _connectivity-check._icmp.example.com. 86400 IN SRV 10 5 8 server2.example.com.
 _connectivity-check._icmp.example.com. 86400 IN SRV 10 5 8 server3.example.com.
 ```
+
 Configuration reference
-```
+
+```yaml
   - name: test-srv-record
     host: _connectivity-check._icmp.example.com
     type: ICMP
 ```
 
 Will be resolved to 3 separate targets:
-```
+
+```yaml
   - name: server.example.com
     host: server.example.com
     type: ICMP
@@ -205,7 +217,6 @@ Will be resolved to 3 separate targets:
     host: server3.example.com
     type: ICMP
 ```
-
 
 ## Deployment
 
@@ -223,4 +234,4 @@ If you have any idea for an improvement or find a bug do not hesitate in opening
 ## License
 
 All content is distributed under the [Apache 2.0 License](http://www.apache.org/licenses/LICENSE-2.0)
-Copyright &copy; 2020, [Sebastian YEPES](mailto:syepes@gmail.com)
+Copyright &copy; 2020-2022, [Sebastian YEPES](mailto:syepes@gmail.com)

@@ -22,6 +22,7 @@ var (
 type MTR struct {
 	Monitor *monitor.MTR
 	metrics map[string]*mtr.MtrResult
+	labels  map[string]map[string]string
 }
 
 // Describe prom
@@ -37,8 +38,12 @@ func (p *MTR) Collect(ch chan<- prometheus.Metric) {
 	mtrMutex.Lock()
 	defer mtrMutex.Unlock()
 
-	if m := p.Monitor.Export(); len(m) > 0 {
+	if m := p.Monitor.ExportMetrics(); len(m) > 0 {
 		p.metrics = m
+	}
+
+	if l := p.Monitor.ExportLabels(); len(l) > 0 {
+		p.labels = l
 	}
 
 	if len(p.metrics) > 0 {
@@ -51,6 +56,10 @@ func (p *MTR) Collect(ch chan<- prometheus.Metric) {
 	for target, metric := range p.metrics {
 		targets = append(targets, target)
 		l := []string{target, metric.DestAddr}
+		l2 := prometheus.Labels(p.labels[target])
+
+		mtrDesc        = prometheus.NewDesc("mtr_rtt_seconds", "Round Trip Time in seconds", append(mtrLabelNames, "type"), l2)
+		mtrHopsDesc    = prometheus.NewDesc("mtr_hops", "Number of route hops", []string{"name", "target"}, l2)
 
 		ch <- prometheus.MustNewConstMetric(mtrHopsDesc, prometheus.GaugeValue, float64(len(metric.Hops)), l...)
 		for _, hop := range metric.Hops {

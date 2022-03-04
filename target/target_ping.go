@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/syepes/network_exporter/pkg/common"
 	"github.com/syepes/network_exporter/pkg/ping"
 )
@@ -21,6 +21,7 @@ type PING struct {
 	interval time.Duration
 	timeout  time.Duration
 	count    int
+	labels   map[string]string
 	result   *ping.PingResult
 	stop     chan struct{}
 	wg       sync.WaitGroup
@@ -28,7 +29,7 @@ type PING struct {
 }
 
 // NewPing starts a new monitoring goroutine
-func NewPing(logger log.Logger, icmpID *common.IcmpID, startupDelay time.Duration, name string, host string, interval time.Duration, timeout time.Duration, count int) (*PING, error) {
+func NewPing(logger log.Logger, icmpID *common.IcmpID, startupDelay time.Duration, name string, host string, interval time.Duration, timeout time.Duration, count int, labels map[string]string) (*PING, error) {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
@@ -40,6 +41,7 @@ func NewPing(logger log.Logger, icmpID *common.IcmpID, startupDelay time.Duratio
 		interval: interval,
 		timeout:  timeout,
 		count:    count,
+		labels:   labels,
 		stop:     make(chan struct{}),
 	}
 	t.wg.Add(1)
@@ -115,4 +117,11 @@ func (t *PING) Host() string {
 	t.RLock()
 	defer t.RUnlock()
 	return t.host
+}
+
+// Labels returns labels
+func (t *PING) Labels() map[string]string {
+	t.RLock()
+	defer t.RUnlock()
+	return t.labels
 }

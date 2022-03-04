@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/syepes/network_exporter/config"
 	"github.com/syepes/network_exporter/pkg/common"
 	"github.com/syepes/network_exporter/pkg/ping"
@@ -77,7 +77,7 @@ func (p *PING) AddTargets() {
 				continue
 			}
 			if target.Type == "ICMP" || target.Type == "ICMP+MTR" {
-				err := p.AddTarget(target.Name, target.Host)
+				err := p.AddTarget(target.Name, target.Host, target.Labels.Kv)
 				if err != nil {
 					level.Warn(p.logger).Log("type", "ICMP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping target: %s", target.Host), "err", err)
 				}
@@ -87,12 +87,12 @@ func (p *PING) AddTargets() {
 }
 
 // AddTarget adds a target to the monitored list
-func (p *PING) AddTarget(name string, host string) (err error) {
-	return p.AddTargetDelayed(name, host, 0)
+func (p *PING) AddTarget(name string, host string, labels map[string]string) (err error) {
+	return p.AddTargetDelayed(name, host, labels, 0)
 }
 
 // AddTargetDelayed is AddTarget with a startup delay
-func (p *PING) AddTargetDelayed(name string, host string, startupDelay time.Duration) (err error) {
+func (p *PING) AddTargetDelayed(name string, host string, labels map[string]string, startupDelay time.Duration) (err error) {
 	level.Debug(p.logger).Log("type", "ICMP", "func", "AddTargetDelayed", "msg", fmt.Sprintf("Adding Target: %s (%s) in %s", name, host, startupDelay))
 
 	p.mtx.Lock()
@@ -104,7 +104,7 @@ func (p *PING) AddTargetDelayed(name string, host string, startupDelay time.Dura
 		return err
 	}
 
-	target, err := target.NewPing(p.logger, p.icmpID, startupDelay, name, ipAddrs[0], p.interval, p.timeout, p.count)
+	target, err := target.NewPing(p.logger, p.icmpID, startupDelay, name, ipAddrs[0], p.interval, p.timeout, p.count, labels)
 	if err != nil {
 		return err
 	}
@@ -160,8 +160,8 @@ func (p *PING) removeTarget(key string) {
 	delete(p.targets, key)
 }
 
-// Export collects the metrics for each monitored target and returns it as a simple map
-func (p *PING) Export() map[string]*ping.PingResult {
+// ExportMetrics collects the metrics for each monitored target and returns it as a simple map
+func (p *PING) ExportMetrics() map[string]*ping.PingResult {
 	m := make(map[string]*ping.PingResult)
 
 	p.mtx.RLock()
@@ -170,10 +170,29 @@ func (p *PING) Export() map[string]*ping.PingResult {
 	for _, target := range p.targets {
 		name := target.Name()
 		metrics := target.Compute()
+
 		if metrics != nil {
-			// level.Debug(p.logger).Log("type", "ICMP", "func", "Export", "msg", fmt.Sprintf("Name: %s, Metrics: %+v", name, metrics))
+			// level.Debug(p.logger).Log("type", "ICMP", "func", "ExportMetrics", "msg", fmt.Sprintf("Name: %s, Metrics: %+v, Labels: %+v", name, metrics, target.Labels()))
 			m[name] = metrics
 		}
 	}
 	return m
+}
+
+// ExportLabels target labels
+func (p *PING) ExportLabels() map[string]map[string]string {
+	l := make(map[string]map[string]string)
+
+	p.mtx.RLock()
+	defer p.mtx.RUnlock()
+
+	for _, target := range p.targets {
+		name := target.Name()
+		labels := target.Labels()
+
+		if labels != nil {
+			l[name] = labels
+		}
+	}
+	return l
 }

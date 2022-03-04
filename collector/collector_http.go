@@ -23,6 +23,7 @@ var (
 type HTTPGet struct {
 	Monitor *monitor.HTTPGet
 	metrics map[string]*http.HTTPReturn
+	labels  map[string]map[string]string
 }
 
 // Describe prom
@@ -39,8 +40,12 @@ func (p *HTTPGet) Collect(ch chan<- prometheus.Metric) {
 	httpMutex.Lock()
 	defer httpMutex.Unlock()
 
-	if m := p.Monitor.Export(); len(m) > 0 {
+	if m := p.Monitor.ExportMetrics(); len(m) > 0 {
 		p.metrics = m
+	}
+
+	if l := p.Monitor.ExportLabels(); len(l) > 0 {
+		p.labels = l
 	}
 
 	if len(p.metrics) > 0 {
@@ -54,6 +59,11 @@ func (p *HTTPGet) Collect(ch chan<- prometheus.Metric) {
 		targets = append(targets, target)
 		l := strings.SplitN(target, " ", 2)
 		l = append(l, metric.DestAddr)
+		l2 := prometheus.Labels(p.labels[target])
+
+		httpTimeDesc    = prometheus.NewDesc("http_get_seconds", "HTTP Get Drill Down time in seconds", append(httpLabelNames, "type"), l2)
+		httpSizeDesc    = prometheus.NewDesc("http_get_content_bytes", "HTTP Get Content Size in bytes", httpLabelNames, l2)
+		httpStatusDesc  = prometheus.NewDesc("http_get_status", "HTTP Get Status", httpLabelNames, l2)
 
 		if metric.Success {
 			ch <- prometheus.MustNewConstMetric(httpStatusDesc, prometheus.GaugeValue, float64(metric.Status), l...)

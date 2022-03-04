@@ -22,6 +22,7 @@ var (
 type PING struct {
 	Monitor *monitor.PING
 	metrics map[string]*ping.PingResult
+	labels  map[string]map[string]string
 }
 
 // Describe prom
@@ -38,8 +39,12 @@ func (p *PING) Collect(ch chan<- prometheus.Metric) {
 	icmpMutex.Lock()
 	defer icmpMutex.Unlock()
 
-	if m := p.Monitor.Export(); len(m) > 0 {
+	if m := p.Monitor.ExportMetrics(); len(m) > 0 {
 		p.metrics = m
+	}
+
+	if l := p.Monitor.ExportLabels(); len(l) > 0 {
+		p.labels = l
 	}
 
 	if len(p.metrics) > 0 {
@@ -52,6 +57,11 @@ func (p *PING) Collect(ch chan<- prometheus.Metric) {
 	for target, metric := range p.metrics {
 		targets = append(targets, target)
 		l := []string{target, metric.DestAddr}
+		l2 := prometheus.Labels(p.labels[target])
+
+		icmpStatusDesc  = prometheus.NewDesc("ping_status", "Ping Status", icmpLabelNames, l2)
+		icmpRttDesc     = prometheus.NewDesc("ping_rtt_seconds", "Round Trip Time in seconds", append(icmpLabelNames, "type"), l2)
+		icmpLossDesc    = prometheus.NewDesc("ping_loss_percent", "Packet loss in percent", icmpLabelNames, l2)
 
 		if metric.Success {
 			ch <- prometheus.MustNewConstMetric(icmpStatusDesc, prometheus.GaugeValue, 1, l...)

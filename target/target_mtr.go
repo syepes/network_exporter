@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/syepes/network_exporter/pkg/common"
 	"github.com/syepes/network_exporter/pkg/mtr"
 )
@@ -22,6 +22,7 @@ type MTR struct {
 	timeout  time.Duration
 	maxHops  int
 	count    int
+	labels   map[string]string
 	result   *mtr.MtrResult
 	stop     chan struct{}
 	wg       sync.WaitGroup
@@ -29,7 +30,7 @@ type MTR struct {
 }
 
 // NewMTR starts a new monitoring goroutine
-func NewMTR(logger log.Logger, icmpID *common.IcmpID, startupDelay time.Duration, name string, host string, interval time.Duration, timeout time.Duration, maxHops int, count int) (*MTR, error) {
+func NewMTR(logger log.Logger, icmpID *common.IcmpID, startupDelay time.Duration, name string, host string, interval time.Duration, timeout time.Duration, maxHops int, count int, labels map[string]string) (*MTR, error) {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
@@ -42,6 +43,7 @@ func NewMTR(logger log.Logger, icmpID *common.IcmpID, startupDelay time.Duration
 		timeout:  timeout,
 		maxHops:  maxHops,
 		count:    count,
+		labels:   labels,
 		stop:     make(chan struct{}),
 	}
 	t.wg.Add(1)
@@ -117,4 +119,11 @@ func (t *MTR) Host() string {
 	t.RLock()
 	defer t.RUnlock()
 	return t.host
+}
+
+// Labels returns labels
+func (t *MTR) Labels() map[string]string {
+	t.RLock()
+	defer t.RUnlock()
+	return t.labels
 }

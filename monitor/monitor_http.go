@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/syepes/network_exporter/config"
 	"github.com/syepes/network_exporter/pkg/common"
 	"github.com/syepes/network_exporter/pkg/http"
@@ -75,12 +75,12 @@ func (p *HTTPGet) AddTargets() {
 			}
 			if target.Type == "HTTPGet" {
 				if target.Proxy != "" {
-					err := p.AddTarget(target.Name, target.Host, target.Proxy)
+					err := p.AddTarget(target.Name, target.Host, target.Proxy, target.Labels.Kv)
 					if err != nil {
 						level.Warn(p.logger).Log("type", "HTTPGet", "func", "AddTargets", "msg", fmt.Sprintf("Skipping target: %s", target.Host), "err", err)
 					}
 				} else {
-					err := p.AddTarget(target.Name, target.Host, "")
+					err := p.AddTarget(target.Name, target.Host, "", target.Labels.Kv)
 					if err != nil {
 						level.Warn(p.logger).Log("type", "HTTPGet", "func", "AddTargets", "msg", fmt.Sprintf("Skipping target: %s", target.Host), "err", err)
 					}
@@ -91,12 +91,12 @@ func (p *HTTPGet) AddTargets() {
 }
 
 // AddTarget adds a target to the monitored list
-func (p *HTTPGet) AddTarget(name string, url string, proxy string) (err error) {
-	return p.AddTargetDelayed(name, url, proxy, 0)
+func (p *HTTPGet) AddTarget(name string, url string, proxy string, labels map[string]string) (err error) {
+	return p.AddTargetDelayed(name, url, proxy, labels, 0)
 }
 
 // AddTargetDelayed is AddTarget with a startup delay
-func (p *HTTPGet) AddTargetDelayed(name string, urlStr string, proxy string, startupDelay time.Duration) (err error) {
+func (p *HTTPGet) AddTargetDelayed(name string, urlStr string, proxy string, labels map[string]string, startupDelay time.Duration) (err error) {
 	if proxy != "" {
 		level.Debug(p.logger).Log("type", "HTTPGet", "func", "AddTargetDelayed", "msg", fmt.Sprintf("Adding Target: %s (%s) with proxy (%s) in %s", name, urlStr, proxy, startupDelay))
 	} else {
@@ -120,7 +120,7 @@ func (p *HTTPGet) AddTargetDelayed(name string, urlStr string, proxy string, sta
 		}
 	}
 
-	target, err := target.NewHTTPGet(p.logger, startupDelay, name, dURL.String(), proxy, p.interval, p.timeout)
+	target, err := target.NewHTTPGet(p.logger, startupDelay, name, dURL.String(), proxy, p.interval, p.timeout, labels)
 	if err != nil {
 		return err
 	}
@@ -177,7 +177,7 @@ func (p *HTTPGet) removeTarget(key string) {
 }
 
 // Export collects the metrics for each monitored target and returns it as a simple map
-func (p *HTTPGet) Export() map[string]*http.HTTPReturn {
+func (p *HTTPGet) ExportMetrics() map[string]*http.HTTPReturn {
 	m := make(map[string]*http.HTTPReturn)
 
 	p.mtx.RLock()
@@ -186,10 +186,29 @@ func (p *HTTPGet) Export() map[string]*http.HTTPReturn {
 	for _, target := range p.targets {
 		name := target.Name()
 		metrics := target.Compute()
+
 		if metrics != nil {
-			// level.Debug(p.logger).Log("type", "HTTPGet", "func", "Export", "msg", fmt.Sprintf("Name: %s, Metrics: %+v", name, metrics))
+			// level.Debug(p.logger).Log("type", "HTTPGet", "func", "ExportMetrics", "msg", fmt.Sprintf("Name: %s, Metrics: %+v, Labels: %+v", name, metrics, target.Labels()))
 			m[name] = metrics
 		}
 	}
 	return m
+}
+
+// ExportLabels target labels
+func (p *HTTPGet) ExportLabels() map[string]map[string]string {
+	l := make(map[string]map[string]string)
+
+	p.mtx.RLock()
+	defer p.mtx.RUnlock()
+
+	for _, target := range p.targets {
+		name := target.Name()
+		labels := target.Labels()
+
+		if labels != nil {
+			l[name] = labels
+		}
+	}
+	return l
 }

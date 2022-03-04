@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/syepes/network_exporter/pkg/tcp"
 )
 
@@ -19,6 +19,7 @@ type TCPPort struct {
 	port     string
 	interval time.Duration
 	timeout  time.Duration
+	labels   map[string]string
 	result   *tcp.TCPPortReturn
 	stop     chan struct{}
 	wg       sync.WaitGroup
@@ -26,7 +27,7 @@ type TCPPort struct {
 }
 
 // NewTCPPort starts a new monitoring goroutine
-func NewTCPPort(logger log.Logger, startupDelay time.Duration, name string, host string, port string, interval time.Duration, timeout time.Duration) (*TCPPort, error) {
+func NewTCPPort(logger log.Logger, startupDelay time.Duration, name string, host string, port string, interval time.Duration, timeout time.Duration, labels map[string]string) (*TCPPort, error) {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
@@ -37,6 +38,7 @@ func NewTCPPort(logger log.Logger, startupDelay time.Duration, name string, host
 		port:     port,
 		interval: interval,
 		timeout:  timeout,
+		labels:   labels,
 		stop:     make(chan struct{}),
 	}
 	t.wg.Add(1)
@@ -111,4 +113,11 @@ func (t *TCPPort) Host() string {
 	t.RLock()
 	defer t.RUnlock()
 	return t.host
+}
+
+// Labels returns labels
+func (t *TCPPort) Labels() map[string]string {
+	t.RLock()
+	defer t.RUnlock()
+	return t.labels
 }

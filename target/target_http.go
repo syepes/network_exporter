@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/syepes/network_exporter/pkg/http"
 )
 
@@ -19,6 +19,7 @@ type HTTPGet struct {
 	proxy    string
 	interval time.Duration
 	timeout  time.Duration
+	labels   map[string]string
 	result   *http.HTTPReturn
 	stop     chan struct{}
 	wg       sync.WaitGroup
@@ -26,7 +27,7 @@ type HTTPGet struct {
 }
 
 // NewHTTPGet starts a new monitoring goroutine
-func NewHTTPGet(logger log.Logger, startupDelay time.Duration, name string, url string, proxy string, interval time.Duration, timeout time.Duration) (*HTTPGet, error) {
+func NewHTTPGet(logger log.Logger, startupDelay time.Duration, name string, url string, proxy string, interval time.Duration, timeout time.Duration, labels map[string]string) (*HTTPGet, error) {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
@@ -37,6 +38,7 @@ func NewHTTPGet(logger log.Logger, startupDelay time.Duration, name string, url 
 		proxy:    proxy,
 		interval: interval,
 		timeout:  timeout,
+		labels:   labels,
 		stop:     make(chan struct{}),
 	}
 	t.wg.Add(1)
@@ -124,4 +126,11 @@ func (t *HTTPGet) URL() string {
 	t.RLock()
 	defer t.RUnlock()
 	return t.url
+}
+
+// Labels returns labels
+func (t *HTTPGet) Labels() map[string]string {
+	t.RLock()
+	defer t.RUnlock()
+	return t.labels
 }
