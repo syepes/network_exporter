@@ -86,6 +86,45 @@ func (p *PING) AddTargets() {
 	}
 }
 
+// Readd target if IP was changed (DNS record)
+func (p *PING) CheckActiveTargets() (err error) {
+	level.Debug(p.logger).Log("type", "ICMP", "func", "CheckActiveTargets", "msg", fmt.Sprintf("Current Targets: %d, cfg: %d", len(p.targets), countTargets(p.sc, "ICMP")))
+
+	targetActiveTmp := make(map[string]string)
+	for _, v := range p.targets {
+		targetActiveTmp[v.Name()] = v.Host()
+	}
+
+	for targetName, targetIp := range targetActiveTmp {
+		for _, target := range p.sc.Cfg.Targets {
+			if target.Name != targetName {
+				continue
+			}
+			ipAddrs, err := common.DestAddrs(target.Host, p.resolver)
+			if err != nil || len(ipAddrs) == 0 {
+				return err
+			}
+
+			if !func(ips []string, target string) bool {
+				for _, ip := range ips {
+					if ip == target {
+						return true
+					}
+				}
+				return false
+			}(ipAddrs, targetIp) {
+
+				p.RemoveTarget(targetName)
+				err := p.AddTarget(target.Name, target.Host)
+				if err != nil {
+					level.Warn(p.logger).Log("type", "ICMP", "func", "CheckActiveTargets", "msg", fmt.Sprintf("Skipping target: %s", target.Host), "err", err)
+				}
+			}
+		}
+	}
+	return nil
+}
+
 // AddTarget adds a target to the monitored list
 func (p *PING) AddTarget(name string, host string, labels map[string]string) (err error) {
 	return p.AddTargetDelayed(name, host, labels, 0)

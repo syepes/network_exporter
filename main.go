@@ -54,7 +54,7 @@ func main() {
 	level.Info(logger).Log("msg", "Starting network_exporter", "version", version)
 
 	level.Info(logger).Log("msg", "Loading config")
-	if err := sc.ReloadConfig(*configFile); err != nil {
+	if err := sc.ReloadConfig(logger, *configFile); err != nil {
 		level.Error(logger).Log("msg", "Loading config", "err", err)
 		os.Exit(1)
 	}
@@ -88,18 +88,21 @@ func startConfigRefresh() {
 
 	for range time.NewTicker(interval).C {
 		level.Info(logger).Log("msg", "ReLoading config")
-		if err := sc.ReloadConfig(*configFile); err != nil {
+		if err := sc.ReloadConfig(logger, *configFile); err != nil {
 			level.Error(logger).Log("msg", "Reloading config skipped", "err", err)
 			continue
 		} else {
-			monitorPING.AddTargets()
 			monitorPING.DelTargets()
-			monitorMTR.AddTargets()
+			monitorPING.CheckActiveTargets()
+			monitorPING.AddTargets()
 			monitorMTR.DelTargets()
-			monitorTCP.AddTargets()
+			monitorMTR.CheckActiveTargets()
+			monitorMTR.AddTargets()
 			monitorTCP.DelTargets()
-			monitorHTTPGet.AddTargets()
+			monitorTCP.CheckActiveTargets()
+			monitorTCP.AddTargets()
 			monitorHTTPGet.DelTargets()
+			monitorHTTPGet.AddTargets()
 		}
 	}
 }

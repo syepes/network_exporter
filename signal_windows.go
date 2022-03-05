@@ -22,18 +22,21 @@ func reloadSignal() {
 			case <-hup:
 				level.Debug(logger).Log("msg", "Signal: HUP")
 				level.Info(logger).Log("msg", "ReLoading config")
-				if err := sc.ReloadConfig(*configFile); err != nil {
+				if err := sc.ReloadConfiglogger, (*configFile); err != nil {
 					level.Error(logger).Log("msg", "Reloading config skipped", "err", err)
 					continue
 				} else {
-					monitorPING.AddTargets()
 					monitorPING.DelTargets()
-					monitorMTR.AddTargets()
+					monitorPING.CheckActiveTargets()
+					monitorPING.AddTargets()
 					monitorMTR.DelTargets()
-					monitorTCP.AddTargets()
+					monitorMTR.CheckActiveTargets()
+					monitorMTR.AddTargets()
 					monitorTCP.DelTargets()
-					monitorHTTPGet.AddTargets()
+					monitorTCP.CheckActiveTargets()
+					monitorTCP.AddTargets()
 					monitorHTTPGet.DelTargets()
+					monitorHTTPGet.AddTargets()
 				}
 			}
 		}

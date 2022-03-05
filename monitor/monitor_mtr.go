@@ -163,6 +163,45 @@ func (p *MTR) removeTarget(key string) {
 	delete(p.targets, key)
 }
 
+// Readd target if IP was changed (DNS record)
+func (p *MTR) CheckActiveTargets() (err error) {
+	level.Debug(p.logger).Log("type", "MTR", "func", "CheckActiveTargets", "msg", fmt.Sprintf("Current Targets: %d, cfg: %d", len(p.targets), countTargets(p.sc, "MTR")))
+
+	targetActiveTmp := make(map[string]string)
+	for _, v := range p.targets {
+		targetActiveTmp[v.Name()] = v.Host()
+	}
+
+	for targetName, targetIp := range targetActiveTmp {
+		for _, target := range p.sc.Cfg.Targets {
+			if target.Name != targetName {
+				continue
+			}
+			ipAddrs, err := common.DestAddrs(target.Host, p.resolver)
+			if err != nil || len(ipAddrs) == 0 {
+				return err
+			}
+
+			if !func(ips []string, target string) bool {
+				for _, ip := range ips {
+					if ip == target {
+						return true
+					}
+				}
+				return false
+			}(ipAddrs, targetIp) {
+
+				p.RemoveTarget(targetName)
+				err := p.AddTarget(target.Name, target.Host, target.Labels.Kv)
+				if err != nil {
+					level.Warn(p.logger).Log("type", "MTR", "func", "CheckActiveTargets", "msg", fmt.Sprintf("Skipping target: %s", target.Host), "err", err)
+				}
+			}
+		}
+	}
+	return nil
+}
+
 // ExportMetrics collects the metrics for each monitored target and returns it as a simple map
 func (p *MTR) ExportMetrics() map[string]*mtr.MtrResult {
 	m := make(map[string]*mtr.MtrResult)

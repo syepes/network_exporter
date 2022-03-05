@@ -19,14 +19,25 @@ func SrvRecordCheck(record string) bool {
 }
 
 func SrvRecordHosts(record string) ([]string, error) {
-	_, members, err := net.LookupSRV("", "", record)
+	record_split := strings.Split(record, ".")
+	service :=  record_split[0][1:]
+	proto := record_split[1][1:]
+
+	_, members, err := net.LookupSRV(service, proto, strings.Join(record_split[2:],"."))
 	if err != nil {
-		return nil, fmt.Errorf("Resolving target: %v", err)
+		return nil, fmt.Errorf("resolving target: %v", err)
 	}
 	hosts := []string{}
-	for _, host := range members {
-		hosts = append(hosts, host.Target)
+	if proto == "tcp" {
+		for _, host := range members {
+			hosts = append(hosts,  fmt.Sprintf("%s:%d", host.Target[:len(host.Target) - 1], host.Port))
+		}
+	} else {
+		for _, host := range members {
+			hosts = append(hosts, host.Target[:len(host.Target) - 1])
+		}
 	}
+
 	return hosts, nil
 }
 
