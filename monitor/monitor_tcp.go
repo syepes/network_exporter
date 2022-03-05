@@ -162,6 +162,50 @@ func (p *TCPPort) removeTarget(key string) {
 	delete(p.targets, key)
 }
 
+// Readd target if IP was changed (DNS record)
+func (p *TCPPort) CheckActiveTargets() (err error){
+	level.Debug(p.logger).Log("type", "TCP", "func", "CheckActiveTargets", "msg", fmt.Sprintf("Current Targets: %d, cfg: %d", len(p.targets), countTargets(p.sc, "TCP")))
+
+	targetActiveTmp := make(map[string]string)
+	for _, v := range p.targets {
+		targetActiveTmp[v.Name()] = v.Host()
+	}
+
+	for targetName, targetIp := range targetActiveTmp {
+		for _, target := range p.sc.Cfg.Targets {
+			if target.Name != targetName {
+				continue
+			}
+			ipAddrs, err := common.DestAddrs(strings.Split(target.Host, ":")[0], p.resolver)
+			if err != nil || len(ipAddrs) == 0 {
+				return err
+			}
+
+			if !func(ips []string, target string) bool {
+				for _, ip := range ips {
+					if ip == target {
+						return true
+					}
+				}
+				return false
+			}(ipAddrs, targetIp) {
+
+				p.RemoveTarget(targetName)
+				conn := strings.Split(target.Host, ":")
+				if len(conn) != 2 {
+					level.Warn(p.logger).Log("type", "TCP", "func", "CheckActiveTargets", "msg", fmt.Sprintf("Skipping target, could not identify host/port: %v", target.Host))
+					continue
+				}
+				err := p.AddTarget(target.Name, conn[0], conn[1],  target.Labels.Kv)
+				if err != nil {
+					level.Warn(p.logger).Log("type", "TCP", "func", "CheckActiveTargets", "msg", fmt.Sprintf("Skipping target: %s", target.Host), "err", err)
+				}
+			}
+		}
+	}
+	return nil
+}
+
 // ExportMetrics collects the metrics for each monitored target and returns it as a simple map
 func (p *TCPPort) ExportMetrics() map[string]*tcp.TCPPortReturn {
 	m := make(map[string]*tcp.TCPPortReturn)

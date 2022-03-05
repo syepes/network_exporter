@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/syepes/network_exporter/pkg/common"
 	yaml "gopkg.in/yaml.v3"
 )
@@ -77,7 +80,7 @@ type SafeConfig struct {
 }
 
 // ReloadConfig Safe configuration reload
-func (sc *SafeConfig) ReloadConfig(confFile string) (err error) {
+func (sc *SafeConfig) ReloadConfig(logger log.Logger, confFile string) (err error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		panic(err)
@@ -97,25 +100,32 @@ func (sc *SafeConfig) ReloadConfig(confFile string) (err error) {
 
 	// Validate and Filter config
 	targets := Targets{}
-	var targetNames []string
-
 	for _, t := range c.Targets {
 		if common.SrvRecordCheck(t.Host) {
 			found, _ := regexp.MatchString("^ICMP|MTR|ICMP+MTR|TCP|HTTPGet$", t.Type)
 			if !found {
-				return fmt.Errorf("Target '%s' has unknown check type '%s' must be one of (ICMP|MTR|ICMP+MTR|TCP|HTTPGet)", t.Name, t.Type)
+				level.Error(logger).Log("type", "Config", "func", "ReloadConfig", "msg", fmt.Sprintf("Target '%s' has unknown check type '%s' must be one of (ICMP|MTR|ICMP+MTR|TCP|HTTPGet)", t.Name, t.Type))
+				continue
 			}
+			// Check that SRV record's type is TCP, if config's type is TCP
+			if t.Type == "TCP" {
+				if !strings.EqualFold(t.Type, strings.Split(t.Host, ".")[1][1:]) {
+					level.Error(logger).Log("type", "Config", "func", "ReloadConfig", "msg", fmt.Sprintf("Target %s type '%s' doesn't match SRV record proto '%s'", t.Name, t.Type, strings.Split(t.Host, ".")[1][1:]))
+					continue
+				}
+			}
+
 
 			srv_record_hosts, err := common.SrvRecordHosts(t.Host)
 			if err != nil {
-				return fmt.Errorf((fmt.Sprintf("Error processing SRV target: %s", t.Host)))
+				level.Error(logger).Log("type", "Config", "func", "ReloadConfig", "msg",(fmt.Sprintf("Error processing SRV {target %s}: %s", t.Host, err)))
+				continue
 			}
 
-			for _, srv_host := range srv_record_hosts {
-				targetNames = append(targetNames, srv_host)
+			for _, srvTarget := range srv_record_hosts {
 				sub_target := t
-				sub_target.Name = srv_host
-				sub_target.Host = srv_host
+				sub_target.Name = srvTarget
+				sub_target.Host = srvTarget
 
 				// Filter out the targets that are not assigned to the running host, if the `probe` is not specified don't filter
 				if sub_target.Probe == nil {
@@ -130,10 +140,10 @@ func (sc *SafeConfig) ReloadConfig(confFile string) (err error) {
 				}
 			}
 		} else {
-			targetNames = append(targetNames, t.Name)
 			found, _ := regexp.MatchString("^ICMP|MTR|ICMP+MTR|TCP|HTTPGet$", t.Type)
 			if !found {
-				return fmt.Errorf("Target '%s' has unknown check type '%s' must be one of (ICMP|MTR|ICMP+MTR|TCP|HTTPGet)", t.Name, t.Type)
+				level.Error(logger).Log("type", "Config", "func", "ReloadConfig", "msg","Target '%s' has unknown check type '%s' must be one of (ICMP|MTR|ICMP+MTR|TCP|HTTPGet)", t.Name, t.Type)
+				continue
 			}
 
 			// Filter out the targets that are not assigned to the running host, if the `probe` is not specified don't filter
@@ -153,8 +163,8 @@ func (sc *SafeConfig) ReloadConfig(confFile string) (err error) {
 	// Remap the filtered targets
 	c.Targets = targets
 
-	if _, err = common.HasListDuplicates(targetNames); err != nil {
-		return fmt.Errorf("Parsing config file: %s", err)
+	if _, err = HasDuplicateTargets(c.Targets); err != nil {
+		return fmt.Errorf("parsing config file: %s", err)
 	}
 
 	// Config precheck
@@ -194,4 +204,33 @@ func (d duration) Duration() time.Duration {
 // Set updates the underlying duration.
 func (d *duration) Set(dur time.Duration) {
 	*d = duration(dur)
+}
+
+// HasDuplicateTargets Find duplicates with same type 
+func HasDuplicateTargets(m Targets) (bool, error) {
+	tmp := map[string]map[string]bool{
+		"TCP": map[string]bool{},
+		"ICMP": map[string]bool{},
+		"MTR": map[string]bool{},
+		"HTTPGet": map[string]bool{},
+	}
+
+	for _,t := range m {
+		if t.Type == "ICMP+MTR" {
+			if tmp["MTR"][t.Name] {
+				return true, fmt.Errorf("Found duplicated record: %s", t.Name)
+			}
+			tmp["MTR"][t.Name] = true
+			if tmp["ICMP"][t.Name] {
+				return true, fmt.Errorf("Found duplicated record: %s", t.Name)
+			}
+			tmp["ICMP"][t.Name] = true
+		} else {
+			if tmp[t.Type][t.Name] {
+				return true, fmt.Errorf("Found duplicated record: %s", t.Name)
+			}
+			tmp[t.Type][t.Name] = true
+		}
+	}
+	return false, nil
 }
