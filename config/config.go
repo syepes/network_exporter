@@ -122,11 +122,10 @@ func (sc *SafeConfig) ReloadConfig(logger log.Logger, confFile string) (err erro
 				continue
 			}
 
-			for _, srv_host := range srv_record_hosts {
-				srvTargetName := srv_host[:len(srv_host) - 1]
+			for _, srvTarget := range srv_record_hosts {
 				sub_target := t
-				sub_target.Name = srvTargetName
-				sub_target.Host = srvTargetName
+				sub_target.Name = srvTarget
+				sub_target.Host = srvTarget
 
 				// Filter out the targets that are not assigned to the running host, if the `probe` is not specified don't filter
 				if sub_target.Probe == nil {
@@ -217,10 +216,21 @@ func HasDuplicateTargets(m Targets) (bool, error) {
 	}
 
 	for _,t := range m {
-		if tmp[t.Type][t.Name] {
-			return true, fmt.Errorf("Found duplicated record: %s", t.Name)
+		if t.Type == "ICMP+MTR" {
+			if tmp["MTR"][t.Name] {
+				return true, fmt.Errorf("Found duplicated record: %s", t.Name)
+			}
+			tmp["MTR"][t.Name] = true
+			if tmp["ICMP"][t.Name] {
+				return true, fmt.Errorf("Found duplicated record: %s", t.Name)
+			}
+			tmp["ICMP"][t.Name] = true
+		} else {
+			if tmp[t.Type][t.Name] {
+				return true, fmt.Errorf("Found duplicated record: %s", t.Name)
+			}
+			tmp[t.Type][t.Name] = true
 		}
-		tmp[t.Type][t.Name] = true
 	}
 	return false, nil
 }
