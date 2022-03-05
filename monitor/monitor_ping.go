@@ -115,7 +115,7 @@ func (p *PING) CheckActiveTargets() (err error) {
 			}(ipAddrs, targetIp) {
 
 				p.RemoveTarget(targetName)
-				err := p.AddTarget(target.Name, target.Host)
+				err := p.AddTarget(target.Name, target.Host, target.Labels.Kv)
 				if err != nil {
 					level.Warn(p.logger).Log("type", "ICMP", "func", "CheckActiveTargets", "msg", fmt.Sprintf("Skipping target: %s", target.Host), "err", err)
 				}
