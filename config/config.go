@@ -89,20 +89,21 @@ func (sc *SafeConfig) ReloadConfig(logger log.Logger, confFile string) (err erro
 	var c = &Config{}
 	f, err := os.Open(confFile)
 	if err != nil {
-		return fmt.Errorf("Reading config file: %s", err)
+		return fmt.Errorf("reading config file: %s", err)
 	}
 	defer f.Close()
 
 	decoder := yaml.NewDecoder(f)
 	if err = decoder.Decode(c); err != nil {
-		return fmt.Errorf("Parsing config file: %s", err)
+		return fmt.Errorf("parsing config file: %s", err)
 	}
 
 	// Validate and Filter config
 	targets := Targets{}
+	re := regexp.MustCompile("^ICMP|MTR|ICMP+MTR|TCP|HTTPGet$")
 	for _, t := range c.Targets {
 		if common.SrvRecordCheck(t.Host) {
-			found, _ := regexp.MatchString("^ICMP|MTR|ICMP+MTR|TCP|HTTPGet$", t.Type)
+			found := re.MatchString(t.Type)
 			if !found {
 				level.Error(logger).Log("type", "Config", "func", "ReloadConfig", "msg", fmt.Sprintf("Target '%s' has unknown check type '%s' must be one of (ICMP|MTR|ICMP+MTR|TCP|HTTPGet)", t.Name, t.Type))
 				continue
@@ -115,10 +116,9 @@ func (sc *SafeConfig) ReloadConfig(logger log.Logger, confFile string) (err erro
 				}
 			}
 
-
 			srv_record_hosts, err := common.SrvRecordHosts(t.Host)
 			if err != nil {
-				level.Error(logger).Log("type", "Config", "func", "ReloadConfig", "msg",(fmt.Sprintf("Error processing SRV {target %s}: %s", t.Host, err)))
+				level.Error(logger).Log("type", "Config", "func", "ReloadConfig", "msg", (fmt.Sprintf("Error processing SRV {target %s}: %s", t.Host, err)))
 				continue
 			}
 
@@ -140,9 +140,9 @@ func (sc *SafeConfig) ReloadConfig(logger log.Logger, confFile string) (err erro
 				}
 			}
 		} else {
-			found, _ := regexp.MatchString("^ICMP|MTR|ICMP+MTR|TCP|HTTPGet$", t.Type)
+			found := re.MatchString(t.Type)
 			if !found {
-				level.Error(logger).Log("type", "Config", "func", "ReloadConfig", "msg","Target '%s' has unknown check type '%s' must be one of (ICMP|MTR|ICMP+MTR|TCP|HTTPGet)", t.Name, t.Type)
+				level.Error(logger).Log("type", "Config", "func", "ReloadConfig", "msg", "Target '%s' has unknown check type '%s' must be one of (ICMP|MTR|ICMP+MTR|TCP|HTTPGet)", t.Name, t.Type)
 				continue
 			}
 
@@ -206,28 +206,28 @@ func (d *duration) Set(dur time.Duration) {
 	*d = duration(dur)
 }
 
-// HasDuplicateTargets Find duplicates with same type 
+// HasDuplicateTargets Find duplicates with same type
 func HasDuplicateTargets(m Targets) (bool, error) {
 	tmp := map[string]map[string]bool{
-		"TCP": map[string]bool{},
-		"ICMP": map[string]bool{},
-		"MTR": map[string]bool{},
+		"TCP":     map[string]bool{},
+		"ICMP":    map[string]bool{},
+		"MTR":     map[string]bool{},
 		"HTTPGet": map[string]bool{},
 	}
 
-	for _,t := range m {
+	for _, t := range m {
 		if t.Type == "ICMP+MTR" {
 			if tmp["MTR"][t.Name] {
-				return true, fmt.Errorf("Found duplicated record: %s", t.Name)
+				return true, fmt.Errorf("found duplicated record: %s", t.Name)
 			}
 			tmp["MTR"][t.Name] = true
 			if tmp["ICMP"][t.Name] {
-				return true, fmt.Errorf("Found duplicated record: %s", t.Name)
+				return true, fmt.Errorf("found duplicated record: %s", t.Name)
 			}
 			tmp["ICMP"][t.Name] = true
 		} else {
 			if tmp[t.Type][t.Name] {
-				return true, fmt.Errorf("Found duplicated record: %s", t.Name)
+				return true, fmt.Errorf("found duplicated record: %s", t.Name)
 			}
 			tmp[t.Type][t.Name] = true
 		}

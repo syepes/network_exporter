@@ -16,6 +16,7 @@ This exporter gathers either ICMP, MTR, TCP Port or HTTP Get stats and exports t
 - Dynamically Add or Remove targets without affecting the currently running tests
 - Update of the IP for existing target when DNS resolving changes
 - Targets can be executed on all hosts or a list of specified ones `probe`
+- Extra labels when defining targets
 - Configurable logging levels and format (text or json)
 - Configurable DNS Server
 
@@ -185,16 +186,18 @@ targets:
 By default if not configured, `network_exporter` uses the system resolver to translate domain names to IP addresses.
 You can also override the DNS resolver address by specifying the `conf.nameserver` configuration setting.
 
-**[SRV records](https://en.wikipedia.org/wiki/SRV_record):**  
+**[SRV records](https://en.wikipedia.org/wiki/SRV_record):**
 If the host field of a target contains a SRV record with the format `_<service>._<protocol>.<domain>` it will be resolved, all it's A records will be added (dynamically) as separate targets with name and host of the this A record.
 Every field of the parent target with a SRV record will be inherited by sub targets except `name` and `host`
 
 SRV record supported for ICMP/MTR/TCP target types.
 TCP SRV record specifcs:
-  - Target type should be `TCP` and `_protocol` part in the SRV record should be `_tcp` as well
-  - Port will be taken from the 3rd number, just before the hostname
+
+- Target type should be `TCP` and `_protocol` part in the SRV record should be `_tcp` as well
+- Port will be taken from the 3rd number, just before the hostname
 
 TCP SRV example
+
 ```console
 _connectivity-check._tcp.example.com. 86400 IN SRV 10 5 80 server.example.com.
 _connectivity-check._tcp.example.com. 86400 IN SRV 10 5 443 server2.example.com.
@@ -202,6 +205,7 @@ _connectivity-check._tcp.example.com. 86400 IN SRV 10 5 9247 server3.example.com
 ```
 
 ICMP SRV example
+
 ```console
 _connectivity-check._icmp.example.com. 86400 IN SRV 10 5 8 server.example.com.
 _connectivity-check._icmp.example.com. 86400 IN SRV 10 5 8 server2.example.com.
