@@ -22,7 +22,7 @@ func reloadSignal() {
 			case <-hup:
 				level.Debug(logger).Log("msg", "Signal: HUP")
 				level.Info(logger).Log("msg", "ReLoading config")
-				if err := sc.ReloadConfiglogger, (*configFile); err != nil {
+				if err := sc.ReloadConfig(logger, *configFile); err != nil {
 					level.Error(logger).Log("msg", "Reloading config skipped", "err", err)
 					continue
 				} else {
