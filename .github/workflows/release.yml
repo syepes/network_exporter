@@ -39,9 +39,11 @@ jobs:
         env:
           VERSION: ${{steps.vars.outputs.repo_tag}}
 
-      - name: build and push (master)
-        if: "github.ref == 'refs/heads/master'"
+      - name: build and push (latest)
+        if: startsWith( github.ref, 'refs/tags/')
         run: make build-push
+        env:
+          VERSION: latest
 
   goreleaser:
     runs-on: ubuntu-latest
