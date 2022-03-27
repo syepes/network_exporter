@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"io"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"net/http/httptrace"
 	"net/url"
@@ -23,12 +22,9 @@ func HTTPGet(destURL string, timeout time.Duration) (*HTTPReturn, error) {
 		return &out, err
 	}
 
-	// Control timeout
-	transport := &http.Transport{
-		Dial:                (&net.Dialer{Timeout: timeout}).Dial,
-		TLSHandshakeTimeout: timeout,
+	client := &http.Client{
+		Timeout: timeout,
 	}
-	client := &http.Client{Transport: transport}
 
 	req, err := http.NewRequest("GET", dURL.String(), nil)
 	if err != nil {
@@ -93,11 +89,12 @@ func HTTPGetProxy(destURL string, timeout time.Duration, proxyURL string) (*HTTP
 
 	// Control timeout and proxy
 	transport := &http.Transport{
-		Dial:                (&net.Dialer{Timeout: timeout}).Dial,
-		TLSHandshakeTimeout: timeout,
-		Proxy:               http.ProxyURL(pURL),
+		Proxy: http.ProxyURL(pURL),
 	}
-	client := &http.Client{Transport: transport}
+	client := &http.Client{
+		Transport: transport,
+		Timeout:   timeout,
+	}
 
 	req, err := http.NewRequest("GET", dURL.String(), nil)
 	if err != nil {
