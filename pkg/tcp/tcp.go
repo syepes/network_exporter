@@ -7,7 +7,7 @@ import (
 )
 
 // Port ICMP Operation
-func Port(addr string, port string, interval time.Duration, timeout time.Duration) (*TCPPortReturn, error) {
+func Port(addr string, ip string, port string, interval time.Duration, timeout time.Duration) (*TCPPortReturn, error) {
 	var out TCPPortReturn
 	var err error
 
@@ -16,10 +16,11 @@ func Port(addr string, port string, interval time.Duration, timeout time.Duratio
 	tcpOptions.SetTimeout(timeout)
 
 	out.DestAddr = addr
+	out.DestIp = ip
 	out.DestPort = port
 
 	start := time.Now()
-	conn, err := net.DialTimeout("tcp", net.JoinHostPort(addr, port), tcpOptions.Timeout())
+	conn, err := net.DialTimeout("tcp", net.JoinHostPort(ip, port), tcpOptions.Timeout())
 	out.ConTime = time.Since(start)
 
 	if err != nil {

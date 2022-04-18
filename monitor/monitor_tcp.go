@@ -62,26 +62,58 @@ func (p *TCPPort) AddTargets() {
 
 	targetConfigTmp := []string{}
 	for _, v := range p.sc.Cfg.Targets {
-		targetConfigTmp = common.AppendIfMissing(targetConfigTmp, v.Name)
+		if v.Type == "TCP" {
+			conn := strings.Split(v.Host, ":")
+			if len(conn) != 2 {
+				level.Warn(p.logger).Log("type", "TCP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping target, could not identify host/port: %v", v.Host))
+				continue
+			}
+			ipAddrs, err := common.DestAddrs(conn[0], p.resolver)
+			if err != nil || len(ipAddrs) == 0 {
+				level.Warn(p.logger).Log("type", "TCP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping resolve target: %s", v.Host), "err", err)
+			}
+			for _, ipAddr := range ipAddrs {
+				targetConfigTmp = common.AppendIfMissing(targetConfigTmp, v.Name+" "+ipAddr)
+			}
+		}
 	}
 
 	targetAdd := common.CompareList(targetActiveTmp, targetConfigTmp)
-	// level.Debug(p.logger).Log("type", "TCP", "func", "AddTargets", "msg", fmt.Sprintf("targetName: %v", targetAdd))
+	level.Debug(p.logger).Log("type", "TCP", "func", "AddTargets", "msg", fmt.Sprintf("targetName: %v", targetAdd))
 
 	for _, targetName := range targetAdd {
 		for _, target := range p.sc.Cfg.Targets {
-			if target.Name != targetName {
-				continue
-			}
 			if target.Type == "TCP" {
-				conn := strings.Split(target.Host, ":")
+				conn := strings.Split(target.Name, ":")
 				if len(conn) != 2 {
-					level.Warn(p.logger).Log("type", "TCP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping target, could not identify host/port: %v", target.Host))
+					level.Warn(p.logger).Log("type", "TCP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping target, could not identify host/port: %v", target.Name))
 					continue
 				}
-				err := p.AddTarget(target.Name, conn[0], conn[1], target.Labels.Kv)
-				if err != nil {
-					level.Warn(p.logger).Log("type", "TCP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping target: %s", target.Host), "err", err)
+				ipAddrs, err := common.DestAddrs(conn[0], p.resolver)
+				if err != nil || len(ipAddrs) == 0 {
+					level.Warn(p.logger).Log("type", "TCP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping resolve target: %s", target.Name), "err", err)
+				}
+				for _, ipAddr := range ipAddrs {
+					if target.Name+" "+ipAddr != targetName {
+						continue
+					}
+					if target.Type == "TCP" {
+						conn := strings.Split(target.Host, ":")
+						if len(conn) != 2 {
+							level.Warn(p.logger).Log("type", "TCP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping target, could not identify host/port: %v", target.Host))
+							continue
+						}
+						ipAddrs, err := common.DestAddrs(conn[0], p.resolver)
+						if err != nil || len(ipAddrs) == 0 {
+							level.Warn(p.logger).Log("type", "TCP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping resolve target: %s", target.Host), "err", err)
+						}
+						for _, ipAddr := range ipAddrs {
+							err := p.AddTarget(target.Name+" "+ipAddr, conn[0], ipAddr, conn[1], target.Labels.Kv)
+							if err != nil {
+								level.Warn(p.logger).Log("type", "TCP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping target. Host: %s IP: %s", target.Host, ipAddr), "err", err)
+							}
+						}
+					}
 				}
 			}
 		}
@@ -89,24 +121,18 @@ func (p *TCPPort) AddTargets() {
 }
 
 // AddTarget adds a target to the monitored list
-func (p *TCPPort) AddTarget(name string, host string, port string, labels map[string]string) (err error) {
-	return p.AddTargetDelayed(name, host, port, labels, 0)
+func (p *TCPPort) AddTarget(name string, host string, ip string, port string, labels map[string]string) (err error) {
+	return p.AddTargetDelayed(name, host, ip, port, labels, 0)
 }
 
 // AddTargetDelayed is AddTarget with a startup delay
-func (p *TCPPort) AddTargetDelayed(name string, host string, port string, labels map[string]string, startupDelay time.Duration) (err error) {
+func (p *TCPPort) AddTargetDelayed(name string, host string, ip string, port string, labels map[string]string, startupDelay time.Duration) (err error) {
 	level.Debug(p.logger).Log("type", "TCP", "func", "AddTargetDelayed", "msg", fmt.Sprintf("Adding Target: %s (%s:%s) in %s", name, host, port, startupDelay))
 
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
 
-	// Resolve hostnames
-	ipAddrs, err := common.DestAddrs(host, p.resolver)
-	if err != nil || len(ipAddrs) == 0 {
-		return err
-	}
-
-	target, err := target.NewTCPPort(p.logger, startupDelay, name, ipAddrs[0], port, p.interval, p.timeout, labels)
+	target, err := target.NewTCPPort(p.logger, startupDelay, name, host, ip, port, p.interval, p.timeout, labels)
 	if err != nil {
 		return err
 	}
@@ -128,7 +154,20 @@ func (p *TCPPort) DelTargets() {
 
 	targetConfigTmp := []string{}
 	for _, v := range p.sc.Cfg.Targets {
-		targetConfigTmp = common.AppendIfMissing(targetConfigTmp, v.Name)
+		if v.Type == "TCP" {
+			conn := strings.Split(v.Host, ":")
+			if len(conn) != 2 {
+				level.Warn(p.logger).Log("type", "TCP", "func", "DelTargets", "msg", fmt.Sprintf("Skipping target, could not identify host/port: %v", v.Host))
+				continue
+			}
+			ipAddrs, err := common.DestAddrs(conn[0], p.resolver)
+			if err != nil || len(ipAddrs) == 0 {
+				level.Warn(p.logger).Log("type", "TCP", "func", "DelTargets", "msg", fmt.Sprintf("Skipping resolve target: %s", v.Host), "err", err)
+			}
+			for _, ipAddr := range ipAddrs {
+				targetConfigTmp = common.AppendIfMissing(targetConfigTmp, v.Name+" "+ipAddr)
+			}
+		}
 	}
 
 	targetDelete := common.CompareList(targetConfigTmp, targetActiveTmp)
@@ -162,13 +201,13 @@ func (p *TCPPort) removeTarget(key string) {
 	delete(p.targets, key)
 }
 
-// Readd target if IP was changed (DNS record)
+// Read target if IP was changed (DNS record)
 func (p *TCPPort) CheckActiveTargets() (err error){
 	level.Debug(p.logger).Log("type", "TCP", "func", "CheckActiveTargets", "msg", fmt.Sprintf("Current Targets: %d, cfg: %d", len(p.targets), countTargets(p.sc, "TCP")))
 
 	targetActiveTmp := make(map[string]string)
 	for _, v := range p.targets {
-		targetActiveTmp[v.Name()] = v.Host()
+		targetActiveTmp[v.Name()+" "+v.Ip()] = v.Ip()
 	}
 
 	for targetName, targetIp := range targetActiveTmp {
@@ -190,15 +229,17 @@ func (p *TCPPort) CheckActiveTargets() (err error){
 				return false
 			}(ipAddrs, targetIp) {
 
-				p.RemoveTarget(targetName)
+				p.RemoveTarget(targetName+" "+targetIp)
 				conn := strings.Split(target.Host, ":")
 				if len(conn) != 2 {
 					level.Warn(p.logger).Log("type", "TCP", "func", "CheckActiveTargets", "msg", fmt.Sprintf("Skipping target, could not identify host/port: %v", target.Host))
 					continue
 				}
-				err := p.AddTarget(target.Name, conn[0], conn[1],  target.Labels.Kv)
-				if err != nil {
-					level.Warn(p.logger).Log("type", "TCP", "func", "CheckActiveTargets", "msg", fmt.Sprintf("Skipping target: %s", target.Host), "err", err)
+				for _, ipAddr := range ipAddrs {
+					err := p.AddTarget(target.Name+" "+ipAddr, conn[0], ipAddr, conn[1],  target.Labels.Kv)
+					if err != nil {
+						level.Warn(p.logger).Log("type", "TCP", "func", "CheckActiveTargets", "msg", fmt.Sprintf("Skipping target: %s", target.Host), "err", err)
+					}
 				}
 			}
 		}
@@ -215,6 +256,7 @@ func (p *TCPPort) ExportMetrics() map[string]*tcp.TCPPortReturn {
 
 	for _, target := range p.targets {
 		name := target.Name()
+		// ip := target.Ip()
 		metrics := target.Compute()
 
 		if metrics != nil {

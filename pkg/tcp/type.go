@@ -9,6 +9,7 @@ const defaultInterval = 10 * time.Millisecond
 type TCPPortReturn struct {
 	Success  bool          `json:"success"`
 	DestAddr string        `json:"dest_address"`
+	DestIp   string        `json:"dest_ip"`
 	DestPort string        `json:"dest_port"`
 	ConTime  time.Duration `json:"connection_time"`
 }
