@@ -7,7 +7,7 @@ ICMP & MTR & TCP Port & HTTP Get Prometheus exporter
 
 This exporter gathers either ICMP, MTR, TCP Port or HTTP Get stats and exports them via HTTP for Prometheus consumption.
 
-![gradana](https://raw.githubusercontent.com/syepes/network_exporter/master/dist/network_exporter.gif)
+![grafana](https://raw.githubusercontent.com/syepes/network_exporter/master/dist/network_exporter.gif)
 
 ## Features
 
@@ -19,6 +19,7 @@ This exporter gathers either ICMP, MTR, TCP Port or HTTP Get stats and exports t
 - Extra labels when defining targets
 - Configurable logging levels and format (text or json)
 - Configurable DNS Server
+- Configurable Source IP per target. IP has to be configured on one of the instance's interfaces.
 
 ### Exported metrics
 
@@ -172,6 +173,7 @@ targets:
     type: ICMP+MTR
   - name: cloudflare-dns-https
     host: 1.1.1.1:443
+    source_ip: 192.168.1.1
     type: TCP
   - name: download-file-64M
     host: http://test-debit.free.fr/65536.rnd
@@ -244,6 +246,18 @@ Will be resolved to 3 separate targets:
   - name: server3.example.com:9427
     host: server3.example.com:9427
     type: TCP
+```
+
+**Source IP**
+
+`source_ip` parameter will try to assign IP for request sent to specific target. This IP has to be configure on one of the interfaces of the OS.
+Supported for all types of the checks
+
+```
+  - name: server3.example.com:9427
+    host: server3.example.com:9427
+    type: TCP
+    source_ip: 192.168.1.1
 ```
 
 ## Deployment

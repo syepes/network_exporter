@@ -10,7 +10,7 @@ import (
 )
 
 // Ping ICMP Operation
-func Ping(addr string, count int, interval time.Duration, timeout time.Duration, icmpID int) (*PingResult, error) {
+func Ping(addr string, srcAddr string, count int, interval time.Duration, timeout time.Duration, icmpID int) (*PingResult, error) {
 	var out PingResult
 
 	pingOptions := &PingOptions{}
@@ -18,13 +18,15 @@ func Ping(addr string, count int, interval time.Duration, timeout time.Duration,
 	pingOptions.SetTimeout(timeout)
 	pingOptions.SetInterval(interval)
 
-	out = runPing(addr, icmpID, pingOptions)
-
+	out, err := runPing(addr, srcAddr, icmpID, pingOptions)
+	if err != nil {
+		return &out, err
+	}
 	return &out, nil
 }
 
 // PingString ICMP Operation
-func PingString(addr string, count int, timeout time.Duration, interval time.Duration, icmpID int) (result string, err error) {
+func PingString(addr string, srcAddr string, count int, timeout time.Duration, interval time.Duration, icmpID int) (result string, err error) {
 	pingOptions := &PingOptions{}
 	pingOptions.SetCount(count)
 	pingOptions.SetTimeout(timeout)
@@ -33,7 +35,7 @@ func PingString(addr string, count int, timeout time.Duration, interval time.Dur
 	var buffer bytes.Buffer
 	buffer.WriteString(fmt.Sprintf("Start %v, PING %v (%v)\n", time.Now().Format("2006-01-02 15:04:05"), addr, addr))
 	begin := time.Now().UnixNano() / 1e6
-	pingResult := runPing(addr, icmpID, pingOptions)
+	pingResult, err := runPing(addr, srcAddr, icmpID, pingOptions)
 	end := time.Now().UnixNano() / 1e6
 
 	buffer.WriteString(fmt.Sprintf("%v packets transmitted, %v packet loss, time %vms\n", count, pingResult.DropRate, end-begin))
@@ -41,10 +43,14 @@ func PingString(addr string, count int, timeout time.Duration, interval time.Dur
 
 	result = buffer.String()
 
+	if err != nil {
+		return result, err
+	}
+
 	return result, nil
 }
 
-func runPing(ipAddr string, icmpID int, option *PingOptions) (pingResult PingResult) {
+func runPing(ipAddr string, srcAddr string, icmpID int, option *PingOptions) (pingResult PingResult, err error) {
 	pingResult.DestAddr = ipAddr
 
 	// Avoid collisions/interference caused by multiple coroutines initiating mtr
@@ -56,8 +62,14 @@ func runPing(ipAddr string, icmpID int, option *PingOptions) (pingResult PingRes
 
 	seq := 0
 	for cnt := 0; cnt < option.Count(); cnt++ {
-		icmpReturn, err := icmp.Icmp(ipAddr, ttl, pid, timeout, seq)
-		if err != nil || !icmpReturn.Success || !common.IsEqualIP(ipAddr, icmpReturn.Addr) {
+		icmpReturn, err := icmp.Icmp(ipAddr, srcAddr, ttl, pid, timeout, seq)
+		if err != nil {
+			pingResult.Success = false
+			pingResult.DropRate = 1.0
+			return pingResult, err
+		}
+
+		if !icmpReturn.Success || !common.IsEqualIP(ipAddr, icmpReturn.Addr) {
 			continue
 		}
 
@@ -81,7 +93,7 @@ func runPing(ipAddr string, icmpID int, option *PingOptions) (pingResult PingRes
 	if !pingReturn.success {
 		pingResult.Success = false
 		pingResult.DropRate = 1.0
-		return pingResult
+		return pingResult, nil
 	}
 
 	pingResult.Success = pingReturn.success
@@ -95,5 +107,5 @@ func runPing(ipAddr string, icmpID int, option *PingOptions) (pingResult PingRes
 	pingResult.CorrectedSDTime = time.Duration(common.TimeCorrectedDeviation(pingReturn.allTime))
 	pingResult.RangeTime = time.Duration(common.TimeRange(pingReturn.allTime))
 
-	return pingResult
+	return pingResult, nil
 }

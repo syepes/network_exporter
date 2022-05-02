@@ -75,12 +75,12 @@ func (p *HTTPGet) AddTargets() {
 			}
 			if target.Type == "HTTPGet" {
 				if target.Proxy != "" {
-					err := p.AddTarget(target.Name, target.Host, target.Proxy, target.Labels.Kv)
+					err := p.AddTarget(target.Name, target.Host, target.SourceIp, target.Proxy, target.Labels.Kv)
 					if err != nil {
 						level.Warn(p.logger).Log("type", "HTTPGet", "func", "AddTargets", "msg", fmt.Sprintf("Skipping target: %s", target.Host), "err", err)
 					}
 				} else {
-					err := p.AddTarget(target.Name, target.Host, "", target.Labels.Kv)
+					err := p.AddTarget(target.Name, target.Host, target.SourceIp, "", target.Labels.Kv)
 					if err != nil {
 						level.Warn(p.logger).Log("type", "HTTPGet", "func", "AddTargets", "msg", fmt.Sprintf("Skipping target: %s", target.Host), "err", err)
 					}
@@ -91,12 +91,12 @@ func (p *HTTPGet) AddTargets() {
 }
 
 // AddTarget adds a target to the monitored list
-func (p *HTTPGet) AddTarget(name string, url string, proxy string, labels map[string]string) (err error) {
-	return p.AddTargetDelayed(name, url, proxy, labels, 0)
+func (p *HTTPGet) AddTarget(name string, url string, srcAddr string, proxy string, labels map[string]string) (err error) {
+	return p.AddTargetDelayed(name, url, srcAddr, proxy, labels, 0)
 }
 
 // AddTargetDelayed is AddTarget with a startup delay
-func (p *HTTPGet) AddTargetDelayed(name string, urlStr string, proxy string, labels map[string]string, startupDelay time.Duration) (err error) {
+func (p *HTTPGet) AddTargetDelayed(name string, urlStr string, srcAddr string, proxy string, labels map[string]string, startupDelay time.Duration) (err error) {
 	if proxy != "" {
 		level.Debug(p.logger).Log("type", "HTTPGet", "func", "AddTargetDelayed", "msg", fmt.Sprintf("Adding Target: %s (%s) with proxy (%s) in %s", name, urlStr, proxy, startupDelay))
 	} else {
@@ -120,7 +120,7 @@ func (p *HTTPGet) AddTargetDelayed(name string, urlStr string, proxy string, lab
 		}
 	}
 
-	target, err := target.NewHTTPGet(p.logger, startupDelay, name, dURL.String(), proxy, p.interval, p.timeout, labels)
+	target, err := target.NewHTTPGet(p.logger, startupDelay, name, dURL.String(), srcAddr, proxy, p.interval, p.timeout, labels)
 	if err != nil {
 		return err
 	}

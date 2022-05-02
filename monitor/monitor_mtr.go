@@ -80,7 +80,7 @@ func (p *MTR) AddTargets() {
 			}
 
 			if target.Type == "MTR" || target.Type == "ICMP+MTR" {
-				err := p.AddTarget(target.Name, target.Host, target.Labels.Kv)
+				err := p.AddTarget(target.Name, target.Host, target.SourceIp, target.Labels.Kv)
 				if err != nil {
 					level.Warn(p.logger).Log("type", "MTR", "func", "AddTargets", "msg", fmt.Sprintf("Skipping target: %s", target.Host), "err", err)
 				}
@@ -90,12 +90,12 @@ func (p *MTR) AddTargets() {
 }
 
 // AddTarget adds a target to the monitored list
-func (p *MTR) AddTarget(name string, host string, labels map[string]string) (err error) {
-	return p.AddTargetDelayed(name, host, labels, 0)
+func (p *MTR) AddTarget(name string, host string, srcAddr string, labels map[string]string) (err error) {
+	return p.AddTargetDelayed(name, host, srcAddr, labels, 0)
 }
 
 // AddTargetDelayed is AddTarget with a startup delay
-func (p *MTR) AddTargetDelayed(name string, host string, labels map[string]string, startupDelay time.Duration) (err error) {
+func (p *MTR) AddTargetDelayed(name string, host string, srcAddr string, labels map[string]string, startupDelay time.Duration) (err error) {
 	level.Debug(p.logger).Log("type", "MTR", "func", "AddTargetDelayed", "msg", fmt.Sprintf("Adding Target: %s (%s) in %s", name, host, startupDelay))
 
 	p.mtx.Lock()
@@ -107,7 +107,7 @@ func (p *MTR) AddTargetDelayed(name string, host string, labels map[string]strin
 		return err
 	}
 
-	target, err := target.NewMTR(p.logger, p.icmpID, startupDelay, name, ipAddrs[0], p.interval, p.timeout, p.maxHops, p.count, labels)
+	target, err := target.NewMTR(p.logger, p.icmpID, startupDelay, name, ipAddrs[0], srcAddr, p.interval, p.timeout, p.maxHops, p.count, labels)
 	if err != nil {
 		return err
 	}
@@ -192,7 +192,7 @@ func (p *MTR) CheckActiveTargets() (err error) {
 			}(ipAddrs, targetIp) {
 
 				p.RemoveTarget(targetName)
-				err := p.AddTarget(target.Name, target.Host, target.Labels.Kv)
+				err := p.AddTarget(target.Name, target.Host, target.SourceIp, target.Labels.Kv)
 				if err != nil {
 					level.Warn(p.logger).Log("type", "MTR", "func", "CheckActiveTargets", "msg", fmt.Sprintf("Skipping target: %s", target.Host), "err", err)
 				}
