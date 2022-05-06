@@ -16,6 +16,7 @@ type TCPPort struct {
 	logger   log.Logger
 	name     string
 	host     string
+	ip       string
 	srcAddr  string
 	port     string
 	interval time.Duration
@@ -28,7 +29,7 @@ type TCPPort struct {
 }
 
 // NewTCPPort starts a new monitoring goroutine
-func NewTCPPort(logger log.Logger, startupDelay time.Duration, name string, host string, srcAddr string, port string, interval time.Duration, timeout time.Duration, labels map[string]string) (*TCPPort, error) {
+func NewTCPPort(logger log.Logger, startupDelay time.Duration, name string, host string, ip string, port string, srcAddr string, interval time.Duration, timeout time.Duration, labels map[string]string) (*TCPPort, error) {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
@@ -36,8 +37,9 @@ func NewTCPPort(logger log.Logger, startupDelay time.Duration, name string, host
 		logger:   logger,
 		name:     name,
 		host:     host,
+		ip:       ip,
 		port:     port,
-		srcAddr: srcAddr,
+		srcAddr:  srcAddr,
 		interval: interval,
 		timeout:  timeout,
 		labels:   labels,
@@ -76,7 +78,7 @@ func (t *TCPPort) Stop() {
 }
 
 func (t *TCPPort) portCheck() {
-	data, err := tcp.Port(t.host, t.srcAddr, t.port, t.interval, t.timeout)
+	data, err := tcp.Port(t.host, t.ip, t.srcAddr, t.port, t.interval, t.timeout)
 	if err != nil {
 		level.Error(t.logger).Log("type", "TCP", "func", "port", "msg", fmt.Sprintf("%s", err))
 	}
@@ -115,6 +117,13 @@ func (t *TCPPort) Host() string {
 	t.RLock()
 	defer t.RUnlock()
 	return t.host
+}
+
+// Ip returns ip
+func (t *TCPPort) Ip() string {
+	t.RLock()
+	defer t.RUnlock()
+	return t.ip
 }
 
 // Labels returns labels
