@@ -24,7 +24,7 @@ import (
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
-const version string = "1.5.2"
+const version string = "1.6.0"
 
 var (
 	listenAddress  = kingpin.Flag("web.listen-address", "The address to listen on for HTTP requests").Default(":9427").String()

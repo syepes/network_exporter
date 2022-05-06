@@ -1,4 +1,4 @@
-BUILDX_VER=v0.8.1
+BUILDX_VER=v0.8.2
 IMAGE_NAME=syepes/network_exporter
 VERSION?=latest
 

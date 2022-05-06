@@ -55,8 +55,9 @@ func (p *TCP) Collect(ch chan<- prometheus.Metric) {
 	targets := []string{}
 	for target, metric := range p.metrics {
 		targets = append(targets, target)
-		l := strings.SplitN(target, " ", 2)
-		l = append(l, metric.DestAddr)
+		l := strings.SplitN(strings.SplitN(target, " ", 2)[0], " ", 2) // get name without ip and create slice
+		// l = append(l, metric.DestAddr) // removed host from labels metrics
+		l = append(l, metric.DestIp)
 		l = append(l, metric.DestPort)
 		l2 := prometheus.Labels(p.labels[target])
 
