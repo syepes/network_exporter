@@ -79,7 +79,7 @@ func (p *TCPPort) AddTargets() {
 					level.Warn(p.logger).Log("type", "TCP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping target, could not identify host/port: %v", target.Host))
 					continue
 				}
-				err := p.AddTarget(target.Name, conn[0], conn[1], target.Labels.Kv)
+				err := p.AddTarget(target.Name, conn[0], conn[1], target.SourceIp, target.Labels.Kv)
 				if err != nil {
 					level.Warn(p.logger).Log("type", "TCP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping target: %s", target.Host), "err", err)
 				}
@@ -89,12 +89,12 @@ func (p *TCPPort) AddTargets() {
 }
 
 // AddTarget adds a target to the monitored list
-func (p *TCPPort) AddTarget(name string, host string, port string, labels map[string]string) (err error) {
-	return p.AddTargetDelayed(name, host, port, labels, 0)
+func (p *TCPPort) AddTarget(name string, host string, port string, srcAddr string, labels map[string]string) (err error) {
+	return p.AddTargetDelayed(name, host, port, srcAddr, labels, 0)
 }
 
 // AddTargetDelayed is AddTarget with a startup delay
-func (p *TCPPort) AddTargetDelayed(name string, host string, port string, labels map[string]string, startupDelay time.Duration) (err error) {
+func (p *TCPPort) AddTargetDelayed(name string, host string, port string, srcAddr string, labels map[string]string, startupDelay time.Duration) (err error) {
 	level.Debug(p.logger).Log("type", "TCP", "func", "AddTargetDelayed", "msg", fmt.Sprintf("Adding Target: %s (%s:%s) in %s", name, host, port, startupDelay))
 
 	p.mtx.Lock()
@@ -106,7 +106,7 @@ func (p *TCPPort) AddTargetDelayed(name string, host string, port string, labels
 		return err
 	}
 
-	target, err := target.NewTCPPort(p.logger, startupDelay, name, ipAddrs[0], port, p.interval, p.timeout, labels)
+	target, err := target.NewTCPPort(p.logger, startupDelay, name, ipAddrs[0], srcAddr, port, p.interval, p.timeout, labels)
 	if err != nil {
 		return err
 	}
@@ -196,7 +196,7 @@ func (p *TCPPort) CheckActiveTargets() (err error){
 					level.Warn(p.logger).Log("type", "TCP", "func", "CheckActiveTargets", "msg", fmt.Sprintf("Skipping target, could not identify host/port: %v", target.Host))
 					continue
 				}
-				err := p.AddTarget(target.Name, conn[0], conn[1],  target.Labels.Kv)
+				err := p.AddTarget(target.Name, conn[0], conn[1], target.SourceIp,  target.Labels.Kv)
 				if err != nil {
 					level.Warn(p.logger).Log("type", "TCP", "func", "CheckActiveTargets", "msg", fmt.Sprintf("Skipping target: %s", target.Host), "err", err)
 				}

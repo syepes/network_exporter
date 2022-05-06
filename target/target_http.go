@@ -16,6 +16,7 @@ type HTTPGet struct {
 	logger   log.Logger
 	name     string
 	url      string
+	srcAddr  string
 	proxy    string
 	interval time.Duration
 	timeout  time.Duration
@@ -27,7 +28,7 @@ type HTTPGet struct {
 }
 
 // NewHTTPGet starts a new monitoring goroutine
-func NewHTTPGet(logger log.Logger, startupDelay time.Duration, name string, url string, proxy string, interval time.Duration, timeout time.Duration, labels map[string]string) (*HTTPGet, error) {
+func NewHTTPGet(logger log.Logger, startupDelay time.Duration, name string, url string, srcAddr string, proxy string, interval time.Duration, timeout time.Duration, labels map[string]string) (*HTTPGet, error) {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
@@ -35,6 +36,7 @@ func NewHTTPGet(logger log.Logger, startupDelay time.Duration, name string, url 
 		logger:   logger,
 		name:     name,
 		url:      url,
+		srcAddr: srcAddr,
 		proxy:    proxy,
 		interval: interval,
 		timeout:  timeout,
@@ -85,7 +87,7 @@ func (t *HTTPGet) httpGetCheck() {
 		}
 
 	} else {
-		data, err = http.HTTPGet(t.url, t.timeout)
+		data, err = http.HTTPGet(t.url, t.srcAddr, t.timeout )
 		if err != nil {
 			level.Error(t.logger).Log("type", "HTTPGet", "func", "httpGetCheck", "msg", fmt.Sprintf("%s", err))
 			return

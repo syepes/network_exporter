@@ -7,19 +7,42 @@ import (
 )
 
 // Port ICMP Operation
-func Port(addr string, port string, interval time.Duration, timeout time.Duration) (*TCPPortReturn, error) {
+func Port(destAddr string, srcAddr string, port string, interval time.Duration, timeout time.Duration) (*TCPPortReturn, error) {
 	var out TCPPortReturn
+	//var localAddr &net.TCPAddr
+	var d net.Dialer
 	var err error
 
 	tcpOptions := &TCPPortOptions{}
 	tcpOptions.SetInterval(interval)
 	tcpOptions.SetTimeout(timeout)
 
-	out.DestAddr = addr
+	out.DestAddr = destAddr
 	out.DestPort = port
 
+	if srcAddr != "" {
+		srcIp := net.ParseIP(srcAddr)
+		if srcIp == nil {
+			out.Success = false
+			return &out, fmt.Errorf("source ip: %v is invalid, TCP target: %v", srcAddr, destAddr)
+		}
+		d = net.Dialer{
+			LocalAddr: &net.TCPAddr{
+				IP:   srcIp,
+				Port: 0,
+			},
+			Timeout: tcpOptions.Timeout(),
+		}
+	} else {
+		d = net.Dialer{
+			Timeout: tcpOptions.Timeout(),
+		}
+	}
+
+
+
 	start := time.Now()
-	conn, err := net.DialTimeout("tcp", net.JoinHostPort(addr, port), tcpOptions.Timeout())
+	conn, err := d.Dial("tcp", net.JoinHostPort(destAddr, port))
 	out.ConTime = time.Since(start)
 
 	if err != nil {

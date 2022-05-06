@@ -2,8 +2,10 @@ package http
 
 import (
 	"crypto/tls"
+	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptrace"
 	"net/url"
@@ -11,7 +13,7 @@ import (
 )
 
 // HTTPGet Http Get Trace Operation
-func HTTPGet(destURL string, timeout time.Duration) (*HTTPReturn, error) {
+func HTTPGet(destURL string, srcAddr string, timeout time.Duration) (*HTTPReturn, error) {
 	var out HTTPReturn
 	var err error
 	out.DestAddr = destURL
@@ -26,6 +28,26 @@ func HTTPGet(destURL string, timeout time.Duration) (*HTTPReturn, error) {
 		Timeout: timeout,
 	}
 
+	if srcAddr != "" {
+		srcIp := net.ParseIP(srcAddr)
+		if srcIp == nil {
+			out.Success = false
+			return &out, fmt.Errorf("source ip: %v is invalid, HTTP target: %v", srcAddr, destURL)
+		}
+		transport := &http.Transport{
+			Dial: (&net.Dialer{
+				LocalAddr: &net.TCPAddr{
+					IP:   srcIp,
+					Port: 0,
+				},
+			}).Dial}
+
+		client = &http.Client{
+			Timeout:   timeout,
+			Transport: transport,
+		}
+	} 
+	
 	req, err := http.NewRequest("GET", dURL.String(), nil)
 	if err != nil {
 		out.Success = false

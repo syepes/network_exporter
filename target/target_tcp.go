@@ -16,6 +16,7 @@ type TCPPort struct {
 	logger   log.Logger
 	name     string
 	host     string
+	srcAddr  string
 	port     string
 	interval time.Duration
 	timeout  time.Duration
@@ -27,7 +28,7 @@ type TCPPort struct {
 }
 
 // NewTCPPort starts a new monitoring goroutine
-func NewTCPPort(logger log.Logger, startupDelay time.Duration, name string, host string, port string, interval time.Duration, timeout time.Duration, labels map[string]string) (*TCPPort, error) {
+func NewTCPPort(logger log.Logger, startupDelay time.Duration, name string, host string, srcAddr string, port string, interval time.Duration, timeout time.Duration, labels map[string]string) (*TCPPort, error) {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
@@ -36,6 +37,7 @@ func NewTCPPort(logger log.Logger, startupDelay time.Duration, name string, host
 		name:     name,
 		host:     host,
 		port:     port,
+		srcAddr: srcAddr,
 		interval: interval,
 		timeout:  timeout,
 		labels:   labels,
@@ -74,7 +76,7 @@ func (t *TCPPort) Stop() {
 }
 
 func (t *TCPPort) portCheck() {
-	data, err := tcp.Port(t.host, t.port, t.interval, t.timeout)
+	data, err := tcp.Port(t.host, t.srcAddr, t.port, t.interval, t.timeout)
 	if err != nil {
 		level.Error(t.logger).Log("type", "TCP", "func", "port", "msg", fmt.Sprintf("%s", err))
 	}

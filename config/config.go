@@ -17,12 +17,13 @@ import (
 // Config represents configuration for the exporter
 
 type Targets []struct {
-	Name   string   `yaml:"name" json:"name"`
-	Host   string   `yaml:"host" json:"host"`
-	Type   string   `yaml:"type" json:"type"`
-	Proxy  string   `yaml:"proxy" json:"proxy"`
-	Probe  []string `yaml:"probe" json:"probe"`
-	Labels extraKV  `yaml:"labels,omitempty" json:"labels,omitempty"`
+	Name     string   `yaml:"name" json:"name"`
+	Host     string   `yaml:"host" json:"host"`
+	Type     string   `yaml:"type" json:"type"`
+	Proxy    string   `yaml:"proxy" json:"proxy"`
+	Probe    []string `yaml:"probe" json:"probe"`
+	SourceIp string   `yaml:"source_ip" json:"source_ip"`
+	Labels   extraKV  `yaml:"labels,omitempty" json:"labels,omitempty"`
 }
 
 type HTTPGet struct {

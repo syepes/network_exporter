@@ -18,6 +18,7 @@ type MTR struct {
 	icmpID   *common.IcmpID
 	name     string
 	host     string
+	srcAddr  string
 	interval time.Duration
 	timeout  time.Duration
 	maxHops  int
@@ -30,7 +31,7 @@ type MTR struct {
 }
 
 // NewMTR starts a new monitoring goroutine
-func NewMTR(logger log.Logger, icmpID *common.IcmpID, startupDelay time.Duration, name string, host string, interval time.Duration, timeout time.Duration, maxHops int, count int, labels map[string]string) (*MTR, error) {
+func NewMTR(logger log.Logger, icmpID *common.IcmpID, startupDelay time.Duration, name string, host string, srcAddr string, interval time.Duration, timeout time.Duration, maxHops int, count int, labels map[string]string) (*MTR, error) {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
@@ -39,6 +40,7 @@ func NewMTR(logger log.Logger, icmpID *common.IcmpID, startupDelay time.Duration
 		icmpID:   icmpID,
 		name:     name,
 		host:     host,
+		srcAddr:  srcAddr,
 		interval: interval,
 		timeout:  timeout,
 		maxHops:  maxHops,
@@ -80,7 +82,7 @@ func (t *MTR) Stop() {
 
 func (t *MTR) mtr() {
 	icmpID := int(t.icmpID.Get())
-	data, err := mtr.Mtr(t.host, t.maxHops, t.count, t.timeout, icmpID)
+	data, err := mtr.Mtr(t.host, t.srcAddr, t.maxHops, t.count, t.timeout, icmpID)
 	if err != nil {
 		level.Error(t.logger).Log("type", "MTR", "func", "mtr", "msg", fmt.Sprintf("%s", err))
 	}
