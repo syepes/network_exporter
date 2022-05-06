@@ -29,7 +29,7 @@ type TCPPort struct {
 }
 
 // NewTCPPort starts a new monitoring goroutine
-func NewTCPPort(logger log.Logger, startupDelay time.Duration, name string, host string, ip string, port string, srcAddr string, interval time.Duration, timeout time.Duration, labels map[string]string) (*TCPPort, error) {
+func NewTCPPort(logger log.Logger, startupDelay time.Duration, name string, host string, ip string, srcAddr string, port string, interval time.Duration, timeout time.Duration, labels map[string]string) (*TCPPort, error) {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
@@ -38,8 +38,8 @@ func NewTCPPort(logger log.Logger, startupDelay time.Duration, name string, host
 		name:     name,
 		host:     host,
 		ip:       ip,
-		port:     port,
 		srcAddr:  srcAddr,
+		port:     port,
 		interval: interval,
 		timeout:  timeout,
 		labels:   labels,

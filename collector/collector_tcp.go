@@ -61,8 +61,8 @@ func (p *TCP) Collect(ch chan<- prometheus.Metric) {
 		l = append(l, metric.DestPort)
 		l2 := prometheus.Labels(p.labels[target])
 
-		tcpTimeDesc    = prometheus.NewDesc("tcp_connection_seconds", "Connection time in seconds", tcpLabelNames, l2)
-		tcpStatusDesc  = prometheus.NewDesc("tcp_connection_status", "Connection Status", tcpLabelNames, l2)
+		tcpTimeDesc = prometheus.NewDesc("tcp_connection_seconds", "Connection time in seconds", tcpLabelNames, l2)
+		tcpStatusDesc = prometheus.NewDesc("tcp_connection_status", "Connection Status", tcpLabelNames, l2)
 
 		ch <- prometheus.MustNewConstMetric(tcpTimeDesc, prometheus.GaugeValue, metric.ConTime.Seconds(), l...)
 

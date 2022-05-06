@@ -59,9 +59,9 @@ func (p *PING) Collect(ch chan<- prometheus.Metric) {
 		l := []string{target, metric.DestAddr}
 		l2 := prometheus.Labels(p.labels[target])
 
-		icmpStatusDesc  = prometheus.NewDesc("ping_status", "Ping Status", icmpLabelNames, l2)
-		icmpRttDesc     = prometheus.NewDesc("ping_rtt_seconds", "Round Trip Time in seconds", append(icmpLabelNames, "type"), l2)
-		icmpLossDesc    = prometheus.NewDesc("ping_loss_percent", "Packet loss in percent", icmpLabelNames, l2)
+		icmpStatusDesc = prometheus.NewDesc("ping_status", "Ping Status", icmpLabelNames, l2)
+		icmpRttDesc = prometheus.NewDesc("ping_rtt_seconds", "Round Trip Time in seconds", append(icmpLabelNames, "type"), l2)
+		icmpLossDesc = prometheus.NewDesc("ping_loss_percent", "Packet loss in percent", icmpLabelNames, l2)
 
 		if metric.Success {
 			ch <- prometheus.MustNewConstMetric(icmpStatusDesc, prometheus.GaugeValue, 1, l...)

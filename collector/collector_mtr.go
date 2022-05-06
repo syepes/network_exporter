@@ -58,8 +58,8 @@ func (p *MTR) Collect(ch chan<- prometheus.Metric) {
 		l := []string{target, metric.DestAddr}
 		l2 := prometheus.Labels(p.labels[target])
 
-		mtrDesc        = prometheus.NewDesc("mtr_rtt_seconds", "Round Trip Time in seconds", append(mtrLabelNames, "type"), l2)
-		mtrHopsDesc    = prometheus.NewDesc("mtr_hops", "Number of route hops", []string{"name", "target"}, l2)
+		mtrDesc = prometheus.NewDesc("mtr_rtt_seconds", "Round Trip Time in seconds", append(mtrLabelNames, "type"), l2)
+		mtrHopsDesc = prometheus.NewDesc("mtr_hops", "Number of route hops", []string{"name", "target"}, l2)
 
 		ch <- prometheus.MustNewConstMetric(mtrHopsDesc, prometheus.GaugeValue, float64(len(metric.Hops)), l...)
 		for _, hop := range metric.Hops {

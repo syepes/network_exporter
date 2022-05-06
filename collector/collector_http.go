@@ -61,9 +61,9 @@ func (p *HTTPGet) Collect(ch chan<- prometheus.Metric) {
 		l = append(l, metric.DestAddr)
 		l2 := prometheus.Labels(p.labels[target])
 
-		httpTimeDesc    = prometheus.NewDesc("http_get_seconds", "HTTP Get Drill Down time in seconds", append(httpLabelNames, "type"), l2)
-		httpSizeDesc    = prometheus.NewDesc("http_get_content_bytes", "HTTP Get Content Size in bytes", httpLabelNames, l2)
-		httpStatusDesc  = prometheus.NewDesc("http_get_status", "HTTP Get Status", httpLabelNames, l2)
+		httpTimeDesc = prometheus.NewDesc("http_get_seconds", "HTTP Get Drill Down time in seconds", append(httpLabelNames, "type"), l2)
+		httpSizeDesc = prometheus.NewDesc("http_get_content_bytes", "HTTP Get Content Size in bytes", httpLabelNames, l2)
+		httpStatusDesc = prometheus.NewDesc("http_get_status", "HTTP Get Status", httpLabelNames, l2)
 
 		if metric.Success {
 			ch <- prometheus.MustNewConstMetric(httpStatusDesc, prometheus.GaugeValue, float64(metric.Status), l...)
