@@ -18,6 +18,7 @@ type PING struct {
 	icmpID   *common.IcmpID
 	name     string
 	host     string
+	ip       string
 	srcAddr  string
 	interval time.Duration
 	timeout  time.Duration
@@ -30,7 +31,7 @@ type PING struct {
 }
 
 // NewPing starts a new monitoring goroutine
-func NewPing(logger log.Logger, icmpID *common.IcmpID, startupDelay time.Duration, name string, host string, srcAddr string, interval time.Duration, timeout time.Duration, count int, labels map[string]string) (*PING, error) {
+func NewPing(logger log.Logger, icmpID *common.IcmpID, startupDelay time.Duration, name string, host string, ip string, srcAddr string, interval time.Duration, timeout time.Duration, count int, labels map[string]string) (*PING, error) {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
@@ -39,6 +40,7 @@ func NewPing(logger log.Logger, icmpID *common.IcmpID, startupDelay time.Duratio
 		icmpID:   icmpID,
 		name:     name,
 		host:     host,
+		ip:       ip,
 		srcAddr:  srcAddr,
 		interval: interval,
 		timeout:  timeout,
@@ -80,7 +82,7 @@ func (t *PING) Stop() {
 
 func (t *PING) ping() {
 	icmpID := int(t.icmpID.Get())
-	data, err := ping.Ping(t.host, t.srcAddr, t.count, t.interval, t.timeout, icmpID)
+	data, err := ping.Ping(t.host, t.ip, t.srcAddr, t.count, t.interval, t.timeout, icmpID)
 	if err != nil {
 		level.Error(t.logger).Log("type", "ICMP", "func", "ping", "msg", fmt.Sprintf("%s", err))
 	}
@@ -119,6 +121,13 @@ func (t *PING) Host() string {
 	t.RLock()
 	defer t.RUnlock()
 	return t.host
+}
+
+// Ip returns ip
+func (t *PING) Ip() string {
+	t.RLock()
+	defer t.RUnlock()
+	return t.ip
 }
 
 // Labels returns labels

@@ -19,7 +19,7 @@ This exporter gathers either ICMP, MTR, TCP Port or HTTP Get stats and exports t
 - Extra labels when defining targets
 - Configurable logging levels and format (text or json)
 - Configurable DNS Server
-- Configurable Source IP per target. IP has to be configured on one of the instance's interfaces.
+- Configurable Source IP per target `source_ip` (optional), The IP has to be configured on one of the instance's interfaces
 
 ### Exported metrics
 
@@ -77,10 +77,11 @@ This exporter gathers either ICMP, MTR, TCP Port or HTTP Get stats and exports t
 Each metric contains the below labels and additionally the ones added in the configuration file.
 
 - `name` (ALL: The target name)
-- `target` (ALL: the target IP Address)
-- `port` (TCP: the target TCP Port)
-- `ttl` (MTR: time to live)
-- `path` (MTR: traceroute IP)
+- `target` (ALL: The target defined Hostname or IP)
+- `target_ip` (ALL: The target resolved IP Address)
+- `port` (TCP: The target TCP Port)
+- `ttl` (MTR: Time to live)
+- `path` (MTR: Traceroute IP)
 
 ## Building and running the software
 

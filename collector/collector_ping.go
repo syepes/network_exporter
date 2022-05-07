@@ -1,6 +1,7 @@
 package collector
 
 import (
+	"strings"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -9,7 +10,7 @@ import (
 )
 
 var (
-	icmpLabelNames  = []string{"name", "target"}
+	icmpLabelNames  = []string{"name", "target", "target_ip"}
 	icmpStatusDesc  = prometheus.NewDesc("ping_status", "Ping Status", icmpLabelNames, nil)
 	icmpRttDesc     = prometheus.NewDesc("ping_rtt_seconds", "Round Trip Time in seconds", append(icmpLabelNames, "type"), nil)
 	icmpLossDesc    = prometheus.NewDesc("ping_loss_percent", "Packet loss in percent", icmpLabelNames, nil)
@@ -56,7 +57,9 @@ func (p *PING) Collect(ch chan<- prometheus.Metric) {
 	targets := []string{}
 	for target, metric := range p.metrics {
 		targets = append(targets, target)
-		l := []string{target, metric.DestAddr}
+		l := strings.SplitN(strings.SplitN(target, " ", 2)[0], " ", 2) // get name without ip and create slice
+		l = append(l, metric.DestAddr)
+		l = append(l, metric.DestIp)
 		l2 := prometheus.Labels(p.labels[target])
 
 		icmpStatusDesc = prometheus.NewDesc("ping_status", "Ping Status", icmpLabelNames, l2)

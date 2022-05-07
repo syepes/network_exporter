@@ -29,7 +29,6 @@ func Icmp(destAddr string, srcAddr string, ttl int, pid int, timeout time.Durati
 	ipAddr := net.IPAddr{IP: dstIp}
 
 	if srcAddr != "" {
-
 		srcIp := net.ParseIP(srcAddr)
 		if srcIp == nil {
 			return hop, fmt.Errorf("source ip: %v is invalid, target: %v", srcAddr, destAddr)
@@ -39,11 +38,10 @@ func Icmp(destAddr string, srcAddr string, ttl int, pid int, timeout time.Durati
 			return icmpIpv4(srcAddr, &ipAddr, ttl, pid, timeout, seq)
 		}
 		return icmpIpv6(srcAddr, &ipAddr, ttl, pid, timeout, seq)
-
 	}
 
 	if p4 := dstIp.To4(); len(p4) == net.IPv4len {
-		return icmpIpv4("0.0.0.0/0", &ipAddr, ttl, pid, timeout, seq)
+		return icmpIpv4("0.0.0.0", &ipAddr, ttl, pid, timeout, seq)
 	}
 	return icmpIpv6("::", &ipAddr, ttl, pid, timeout, seq)
 }

@@ -12,6 +12,7 @@ const defaultTTL = 128
 type PingResult struct {
 	Success              bool          `json:"success"`
 	DestAddr             string        `json:"dest_address"`
+	DestIp               string        `json:"dest_ip"`
 	DropRate             float64       `json:"drop_rate"`
 	SumTime              time.Duration `json:"sum"`
 	BestTime             time.Duration `json:"best"`

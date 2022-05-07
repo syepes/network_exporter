@@ -65,21 +65,34 @@ func (p *PING) AddTargets() {
 
 	targetConfigTmp := []string{}
 	for _, v := range p.sc.Cfg.Targets {
-		targetConfigTmp = common.AppendIfMissing(targetConfigTmp, v.Name)
+		ipAddrs, err := common.DestAddrs(v.Host, p.resolver)
+		if err != nil || len(ipAddrs) == 0 {
+			level.Warn(p.logger).Log("type", "ICMP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping resolve target: %s", v.Host), "err", err)
+		}
+		for _, ipAddr := range ipAddrs {
+			targetConfigTmp = common.AppendIfMissing(targetConfigTmp, v.Name+" "+ipAddr)
+		}
 	}
 
 	targetAdd := common.CompareList(targetActiveTmp, targetConfigTmp)
-	// level.Debug(p.logger).Log("type", "ICMP", "func", "AddTargets", "msg", fmt.Sprintf("targetName: %v", targetAdd))
+	level.Debug(p.logger).Log("type", "ICMP", "func", "AddTargets", "msg", fmt.Sprintf("targetName: %v", targetAdd))
 
 	for _, targetName := range targetAdd {
 		for _, target := range p.sc.Cfg.Targets {
-			if target.Name != targetName {
-				continue
-			}
 			if target.Type == "ICMP" || target.Type == "ICMP+MTR" {
-				err := p.AddTarget(target.Name, target.Host, target.SourceIp, target.Labels.Kv)
-				if err != nil {
-					level.Warn(p.logger).Log("type", "ICMP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping target: %s", target.Host), "err", err)
+				ipAddrs, err := common.DestAddrs(target.Host, p.resolver)
+				if err != nil || len(ipAddrs) == 0 {
+					level.Warn(p.logger).Log("type", "ICMP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping resolve target: %s", target.Host), "err", err)
+				}
+
+				for _, ipAddr := range ipAddrs {
+					if target.Name+" "+ipAddr != targetName {
+						continue
+					}
+					err := p.AddTarget(target.Name+" "+ipAddr, target.Host, ipAddr, target.SourceIp, target.Labels.Kv)
+					if err != nil {
+						level.Warn(p.logger).Log("type", "ICMP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping target. Host: %s IP: %s", target.Host, ipAddr), "err", err)
+					}
 				}
 			}
 		}
@@ -92,7 +105,7 @@ func (p *PING) CheckActiveTargets() (err error) {
 
 	targetActiveTmp := make(map[string]string)
 	for _, v := range p.targets {
-		targetActiveTmp[v.Name()] = v.Host()
+		targetActiveTmp[v.Name()+" "+v.Ip()] = v.Ip()
 	}
 
 	for targetName, targetIp := range targetActiveTmp {
@@ -114,10 +127,18 @@ func (p *PING) CheckActiveTargets() (err error) {
 				return false
 			}(ipAddrs, targetIp) {
 
-				p.RemoveTarget(targetName)
-				err := p.AddTarget(target.Name, target.Host, target.SourceIp, target.Labels.Kv)
-				if err != nil {
-					level.Warn(p.logger).Log("type", "ICMP", "func", "CheckActiveTargets", "msg", fmt.Sprintf("Skipping target: %s", target.Host), "err", err)
+				p.RemoveTarget(targetName + " " + targetIp)
+
+				ipAddrs, err := common.DestAddrs(target.Host, p.resolver)
+				if err != nil || len(ipAddrs) == 0 {
+					level.Warn(p.logger).Log("type", "ICMP", "func", "CheckActiveTargets", "msg", fmt.Sprintf("Skipping resolve target: %s", target.Host), "err", err)
+				}
+
+				for _, ipAddr := range ipAddrs {
+					err := p.AddTarget(target.Name+" "+ipAddr, target.Host, ipAddr, target.SourceIp, target.Labels.Kv)
+					if err != nil {
+						level.Warn(p.logger).Log("type", "ICMP", "func", "CheckActiveTargets", "msg", fmt.Sprintf("Skipping target. Host: %s IP: %s", target.Host, ipAddr), "err", err)
+					}
 				}
 			}
 		}
@@ -126,24 +147,18 @@ func (p *PING) CheckActiveTargets() (err error) {
 }
 
 // AddTarget adds a target to the monitored list
-func (p *PING) AddTarget(name string, host string, srcAddr string, labels map[string]string) (err error) {
-	return p.AddTargetDelayed(name, host, srcAddr, labels, 0)
+func (p *PING) AddTarget(name string, host string, ip string, srcAddr string, labels map[string]string) (err error) {
+	return p.AddTargetDelayed(name, host, ip, srcAddr, labels, 0)
 }
 
 // AddTargetDelayed is AddTarget with a startup delay
-func (p *PING) AddTargetDelayed(name string, host string, srcAddr string, labels map[string]string, startupDelay time.Duration) (err error) {
+func (p *PING) AddTargetDelayed(name string, host string, ip string, srcAddr string, labels map[string]string, startupDelay time.Duration) (err error) {
 	level.Debug(p.logger).Log("type", "ICMP", "func", "AddTargetDelayed", "msg", fmt.Sprintf("Adding Target: %s (%s) in %s", name, host, startupDelay))
 
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
 
-	// Resolve hostnames
-	ipAddrs, err := common.DestAddrs(host, p.resolver)
-	if err != nil || len(ipAddrs) == 0 {
-		return err
-	}
-
-	target, err := target.NewPing(p.logger, p.icmpID, startupDelay, name, ipAddrs[0], srcAddr, p.interval, p.timeout, p.count, labels)
+	target, err := target.NewPing(p.logger, p.icmpID, startupDelay, name, host, ip, srcAddr, p.interval, p.timeout, p.count, labels)
 	if err != nil {
 		return err
 	}
@@ -165,7 +180,13 @@ func (p *PING) DelTargets() {
 
 	targetConfigTmp := []string{}
 	for _, v := range p.sc.Cfg.Targets {
-		targetConfigTmp = common.AppendIfMissing(targetConfigTmp, v.Name)
+		ipAddrs, err := common.DestAddrs(v.Host, p.resolver)
+		if err != nil || len(ipAddrs) == 0 {
+			level.Warn(p.logger).Log("type", "ICMP", "func", "DelTargets", "msg", fmt.Sprintf("Skipping resolve target: %s", v.Host), "err", err)
+		}
+		for _, ipAddr := range ipAddrs {
+			targetConfigTmp = common.AppendIfMissing(targetConfigTmp, v.Name+" "+ipAddr)
+		}
 	}
 
 	targetDelete := common.CompareList(targetConfigTmp, targetActiveTmp)

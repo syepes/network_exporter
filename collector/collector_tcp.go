@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	tcpLabelNames  = []string{"name", "target", "port"}
+	tcpLabelNames  = []string{"name", "target", "target_ip", "port"}
 	tcpTimeDesc    = prometheus.NewDesc("tcp_connection_seconds", "Connection time in seconds", tcpLabelNames, nil)
 	tcpStatusDesc  = prometheus.NewDesc("tcp_connection_status", "Connection Status", tcpLabelNames, nil)
 	tcpTargetsDesc = prometheus.NewDesc("tcp_targets", "Number of active targets", nil, nil)
@@ -56,7 +56,7 @@ func (p *TCP) Collect(ch chan<- prometheus.Metric) {
 	for target, metric := range p.metrics {
 		targets = append(targets, target)
 		l := strings.SplitN(strings.SplitN(target, " ", 2)[0], " ", 2) // get name without ip and create slice
-		// l = append(l, metric.DestAddr) // removed host from labels metrics
+		l = append(l, metric.DestAddr)
 		l = append(l, metric.DestIp)
 		l = append(l, metric.DestPort)
 		l2 := prometheus.Labels(p.labels[target])

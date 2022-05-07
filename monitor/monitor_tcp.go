@@ -230,6 +230,7 @@ func (p *TCPPort) CheckActiveTargets() (err error) {
 			}(ipAddrs, targetIp) {
 
 				p.RemoveTarget(targetName + " " + targetIp)
+
 				conn := strings.Split(target.Host, ":")
 				if len(conn) != 2 {
 					level.Warn(p.logger).Log("type", "TCP", "func", "CheckActiveTargets", "msg", fmt.Sprintf("Skipping target, could not identify host/port: %v", target.Host))
