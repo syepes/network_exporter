@@ -65,7 +65,7 @@ func (p *TCPPort) AddTargets() {
 		if v.Type == "TCP" {
 			conn := strings.Split(v.Host, ":")
 			if len(conn) != 2 {
-				level.Warn(p.logger).Log("type", "TCP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping target, could not identify host/port: %v", v.Host))
+				level.Warn(p.logger).Log("type", "TCP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping target, could not identify host: %v (%v)", v.Host, v.Name))
 				continue
 			}
 			ipAddrs, err := common.DestAddrs(conn[0], p.resolver)
@@ -86,7 +86,7 @@ func (p *TCPPort) AddTargets() {
 			if target.Type == "TCP" {
 				conn := strings.Split(target.Host, ":")
 				if len(conn) != 2 {
-					level.Warn(p.logger).Log("type", "TCP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping target, could not identify host/port: %v", target.Name))
+					level.Warn(p.logger).Log("type", "TCP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping target, could not identify host: %v (%v)", target.Host, target.Name))
 					continue
 				}
 				ipAddrs, err := common.DestAddrs(conn[0], p.resolver)
@@ -99,7 +99,7 @@ func (p *TCPPort) AddTargets() {
 					}
 					conn := strings.Split(target.Host, ":")
 					if len(conn) != 2 {
-						level.Warn(p.logger).Log("type", "TCP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping target, could not identify host/port: %v", target.Host))
+						level.Warn(p.logger).Log("type", "TCP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping target, could not identify host: %v (%v)", target.Host, target.Name))
 						continue
 					}
 					ipAddrs, err := common.DestAddrs(conn[0], p.resolver)
@@ -155,7 +155,7 @@ func (p *TCPPort) DelTargets() {
 		if v.Type == "TCP" {
 			conn := strings.Split(v.Host, ":")
 			if len(conn) != 2 {
-				level.Warn(p.logger).Log("type", "TCP", "func", "DelTargets", "msg", fmt.Sprintf("Skipping target, could not identify host/port: %v", v.Host))
+				level.Warn(p.logger).Log("type", "TCP", "func", "DelTargets", "msg", fmt.Sprintf("Skipping target, could not identify host: %v (%v)", v.Host, v.Name))
 				continue
 			}
 			ipAddrs, err := common.DestAddrs(conn[0], p.resolver)
@@ -231,7 +231,7 @@ func (p *TCPPort) CheckActiveTargets() (err error) {
 
 				conn := strings.Split(target.Host, ":")
 				if len(conn) != 2 {
-					level.Warn(p.logger).Log("type", "TCP", "func", "CheckActiveTargets", "msg", fmt.Sprintf("Skipping target, could not identify host/port: %v", target.Host))
+					level.Warn(p.logger).Log("type", "TCP", "func", "CheckActiveTargets", "msg", fmt.Sprintf("Skipping target, could not identify host: %v (%v)", target.Host, target.Name))
 					continue
 				}
 				for _, ipAddr := range ipAddrs {
