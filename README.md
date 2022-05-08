@@ -14,7 +14,7 @@ This exporter gathers either ICMP, MTR, TCP Port or HTTP Get stats and exports t
 - IPv4 & IPv6 support
 - Configuration reloading (By interval or OS signal)
 - Dynamically Add or Remove targets without affecting the currently running tests
-- Update of the IP for existing target when DNS resolving changes
+- Automatic update of the target IP when the DNS resolution changes
 - Targets can be executed on all hosts or a list of specified ones `probe`
 - Extra labels when defining targets
 - Configurable logging levels and format (text or json)
