@@ -67,11 +67,13 @@ func (p *MTR) AddTargets() {
 
 	targetConfigTmp := []string{}
 	for _, v := range p.sc.Cfg.Targets {
-		targetConfigTmp = common.AppendIfMissing(targetConfigTmp, v.Name)
+		if v.Type == "MTR" || v.Type == "ICMP+MTR" {
+			targetConfigTmp = common.AppendIfMissing(targetConfigTmp, v.Name)
+		}
 	}
 
 	targetAdd := common.CompareList(targetActiveTmp, targetConfigTmp)
-	// level.Debug(p.logger).Log("type", "MTR", "func", "AddTargets", "msg", fmt.Sprintf("targetName: %v", targetAdd))
+	level.Debug(p.logger).Log("type", "MTR", "func", "AddTargets", "msg", fmt.Sprintf("targetName: %v", targetAdd))
 
 	for _, targetName := range targetAdd {
 		for _, target := range p.sc.Cfg.Targets {
@@ -96,7 +98,7 @@ func (p *MTR) AddTarget(name string, host string, srcAddr string, labels map[str
 
 // AddTargetDelayed is AddTarget with a startup delay
 func (p *MTR) AddTargetDelayed(name string, host string, srcAddr string, labels map[string]string, startupDelay time.Duration) (err error) {
-	level.Debug(p.logger).Log("type", "MTR", "func", "AddTargetDelayed", "msg", fmt.Sprintf("Adding Target: %s (%s) in %s", name, host, startupDelay))
+	level.Info(p.logger).Log("type", "MTR", "func", "AddTargetDelayed", "msg", fmt.Sprintf("Adding Target: %s (%s) in %s", name, host, startupDelay))
 
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
@@ -129,7 +131,9 @@ func (p *MTR) DelTargets() {
 
 	targetConfigTmp := []string{}
 	for _, v := range p.sc.Cfg.Targets {
-		targetConfigTmp = common.AppendIfMissing(targetConfigTmp, v.Name)
+		if v.Type == "MTR" || v.Type == "ICMP+MTR" {
+			targetConfigTmp = common.AppendIfMissing(targetConfigTmp, v.Name)
+		}
 	}
 
 	targetDelete := common.CompareList(targetConfigTmp, targetActiveTmp)
@@ -147,7 +151,7 @@ func (p *MTR) DelTargets() {
 
 // RemoveTarget removes a target from the monitoring list
 func (p *MTR) RemoveTarget(key string) {
-	level.Debug(p.logger).Log("type", "MTR", "func", "RemoveTarget", "msg", fmt.Sprintf("Removing Target: %s", key))
+	level.Info(p.logger).Log("type", "MTR", "func", "RemoveTarget", "msg", fmt.Sprintf("Removing Target: %s", key))
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
 	p.removeTarget(key)
@@ -163,7 +167,7 @@ func (p *MTR) removeTarget(key string) {
 	delete(p.targets, key)
 }
 
-// Readd target if IP was changed (DNS record)
+// Read target if IP was changed (DNS record)
 func (p *MTR) CheckActiveTargets() (err error) {
 	level.Debug(p.logger).Log("type", "MTR", "func", "CheckActiveTargets", "msg", fmt.Sprintf("Current Targets: %d, cfg: %d", len(p.targets), countTargets(p.sc, "MTR")))
 

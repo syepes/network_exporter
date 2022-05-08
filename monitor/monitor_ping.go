@@ -65,12 +65,14 @@ func (p *PING) AddTargets() {
 
 	targetConfigTmp := []string{}
 	for _, v := range p.sc.Cfg.Targets {
-		ipAddrs, err := common.DestAddrs(v.Host, p.resolver)
-		if err != nil || len(ipAddrs) == 0 {
-			level.Warn(p.logger).Log("type", "ICMP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping resolve target: %s", v.Host), "err", err)
-		}
-		for _, ipAddr := range ipAddrs {
-			targetConfigTmp = common.AppendIfMissing(targetConfigTmp, v.Name+" "+ipAddr)
+		if v.Type == "ICMP" || v.Type == "ICMP+MTR" {
+			ipAddrs, err := common.DestAddrs(v.Host, p.resolver)
+			if err != nil || len(ipAddrs) == 0 {
+				level.Warn(p.logger).Log("type", "ICMP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping resolve target: %s", v.Host), "err", err)
+			}
+			for _, ipAddr := range ipAddrs {
+				targetConfigTmp = common.AppendIfMissing(targetConfigTmp, v.Name+" "+ipAddr)
+			}
 		}
 	}
 
@@ -99,7 +101,83 @@ func (p *PING) AddTargets() {
 	}
 }
 
-// Readd target if IP was changed (DNS record)
+// AddTarget adds a target to the monitored list
+func (p *PING) AddTarget(name string, host string, ip string, srcAddr string, labels map[string]string) (err error) {
+	return p.AddTargetDelayed(name, host, ip, srcAddr, labels, 0)
+}
+
+// AddTargetDelayed is AddTarget with a startup delay
+func (p *PING) AddTargetDelayed(name string, host string, ip string, srcAddr string, labels map[string]string, startupDelay time.Duration) (err error) {
+	level.Info(p.logger).Log("type", "ICMP", "func", "AddTargetDelayed", "msg", fmt.Sprintf("Adding Target: %s (%s/%s) in %s", name, host, ip, startupDelay))
+
+	p.mtx.Lock()
+	defer p.mtx.Unlock()
+
+	target, err := target.NewPing(p.logger, p.icmpID, startupDelay, name, host, ip, srcAddr, p.interval, p.timeout, p.count, labels)
+	if err != nil {
+		return err
+	}
+	p.removeTarget(name)
+	p.targets[name] = target
+	return nil
+}
+
+// DelTargets deletes/stops the removed targets from the configuration
+func (p *PING) DelTargets() {
+	level.Debug(p.logger).Log("type", "ICMP", "func", "DelTargets", "msg", fmt.Sprintf("Current Targets: %d, cfg: %d", len(p.targets), countTargets(p.sc, "ICMP")))
+
+	targetActiveTmp := []string{}
+	for _, v := range p.targets {
+		if v != nil {
+			targetActiveTmp = common.AppendIfMissing(targetActiveTmp, v.Name())
+		}
+	}
+
+	targetConfigTmp := []string{}
+	for _, v := range p.sc.Cfg.Targets {
+		if v.Type == "ICMP" || v.Type == "ICMP+MTR" {
+			ipAddrs, err := common.DestAddrs(v.Host, p.resolver)
+			if err != nil || len(ipAddrs) == 0 {
+				level.Warn(p.logger).Log("type", "ICMP", "func", "DelTargets", "msg", fmt.Sprintf("Skipping resolve target: %s", v.Host), "err", err)
+			}
+			for _, ipAddr := range ipAddrs {
+				targetConfigTmp = common.AppendIfMissing(targetConfigTmp, v.Name+" "+ipAddr)
+			}
+		}
+	}
+
+	targetDelete := common.CompareList(targetConfigTmp, targetActiveTmp)
+	for _, targetName := range targetDelete {
+		for _, t := range p.targets {
+			if t == nil {
+				continue
+			}
+			if t.Name() == targetName {
+				p.RemoveTarget(targetName)
+			}
+		}
+	}
+}
+
+// RemoveTarget removes a target from the monitoring list
+func (p *PING) RemoveTarget(key string) {
+	level.Info(p.logger).Log("type", "ICMP", "func", "RemoveTarget", "msg", fmt.Sprintf("Removing Target: %s", key))
+	p.mtx.Lock()
+	defer p.mtx.Unlock()
+	p.removeTarget(key)
+}
+
+// Stops monitoring a target and removes it from the list (if the list includes the target)
+func (p *PING) removeTarget(key string) {
+	target, found := p.targets[key]
+	if !found {
+		return
+	}
+	target.Stop()
+	delete(p.targets, key)
+}
+
+// Read target if IP was changed (DNS record)
 func (p *PING) CheckActiveTargets() (err error) {
 	level.Debug(p.logger).Log("type", "ICMP", "func", "CheckActiveTargets", "msg", fmt.Sprintf("Current Targets: %d, cfg: %d", len(p.targets), countTargets(p.sc, "ICMP")))
 
@@ -144,80 +222,6 @@ func (p *PING) CheckActiveTargets() (err error) {
 		}
 	}
 	return nil
-}
-
-// AddTarget adds a target to the monitored list
-func (p *PING) AddTarget(name string, host string, ip string, srcAddr string, labels map[string]string) (err error) {
-	return p.AddTargetDelayed(name, host, ip, srcAddr, labels, 0)
-}
-
-// AddTargetDelayed is AddTarget with a startup delay
-func (p *PING) AddTargetDelayed(name string, host string, ip string, srcAddr string, labels map[string]string, startupDelay time.Duration) (err error) {
-	level.Debug(p.logger).Log("type", "ICMP", "func", "AddTargetDelayed", "msg", fmt.Sprintf("Adding Target: %s (%s) in %s", name, host, startupDelay))
-
-	p.mtx.Lock()
-	defer p.mtx.Unlock()
-
-	target, err := target.NewPing(p.logger, p.icmpID, startupDelay, name, host, ip, srcAddr, p.interval, p.timeout, p.count, labels)
-	if err != nil {
-		return err
-	}
-	p.removeTarget(name)
-	p.targets[name] = target
-	return nil
-}
-
-// DelTargets deletes/stops the removed targets from the configuration
-func (p *PING) DelTargets() {
-	level.Debug(p.logger).Log("type", "ICMP", "func", "DelTargets", "msg", fmt.Sprintf("Current Targets: %d, cfg: %d", len(p.targets), countTargets(p.sc, "ICMP")))
-
-	targetActiveTmp := []string{}
-	for _, v := range p.targets {
-		if v != nil {
-			targetActiveTmp = common.AppendIfMissing(targetActiveTmp, v.Name())
-		}
-	}
-
-	targetConfigTmp := []string{}
-	for _, v := range p.sc.Cfg.Targets {
-		ipAddrs, err := common.DestAddrs(v.Host, p.resolver)
-		if err != nil || len(ipAddrs) == 0 {
-			level.Warn(p.logger).Log("type", "ICMP", "func", "DelTargets", "msg", fmt.Sprintf("Skipping resolve target: %s", v.Host), "err", err)
-		}
-		for _, ipAddr := range ipAddrs {
-			targetConfigTmp = common.AppendIfMissing(targetConfigTmp, v.Name+" "+ipAddr)
-		}
-	}
-
-	targetDelete := common.CompareList(targetConfigTmp, targetActiveTmp)
-	for _, targetName := range targetDelete {
-		for _, t := range p.targets {
-			if t == nil {
-				continue
-			}
-			if t.Name() == targetName {
-				p.RemoveTarget(targetName)
-			}
-		}
-	}
-}
-
-// RemoveTarget removes a target from the monitoring list
-func (p *PING) RemoveTarget(key string) {
-	level.Debug(p.logger).Log("type", "ICMP", "func", "RemoveTarget", "msg", fmt.Sprintf("Removing Target: %s", key))
-	p.mtx.Lock()
-	defer p.mtx.Unlock()
-	p.removeTarget(key)
-}
-
-// Stops monitoring a target and removes it from the list (if the list includes the target)
-func (p *PING) removeTarget(key string) {
-	target, found := p.targets[key]
-	if !found {
-		return
-	}
-	target.Stop()
-	delete(p.targets, key)
 }
 
 // ExportMetrics collects the metrics for each monitored target and returns it as a simple map

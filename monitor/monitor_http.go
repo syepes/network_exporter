@@ -62,11 +62,13 @@ func (p *HTTPGet) AddTargets() {
 
 	targetConfigTmp := []string{}
 	for _, v := range p.sc.Cfg.Targets {
-		targetConfigTmp = common.AppendIfMissing(targetConfigTmp, v.Name)
+		if v.Type == "HTTPGet" {
+			targetConfigTmp = common.AppendIfMissing(targetConfigTmp, v.Name)
+		}
 	}
 
 	targetAdd := common.CompareList(targetActiveTmp, targetConfigTmp)
-	// level.Debug(p.logger).Log("type", "HTTPGet", "func", "AddTargets", "msg", fmt.Sprintf("targetName: %v", targetAdd))
+	level.Debug(p.logger).Log("type", "HTTPGet", "func", "AddTargets", "msg", fmt.Sprintf("targetName: %v", targetAdd))
 
 	for _, targetName := range targetAdd {
 		for _, target := range p.sc.Cfg.Targets {
@@ -98,9 +100,9 @@ func (p *HTTPGet) AddTarget(name string, url string, srcAddr string, proxy strin
 // AddTargetDelayed is AddTarget with a startup delay
 func (p *HTTPGet) AddTargetDelayed(name string, urlStr string, srcAddr string, proxy string, labels map[string]string, startupDelay time.Duration) (err error) {
 	if proxy != "" {
-		level.Debug(p.logger).Log("type", "HTTPGet", "func", "AddTargetDelayed", "msg", fmt.Sprintf("Adding Target: %s (%s) with proxy (%s) in %s", name, urlStr, proxy, startupDelay))
+		level.Info(p.logger).Log("type", "HTTPGet", "func", "AddTargetDelayed", "msg", fmt.Sprintf("Adding Target: %s (%s) with proxy (%s) in %s", name, urlStr, proxy, startupDelay))
 	} else {
-		level.Debug(p.logger).Log("type", "HTTPGet", "func", "AddTargetDelayed", "msg", fmt.Sprintf("Adding Target: %s (%s) in %s", name, urlStr, startupDelay))
+		level.Info(p.logger).Log("type", "HTTPGet", "func", "AddTargetDelayed", "msg", fmt.Sprintf("Adding Target: %s (%s) in %s", name, urlStr, startupDelay))
 	}
 
 	p.mtx.Lock()
@@ -142,7 +144,9 @@ func (p *HTTPGet) DelTargets() {
 
 	targetConfigTmp := []string{}
 	for _, v := range p.sc.Cfg.Targets {
-		targetConfigTmp = common.AppendIfMissing(targetConfigTmp, v.Name)
+		if v.Type == "HTTPGet" {
+			targetConfigTmp = common.AppendIfMissing(targetConfigTmp, v.Name)
+		}
 	}
 
 	targetDelete := common.CompareList(targetConfigTmp, targetActiveTmp)
@@ -160,7 +164,7 @@ func (p *HTTPGet) DelTargets() {
 
 // RemoveTarget removes a target from the monitoring list
 func (p *HTTPGet) RemoveTarget(key string) {
-	level.Debug(p.logger).Log("type", "HTTPGet", "func", "RemoveTarget", "msg", fmt.Sprintf("Removing Target: %s", key))
+	level.Info(p.logger).Log("type", "HTTPGet", "func", "RemoveTarget", "msg", fmt.Sprintf("Removing Target: %s", key))
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
 	p.removeTarget(key)
