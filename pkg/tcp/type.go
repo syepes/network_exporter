@@ -11,6 +11,7 @@ type TCPPortReturn struct {
 	DestAddr string        `json:"dest_address"`
 	DestIp   string        `json:"dest_ip"`
 	DestPort string        `json:"dest_port"`
+	SrcIp    string        `json:"src_ip"`
 	ConTime  time.Duration `json:"connection_time"`
 }
 
