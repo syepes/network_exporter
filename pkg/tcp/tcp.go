@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// Port ICMP Operation
+// Port TCP Operation
 func Port(destAddr string, ip string, srcAddr string, port string, interval time.Duration, timeout time.Duration) (*TCPPortReturn, error) {
 	var out TCPPortReturn
 	var d net.Dialer
@@ -42,6 +42,7 @@ func Port(destAddr string, ip string, srcAddr string, port string, interval time
 	start := time.Now()
 	conn, err := d.Dial("tcp", net.JoinHostPort(ip, port))
 	out.ConTime = time.Since(start)
+	out.SrcIp = conn.LocalAddr().(*net.TCPAddr).IP.String()
 
 	if err != nil {
 		out.Success = false
