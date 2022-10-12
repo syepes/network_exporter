@@ -5,9 +5,6 @@ import (
 	"time"
 )
 
-const defaultTimeout = 5 * time.Second
-const defaultInterval = 10 * time.Millisecond
-
 // HTTPReturn Calculated results
 type HTTPReturn struct {
 	Success               bool          `json:"success"`

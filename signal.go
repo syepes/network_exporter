@@ -30,13 +30,13 @@ func reloadSignal() {
 					continue
 				} else {
 					monitorPING.DelTargets()
-					monitorPING.CheckActiveTargets()
+					_ = monitorPING.CheckActiveTargets()
 					monitorPING.AddTargets()
 					monitorMTR.DelTargets()
-					monitorMTR.CheckActiveTargets()
+					_ = monitorMTR.CheckActiveTargets()
 					monitorMTR.AddTargets()
 					monitorTCP.DelTargets()
-					monitorTCP.CheckActiveTargets()
+					_ = monitorTCP.CheckActiveTargets()
 					monitorTCP.AddTargets()
 					monitorHTTPGet.DelTargets()
 					monitorHTTPGet.AddTargets()

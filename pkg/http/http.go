@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptrace"
@@ -46,8 +45,8 @@ func HTTPGet(destURL string, srcAddr string, timeout time.Duration) (*HTTPReturn
 			Timeout:   timeout,
 			Transport: transport,
 		}
-	} 
-	
+	}
+
 	req, err := http.NewRequest("GET", dURL.String(), nil)
 	if err != nil {
 		out.Success = false
@@ -65,7 +64,7 @@ func HTTPGet(destURL string, srcAddr string, timeout time.Duration) (*HTTPReturn
 	}
 
 	// Read
-	if _, err := io.Copy(ioutil.Discard, resp.Body); err != nil {
+	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
 		out.Success = false
 		return &out, err
 	}
@@ -135,7 +134,7 @@ func HTTPGetProxy(destURL string, timeout time.Duration, proxyURL string) (*HTTP
 	}
 
 	// Read
-	if _, err := io.Copy(ioutil.Discard, resp.Body); err != nil {
+	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
 		out.Success = false
 		return &out, err
 	}

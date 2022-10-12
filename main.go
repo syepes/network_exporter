@@ -24,7 +24,7 @@ import (
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
-const version string = "1.6.1"
+const version string = "1.6.2"
 
 var (
 	listenAddress  = kingpin.Flag("web.listen-address", "The address to listen on for HTTP requests").Default(":9427").String()
@@ -93,13 +93,13 @@ func startConfigRefresh() {
 			continue
 		} else {
 			monitorPING.DelTargets()
-			monitorPING.CheckActiveTargets()
+			_ = monitorPING.CheckActiveTargets()
 			monitorPING.AddTargets()
 			monitorMTR.DelTargets()
-			monitorMTR.CheckActiveTargets()
+			_ = monitorMTR.CheckActiveTargets()
 			monitorMTR.AddTargets()
 			monitorTCP.DelTargets()
-			monitorTCP.CheckActiveTargets()
+			_ = monitorTCP.CheckActiveTargets()
 			monitorTCP.AddTargets()
 			monitorHTTPGet.DelTargets()
 			monitorHTTPGet.AddTargets()
