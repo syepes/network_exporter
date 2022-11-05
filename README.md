@@ -111,9 +111,9 @@ To run the network_exporter as a Docker container by builing your own image or u
 ```console
 docker build -t syepes/network_exporter .
 # Default mode
-docker run -p 9427:9427 -v $PWD/network_exporter.yml:/network_exporter.yml:ro --name network_exporter syepes/network_exporter
+docker run -p 9427:9427 -v $PWD/network_exporter.yml:/app/cfg/network_exporter.yml:ro --name network_exporter syepes/network_exporter
 # Debug level
-docker run -p 9427:9427 -v $PWD/network_exporter.yml:/network_exporter.yml:ro --name network_exporter syepes/network_exporter /app/network_exporter --log.level=debug
+docker run -p 9427:9427 -v $PWD/network_exporter.yml:/app/cfg/network_exporter.yml:ro --name network_exporter syepes/network_exporter /app/network_exporter --log.level=debug
 ```
 
 ## Configuration
