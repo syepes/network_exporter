@@ -56,6 +56,7 @@ func HTTPGet(destURL string, srcAddr string, timeout time.Duration) (*HTTPReturn
 	trace, ht := NewClientTrace()
 	ctx := httptrace.WithClientTrace(req.Context(), trace)
 	req = req.WithContext(ctx)
+	req.Close = true
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -64,6 +65,7 @@ func HTTPGet(destURL string, srcAddr string, timeout time.Duration) (*HTTPReturn
 	}
 
 	// Read
+	defer resp.Body.Close()
 	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
 		out.Success = false
 		return &out, err
@@ -126,6 +128,7 @@ func HTTPGetProxy(destURL string, timeout time.Duration, proxyURL string) (*HTTP
 	trace, ht := NewClientTrace()
 	ctx := httptrace.WithClientTrace(req.Context(), trace)
 	req = req.WithContext(ctx)
+	req.Close = true
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -134,6 +137,7 @@ func HTTPGetProxy(destURL string, timeout time.Duration, proxyURL string) (*HTTP
 	}
 
 	// Read
+	defer resp.Body.Close()
 	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
 		out.Success = false
 		return &out, err

@@ -18,3 +18,6 @@ build-push:
 
 build-local:
 	goreleaser release --skip-publish --snapshot --rm-dist
+
+lint:
+	golangci-lint run
