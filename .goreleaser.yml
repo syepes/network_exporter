@@ -28,8 +28,8 @@ archives:
   - format: tar.gz
     rlcp: true
     name_template: >-
-      {{ .ProjectName }}-{{ .Version }}.
-      {{- title .Os }}-
+      {{ .ProjectName }}_{{ .Version }}.
+      {{- title .Os }}_
       {{- if eq .Arch "amd64" }}x86_64
       {{- else if eq .Arch "386" }}i386
       {{- else }}{{ .Arch }}{{ end }}
