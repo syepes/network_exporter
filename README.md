@@ -98,7 +98,7 @@ touch network_exporter.yml
 ### Local Build
 
 ```console
-$ goreleaser release --skip-publish --snapshot --rm-dist
+$ goreleaser release --skip-publish --snapshot --clean
 $ ls -l artifacts/network_exporter_*6?
 # If you want to run it with a non root user
 $ sudo setcap cap_net_raw=+ep artifacts/network_exporter_linux_amd64/network_exporter
