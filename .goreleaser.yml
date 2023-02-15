@@ -40,7 +40,7 @@ archives:
       - README.md
       - LICENSE.md
       - network_exporter.yml
-    wrap_in_directory: "true"
+    wrap_in_directory: false
 snapshot:
   name_template: SNAPSHOT-{{ .Commit }}
 nfpms:
