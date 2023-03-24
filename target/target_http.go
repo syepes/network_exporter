@@ -36,7 +36,7 @@ func NewHTTPGet(logger log.Logger, startupDelay time.Duration, name string, url 
 		logger:   logger,
 		name:     name,
 		url:      url,
-		srcAddr: srcAddr,
+		srcAddr:  srcAddr,
 		proxy:    proxy,
 		interval: interval,
 		timeout:  timeout,
@@ -83,14 +83,12 @@ func (t *HTTPGet) httpGetCheck() {
 		data, err = http.HTTPGetProxy(t.url, t.timeout, t.proxy)
 		if err != nil {
 			level.Error(t.logger).Log("type", "HTTPGet", "func", "httpGetCheck", "msg", fmt.Sprintf("%s", err))
-			return
 		}
 
 	} else {
-		data, err = http.HTTPGet(t.url, t.srcAddr, t.timeout )
+		data, err = http.HTTPGet(t.url, t.srcAddr, t.timeout)
 		if err != nil {
 			level.Error(t.logger).Log("type", "HTTPGet", "func", "httpGetCheck", "msg", fmt.Sprintf("%s", err))
-			return
 		}
 	}
 
@@ -98,7 +96,7 @@ func (t *HTTPGet) httpGetCheck() {
 	if err2 != nil {
 		level.Error(t.logger).Log("type", "HTTPGet", "func", "httpGetCheck", "msg", fmt.Sprintf("%s", err2))
 	}
-	level.Debug(t.logger).Log("type", "HTTPGet", "func", "httpGetCheck", "msg", fmt.Sprintf("%s", string(bytes)))
+	level.Debug(t.logger).Log("type", "HTTPGet", "func", "httpGetCheck", "msg", bytes)
 
 	t.Lock()
 	t.result = data

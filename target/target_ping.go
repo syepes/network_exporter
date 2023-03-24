@@ -91,7 +91,7 @@ func (t *PING) ping() {
 	if err2 != nil {
 		level.Error(t.logger).Log("type", "ICMP", "func", "ping", "msg", fmt.Sprintf("%s", err2))
 	}
-	level.Debug(t.logger).Log("type", "ICMP", "func", "ping", "msg", fmt.Sprintf("%s", string(bytes)))
+	level.Debug(t.logger).Log("type", "ICMP", "func", "ping", "msg", bytes)
 
 	t.Lock()
 	defer t.Unlock()

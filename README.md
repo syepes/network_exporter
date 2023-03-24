@@ -278,4 +278,4 @@ If you have any idea for an improvement or find a bug do not hesitate in opening
 ## License
 
 All content is distributed under the [Apache 2.0 License](http://www.apache.org/licenses/LICENSE-2.0)
-Copyright &copy; 2020-2022, [Sebastian YEPES](mailto:syepes@gmail.com)
+Copyright &copy; 2020-2023, [Sebastian YEPES](mailto:syepes@gmail.com)

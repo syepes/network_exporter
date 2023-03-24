@@ -56,7 +56,7 @@ func Port(destAddr string, ip string, srcAddr string, port string, interval time
 		// Set Deadline timeout
 		if err := conn.SetDeadline(time.Now().Add(tcpOptions.Timeout())); err != nil {
 			out.Success = false
-			return &out, fmt.Errorf("Error setting deadline timout", "err", err)
+			return &out, fmt.Errorf("error setting deadline timout: %v", err)
 		}
 
 		if conn != nil {

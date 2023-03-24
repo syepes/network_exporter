@@ -91,7 +91,7 @@ func (t *MTR) mtr() {
 	if err2 != nil {
 		level.Error(t.logger).Log("type", "MTR", "func", "mtr", "msg", fmt.Sprintf("%s", err2))
 	}
-	level.Debug(t.logger).Log("type", "MTR", "func", "mtr", "msg", fmt.Sprintf("%s", string(bytes)))
+	level.Debug(t.logger).Log("type", "MTR", "func", "mtr", "msg", bytes)
 
 	t.Lock()
 	t.result = data

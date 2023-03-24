@@ -10,6 +10,7 @@ import (
 
 	_ "net/http/pprof"
 
+	"github.com/alecthomas/kingpin/v2"
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
@@ -21,10 +22,9 @@ import (
 	"github.com/syepes/network_exporter/config"
 	"github.com/syepes/network_exporter/monitor"
 	"github.com/syepes/network_exporter/pkg/common"
-	"gopkg.in/alecthomas/kingpin.v2"
 )
 
-const version string = "1.6.7"
+const version string = "1.6.8"
 
 var (
 	listenAddress  = kingpin.Flag("web.listen-address", "The address to listen on for HTTP requests").Default(":9427").String()

@@ -87,7 +87,7 @@ func (t *TCPPort) portCheck() {
 	if err2 != nil {
 		level.Error(t.logger).Log("type", "TCP", "func", "port", "msg", fmt.Sprintf("%s", err2))
 	}
-	level.Debug(t.logger).Log("type", "TCP", "func", "port", "msg", fmt.Sprintf("%s", string(bytes)))
+	level.Debug(t.logger).Log("type", "TCP", "func", "port", "msg", bytes)
 
 	t.Lock()
 	t.result = data
