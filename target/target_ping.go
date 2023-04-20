@@ -12,6 +12,8 @@ import (
 	"github.com/syepes/network_exporter/pkg/ping"
 )
 
+const MaxConcurrentJobs = 3
+
 // PING Object
 type PING struct {
 	logger   log.Logger
@@ -47,6 +49,7 @@ func NewPing(logger log.Logger, icmpID *common.IcmpID, startupDelay time.Duratio
 		count:    count,
 		labels:   labels,
 		stop:     make(chan struct{}),
+		result:   &ping.PingResult{},
 	}
 	t.wg.Add(1)
 	go t.run(startupDelay)
@@ -61,6 +64,7 @@ func (t *PING) run(startupDelay time.Duration) {
 		}
 	}
 
+	waitChan := make(chan struct{}, MaxConcurrentJobs)
 	tick := time.NewTicker(t.interval)
 	for {
 		select {
@@ -69,7 +73,11 @@ func (t *PING) run(startupDelay time.Duration) {
 			t.wg.Done()
 			return
 		case <-tick.C:
-			go t.ping()
+			waitChan <- struct{}{}
+			go func() {
+				t.ping()
+				<-waitChan
+			}()
 		}
 	}
 }
@@ -87,15 +95,18 @@ func (t *PING) ping() {
 		level.Error(t.logger).Log("type", "ICMP", "func", "ping", "msg", fmt.Sprintf("%s", err))
 	}
 
-	bytes, err2 := json.Marshal(data)
+	t.Lock()
+	defer t.Unlock()
+	data.SntSummary += t.result.SntSummary
+	data.SntFailSummary += t.result.SntFailSummary
+	data.SntTimeSummary += t.result.SntTimeSummary
+	t.result = data
+
+	bytes, err2 := json.Marshal(t.result)
 	if err2 != nil {
 		level.Error(t.logger).Log("type", "ICMP", "func", "ping", "msg", fmt.Sprintf("%s", err2))
 	}
 	level.Debug(t.logger).Log("type", "ICMP", "func", "ping", "msg", bytes)
-
-	t.Lock()
-	defer t.Unlock()
-	t.result = data
 }
 
 // Compute returns the results of the Ping metrics

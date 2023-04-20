@@ -58,6 +58,7 @@ func (t *TCPPort) run(startupDelay time.Duration) {
 		}
 	}
 
+	waitChan := make(chan struct{}, MaxConcurrentJobs)
 	tick := time.NewTicker(t.interval)
 	for {
 		select {
@@ -66,7 +67,11 @@ func (t *TCPPort) run(startupDelay time.Duration) {
 			t.wg.Done()
 			return
 		case <-tick.C:
-			go t.portCheck()
+			waitChan <- struct{}{}
+			go func() {
+				t.portCheck()
+				<-waitChan
+			}()
 		}
 	}
 }
@@ -90,8 +95,8 @@ func (t *TCPPort) portCheck() {
 	level.Debug(t.logger).Log("type", "TCP", "func", "port", "msg", bytes)
 
 	t.Lock()
+	defer t.Unlock()
 	t.result = data
-	t.Unlock()
 }
 
 // Compute returns the results of the TCP metrics

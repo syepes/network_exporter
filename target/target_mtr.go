@@ -3,6 +3,7 @@ package target
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -47,6 +48,7 @@ func NewMTR(logger log.Logger, icmpID *common.IcmpID, startupDelay time.Duration
 		count:    count,
 		labels:   labels,
 		stop:     make(chan struct{}),
+		result:   &mtr.MtrResult{HopSummaryMap: map[string]*common.IcmpSummary{}},
 	}
 	t.wg.Add(1)
 	go t.run(startupDelay)
@@ -61,6 +63,7 @@ func (t *MTR) run(startupDelay time.Duration) {
 		}
 	}
 
+	waitChan := make(chan struct{}, MaxConcurrentJobs)
 	tick := time.NewTicker(t.interval)
 	for {
 		select {
@@ -69,7 +72,11 @@ func (t *MTR) run(startupDelay time.Duration) {
 			t.wg.Done()
 			return
 		case <-tick.C:
-			go t.mtr()
+			waitChan <- struct{}{}
+			go func() {
+				t.mtr()
+				<-waitChan
+			}()
 		}
 	}
 }
@@ -87,15 +94,29 @@ func (t *MTR) mtr() {
 		level.Error(t.logger).Log("type", "MTR", "func", "mtr", "msg", fmt.Sprintf("%s", err))
 	}
 
-	bytes, err2 := json.Marshal(data)
+	t.Lock()
+	defer t.Unlock()
+	summaryMap := t.result.HopSummaryMap
+	t.result = data
+	for _, hop := range data.Hops {
+		summary := summaryMap[strconv.Itoa(hop.TTL)+"_"+hop.AddressTo]
+		if summary == nil {
+			summary = &common.IcmpSummary{}
+			summaryMap[strconv.Itoa(hop.TTL)+"_"+hop.AddressTo] = summary
+		}
+		summary.AddressFrom = hop.AddressFrom
+		summary.AddressTo = hop.AddressTo
+		summary.Snt += hop.Snt
+		summary.SntTime += hop.SumTime
+		summary.SntFail += hop.SntFail
+	}
+	t.result.HopSummaryMap = summaryMap
+
+	bytes, err2 := json.Marshal(t.result)
 	if err2 != nil {
 		level.Error(t.logger).Log("type", "MTR", "func", "mtr", "msg", fmt.Sprintf("%s", err2))
 	}
 	level.Debug(t.logger).Log("type", "MTR", "func", "mtr", "msg", bytes)
-
-	t.Lock()
-	t.result = data
-	t.Unlock()
 }
 
 // Compute returns the results of the MTR metrics

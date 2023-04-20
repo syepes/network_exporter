@@ -2,6 +2,7 @@ package collector
 
 import (
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -12,6 +13,9 @@ import (
 var (
 	mtrLabelNames  = []string{"name", "target", "ttl", "path"}
 	mtrDesc        = prometheus.NewDesc("mtr_rtt_seconds", "Round Trip Time in seconds", append(mtrLabelNames, "type"), nil)
+	mtrSntDesc     = prometheus.NewDesc("mtr_rtt_snt_count", "Round Trip Send Package Total", append(mtrLabelNames, "type"), nil)
+	mtrSntFailDesc = prometheus.NewDesc("mtr_rtt_snt_fail_count", "Round Trip Send Package Fail Total", append(mtrLabelNames, "type"), nil)
+	mtrSntTimeDesc = prometheus.NewDesc("mtr_rtt_snt_seconds", "Round Trip Send Package Time Total", append(mtrLabelNames, "type"), nil)
 	mtrHopsDesc    = prometheus.NewDesc("mtr_hops", "Number of route hops", []string{"name", "target"}, nil)
 	mtrTargetsDesc = prometheus.NewDesc("mtr_targets", "Number of active targets", nil, nil)
 	mtrStateDesc   = prometheus.NewDesc("mtr_up", "Exporter state", nil, nil)
@@ -75,6 +79,18 @@ func (p *MTR) Collect(ch chan<- prometheus.Metric) {
 			ch <- prometheus.MustNewConstMetric(mtrDesc, prometheus.GaugeValue, hop.CorrectedSDTime.Seconds(), append(ll, "csd")...)
 			ch <- prometheus.MustNewConstMetric(mtrDesc, prometheus.GaugeValue, hop.RangeTime.Seconds(), append(ll, "range")...)
 			ch <- prometheus.MustNewConstMetric(mtrDesc, prometheus.GaugeValue, float64(hop.Loss), append(ll, "loss")...)
+		}
+
+		mtrSntDesc = prometheus.NewDesc("mtr_rtt_snt_count", "Round Trip Send Package Total", mtrLabelNames, l2)
+		mtrSntFailDesc = prometheus.NewDesc("mtr_rtt_snt_fail_count", "Round Trip Send Package Fail Total", mtrLabelNames, l2)
+		mtrSntTimeDesc = prometheus.NewDesc("mtr_rtt_snt_seconds", "Round Trip Send Package Time Total", mtrLabelNames, l2)
+
+		for ttl, summary := range metric.HopSummaryMap {
+			ll := append(l, strings.Split(ttl, "_")[0])
+			ll = append(ll, summary.AddressTo)
+			ch <- prometheus.MustNewConstMetric(mtrSntDesc, prometheus.CounterValue, float64(summary.Snt), ll...)
+			ch <- prometheus.MustNewConstMetric(mtrSntFailDesc, prometheus.CounterValue, float64(summary.SntFail), ll...)
+			ch <- prometheus.MustNewConstMetric(mtrSntTimeDesc, prometheus.CounterValue, summary.SntTime.Seconds(), ll...)
 		}
 	}
 	ch <- prometheus.MustNewConstMetric(mtrTargetsDesc, prometheus.GaugeValue, float64(len(targets)))

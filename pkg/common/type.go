@@ -36,6 +36,15 @@ type IcmpReturn struct {
 	Elapsed time.Duration
 }
 
+// IcmpSummary ICMP HOP Summary
+type IcmpSummary struct {
+	AddressFrom string        `json:"address_from"`
+	AddressTo   string        `json:"address_to"`
+	Snt         int           `json:"snt"`
+	SntFail     int           `json:"snt_fail"`
+	SntTime     time.Duration `json:"snt_time"`
+}
+
 // IcmpHop ICMP HOP Response time details
 type IcmpHop struct {
 	Success              bool          `json:"success"`
@@ -44,6 +53,7 @@ type IcmpHop struct {
 	N                    int           `json:"n"`
 	TTL                  int           `json:"ttl"`
 	Snt                  int           `json:"snt"`
+	SntFail              int           `json:"snt_fail"`
 	LastTime             time.Duration `json:"last"`
 	SumTime              time.Duration `json:"sum"`
 	AvgTime              time.Duration `json:"avg"`

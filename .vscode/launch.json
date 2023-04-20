@@ -1,0 +1,19 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Launch Process",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "cwd": "${workspaceFolder}",
+      "program": "${fileDirname}",
+      "args": [
+        "--log.level=debug",
+        "--config.file=temp/network_exporter.yml",
+      ],
+      "showLog": true,
+      "asRoot": true,
+    }
+  ]
+}

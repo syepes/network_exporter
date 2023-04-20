@@ -34,6 +34,9 @@ This exporter gathers either ICMP, MTR, TCP Port or HTTP Get stats and exports t
 - `ping_rtt_seconds{type=usd}`:                    Standard deviation without correction in seconds
 - `ping_rtt_seconds{type=csd}`:                    Standard deviation with correction (Bessel's) in seconds
 - `ping_rtt_seconds{type=range}`:                  Range in seconds
+- `ping_rtt_snt_count`:                            Packet sent count total
+- `ping_rtt_snt_fail_count`:                       Packet sent fail count total
+- `ping_rtt_snt_seconds`:                          Packet sent time total in seconds
 - `ping_loss_percent`:                             Packet loss in percent
 
 ---
@@ -51,6 +54,9 @@ This exporter gathers either ICMP, MTR, TCP Port or HTTP Get stats and exports t
 - `mtr_rtt_seconds{type=csd}`:                     Standard deviation with correction (Bessel's) in seconds
 - `mtr_rtt_seconds{type=range}`:                   Range in seconds
 - `mtr_rtt_seconds{type=loss}`:                    Packet loss in percent
+- `mtr_rtt_snt_count`:                             Packet sent count total
+- `mtr_rtt_snt_fail_count`:                        Packet sent fail count total
+- `mtr_rtt_snt_seconds`:                           Packet sent time total in seconds
 
 ---
 

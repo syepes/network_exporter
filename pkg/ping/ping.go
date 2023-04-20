@@ -64,13 +64,8 @@ func runPing(ipAddr string, ip string, srcAddr string, icmpID int, option *PingO
 	seq := 0
 	for cnt := 0; cnt < option.Count(); cnt++ {
 		icmpReturn, err := icmp.Icmp(ip, srcAddr, ttl, pid, timeout, seq)
-		if err != nil {
-			pingResult.Success = false
-			pingResult.DropRate = 1.0
-			return pingResult, err
-		}
 
-		if !icmpReturn.Success || !common.IsEqualIP(ip, icmpReturn.Addr) {
+		if err != nil || !icmpReturn.Success || !common.IsEqualIP(ip, icmpReturn.Addr) {
 			continue
 		}
 
@@ -91,12 +86,6 @@ func runPing(ipAddr string, ip string, srcAddr string, icmpID int, option *PingO
 		time.Sleep(interval)
 	}
 
-	if !pingReturn.success {
-		pingResult.Success = false
-		pingResult.DropRate = 1.0
-		return pingResult, nil
-	}
-
 	pingResult.Success = pingReturn.success
 	pingResult.DropRate = float64(option.Count()-pingReturn.succSum) / float64(option.Count())
 	pingResult.SumTime = pingReturn.sumTime
@@ -107,6 +96,9 @@ func runPing(ipAddr string, ip string, srcAddr string, icmpID int, option *PingO
 	pingResult.UncorrectedSDTime = time.Duration(common.TimeUncorrectedDeviation(pingReturn.allTime))
 	pingResult.CorrectedSDTime = time.Duration(common.TimeCorrectedDeviation(pingReturn.allTime))
 	pingResult.RangeTime = time.Duration(common.TimeRange(pingReturn.allTime))
+	pingResult.SntSummary = option.Count()
+	pingResult.SntFailSummary = option.Count() - pingReturn.succSum
+	pingResult.SntTimeSummary = time.Duration(common.TimeRange(pingReturn.allTime))
 
 	return pingResult, nil
 }

@@ -2,15 +2,16 @@ package main
 
 import (
 	"context"
+	"expvar"
 	"fmt"
 	"net"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"time"
 
-	_ "net/http/pprof"
-
 	"github.com/alecthomas/kingpin/v2"
+	"github.com/felixge/fgprof"
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
@@ -24,18 +25,19 @@ import (
 	"github.com/syepes/network_exporter/pkg/common"
 )
 
-const version string = "1.6.8"
+const version string = "1.7.0"
 
 var (
-	listenAddress  = kingpin.Flag("web.listen-address", "The address to listen on for HTTP requests").Default(":9427").String()
-	configFile     = kingpin.Flag("config.file", "Exporter configuration file").Default("/app/cfg/network_exporter.yml").String()
-	sc             = &config.SafeConfig{Cfg: &config.Config{}}
-	logger         log.Logger
-	icmpID         *common.IcmpID // goroutine shared counter
-	monitorPING    *monitor.PING
-	monitorMTR     *monitor.MTR
-	monitorTCP     *monitor.TCPPort
-	monitorHTTPGet *monitor.HTTPGet
+	listenAddress    = kingpin.Flag("web.listen-address", "The address to listen on for HTTP requests").Default(":9427").String()
+	configFile       = kingpin.Flag("config.file", "Exporter configuration file").Default("/app/cfg/network_exporter.yml").String()
+	enableProfileing = kingpin.Flag("profiling", "Enable Profiling (pprof + fgprof)").Default("false").Bool()
+	sc               = &config.SafeConfig{Cfg: &config.Config{}}
+	logger           log.Logger
+	icmpID           *common.IcmpID // goroutine shared counter
+	monitorPING      *monitor.PING
+	monitorMTR       *monitor.MTR
+	monitorTCP       *monitor.TCPPort
+	monitorHTTPGet   *monitor.HTTPGet
 
 	indexHTML = `<!doctype html><html><head> <meta charset="UTF-8"><title>Network Exporter (Version ` + version + `)</title></head><body><h1>Network Exporter</h1><p><a href="%s">Metrics</a></p></body></html>`
 )
@@ -108,12 +110,8 @@ func startConfigRefresh() {
 }
 
 func startServer() {
+	mux := http.NewServeMux()
 	metricsPath := "/metrics"
-	level.Info(logger).Log("msg", "Starting ping exporter", "version", version)
-
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, indexHTML, metricsPath)
-	})
 
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(collectors.NewGoCollector())
@@ -123,10 +121,25 @@ func startServer() {
 	reg.MustRegister(&collector.TCP{Monitor: monitorTCP})
 	reg.MustRegister(&collector.HTTPGet{Monitor: monitorHTTPGet})
 	h := promhttp.HandlerFor(reg, promhttp.HandlerOpts{})
-	http.Handle(metricsPath, h)
+	mux.Handle(metricsPath, h)
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, indexHTML, metricsPath)
+	})
 
+	if *enableProfileing {
+		level.Info(logger).Log("msg", "Profiling enabled")
+		mux.Handle("/debug/vars", http.HandlerFunc(expVars))
+		mux.HandleFunc("/debug/fgprof", fgprof.Handler().(http.HandlerFunc))
+		mux.HandleFunc("/debug/pprof/", pprof.Index)
+		mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	}
+
+	level.Info(logger).Log("msg", "Starting ping exporter", "version", version)
 	level.Info(logger).Log("msg", fmt.Sprintf("Listening for %s on %s", metricsPath, *listenAddress))
-	level.Error(logger).Log("msg", "Could not start http", "err", http.ListenAndServe(*listenAddress, nil))
+	level.Error(logger).Log("msg", "Could not start http", "err", http.ListenAndServe(*listenAddress, mux))
 }
 
 func getResolver() *net.Resolver {
@@ -141,4 +154,18 @@ func getResolver() *net.Resolver {
 		return d.DialContext(ctx, "udp", sc.Cfg.Conf.Nameserver)
 	}
 	return &net.Resolver{PreferGo: true, Dial: dialer}
+}
+
+func expVars(w http.ResponseWriter, r *http.Request) {
+	first := true
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	fmt.Fprintf(w, "{\n")
+	expvar.Do(func(kv expvar.KeyValue) {
+		if !first {
+			fmt.Fprintf(w, ",\n")
+		}
+		first = false
+		fmt.Fprintf(w, "%q: %s", kv.Key, kv.Value)
+	})
+	fmt.Fprintf(w, "\n}\n")
 }

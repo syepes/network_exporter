@@ -41,13 +41,12 @@ services:
       - "-storageDataPath=/storage"
       - "-loggerLevel=INFO"
       - "-httpListenAddr=:8428"
-      - "-retentionPeriod=24"
-      - "-memory.allowedPercent=70"
+      - "-retentionPeriod=1y"
       - "-influxSkipSingleField"
       - "-selfScrapeInterval=30s"
 
   station1_agt:
-    image: victoriametrics/vmagent
+    image: victoriametrics/vmagent:latest
     container_name: station1_agt
     hostname: station1_agt
     restart: always
@@ -63,11 +62,9 @@ services:
       - "-promscrape.config=/vmagent_prometheus.yml"
       - "-remoteWrite.tmpDataPath=/storage"
       - "-loggerLevel=INFO"
-      - "-memory.allowedPercent=70"
-      - "-insert.maxQueueDuration=360m0s"
       - "-remoteWrite.url=http://central_vm:8428/api/v1/write"
   station1_exporter:
-    image: syepes/network_exporter
+    image: syepes/network_exporter:latest
     container_name: station1_exporter
     hostname: station1_exporter
     restart: always

@@ -22,6 +22,9 @@ type PingResult struct {
 	UncorrectedSDTime    time.Duration `json:"usd"`
 	CorrectedSDTime      time.Duration `json:"csd"`
 	RangeTime            time.Duration `json:"range"`
+	SntSummary           int           `json:"snt_summary"`
+	SntFailSummary       int           `json:"snt_fail_summary"`
+	SntTimeSummary       time.Duration `json:"snt_time_summary"`
 }
 
 // PingReturn ICMP Response

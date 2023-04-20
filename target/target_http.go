@@ -56,6 +56,7 @@ func (t *HTTPGet) run(startupDelay time.Duration) {
 		}
 	}
 
+	waitChan := make(chan struct{}, MaxConcurrentJobs)
 	tick := time.NewTicker(t.interval)
 	for {
 		select {
@@ -64,7 +65,11 @@ func (t *HTTPGet) run(startupDelay time.Duration) {
 			t.wg.Done()
 			return
 		case <-tick.C:
-			go t.httpGetCheck()
+			waitChan <- struct{}{}
+			go func() {
+				t.httpGetCheck()
+				<-waitChan
+			}()
 		}
 	}
 }
@@ -99,8 +104,8 @@ func (t *HTTPGet) httpGetCheck() {
 	level.Debug(t.logger).Log("type", "HTTPGet", "func", "httpGetCheck", "msg", bytes)
 
 	t.Lock()
+	defer t.Unlock()
 	t.result = data
-	t.Unlock()
 }
 
 // Compute returns the results of the HTTP metrics
