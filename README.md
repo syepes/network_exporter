@@ -94,7 +94,9 @@ Each metric contains the below labels and additionally the ones added in the con
 
 ### Prerequisites for Linux
 
-```console
+The process must run with the necesary linux or docker previlages to be able to perform the necesary tests
+
+```bash
 apt update
 apt install docker
 apt install docker.io
@@ -103,30 +105,30 @@ touch network_exporter.yml
 
 ### Local Build
 
-```console
+```bash
 $ goreleaser release --skip-publish --snapshot --clean
 $ ls -l artifacts/network_exporter_*6?
 # If you want to run it with a non root user
-$ sudo setcap cap_net_raw=+ep artifacts/network_exporter_linux_amd64/network_exporter
+$ sudo setcap 'cap_net_raw,cap_net_admin+eip' artifacts/network_exporter_linux_amd64/network_exporter
 ```
 
 ### Building with Docker
 
 To run the network_exporter as a Docker container by builing your own image or using <https://hub.docker.com/r/syepes/network_exporter>
 
-```console
+```bash
 docker build -t syepes/network_exporter .
 # Default mode
-docker run -p 9427:9427 -v $PWD/network_exporter.yml:/app/cfg/network_exporter.yml:ro --name network_exporter syepes/network_exporter
+docker run --privileged --cap-add NET_ADMIN --cap-add NET_RAW -p 9427:9427 -v $PWD/network_exporter.yml:/app/cfg/network_exporter.yml:ro --name network_exporter syepes/network_exporter
 # Debug level
-docker run -p 9427:9427 -v $PWD/network_exporter.yml:/app/cfg/network_exporter.yml:ro --name network_exporter syepes/network_exporter /app/network_exporter --log.level=debug
+docker run --privileged --cap-add NET_ADMIN --cap-add NET_RAW -p 9427:9427 -v $PWD/network_exporter.yml:/app/cfg/network_exporter.yml:ro --name network_exporter syepes/network_exporter /app/network_exporter --log.level=debug
 ```
 
 ## Configuration
 
 To see all available configuration flags:
 
-```console
+```bash
 ./network_exporter -h
 ```
 
@@ -192,6 +194,18 @@ targets:
     proxy: http://localhost:3128
 ```
 
+Source IP
+
+`source_ip` parameter will try to assign IP for request sent to specific target. This IP has to be configure on one of the interfaces of the OS.
+Supported for all types of the checks
+
+```yaml
+  - name: server3.example.com:9427
+    host: server3.example.com:9427
+    type: TCP
+    source_ip: 192.168.1.1
+```
+
 **Note:** Domain names are resolved (regularly) to their corresponding A and AAAA records (IPv4 and IPv6).
 By default if not configured, `network_exporter` uses the system resolver to translate domain names to IP addresses.
 You can also override the DNS resolver address by specifying the `conf.nameserver` configuration setting.
@@ -254,18 +268,6 @@ Will be resolved to 3 separate targets:
   - name: server3.example.com:9427
     host: server3.example.com:9427
     type: TCP
-```
-
-**Source IP**
-
-`source_ip` parameter will try to assign IP for request sent to specific target. This IP has to be configure on one of the interfaces of the OS.
-Supported for all types of the checks
-
-```
-  - name: server3.example.com:9427
-    host: server3.example.com:9427
-    type: TCP
-    source_ip: 192.168.1.1
 ```
 
 ## Deployment
