@@ -20,21 +20,21 @@ func SrvRecordCheck(record string) bool {
 
 func SrvRecordHosts(record string) ([]string, error) {
 	record_split := strings.Split(record, ".")
-	service :=  record_split[0][1:]
+	service := record_split[0][1:]
 	proto := record_split[1][1:]
 
-	_, members, err := net.LookupSRV(service, proto, strings.Join(record_split[2:],"."))
+	_, members, err := net.LookupSRV(service, proto, strings.Join(record_split[2:], "."))
 	if err != nil {
 		return nil, fmt.Errorf("resolving target: %v", err)
 	}
 	hosts := []string{}
 	if proto == "tcp" {
 		for _, host := range members {
-			hosts = append(hosts,  fmt.Sprintf("%s:%d", host.Target[:len(host.Target) - 1], host.Port))
+			hosts = append(hosts, fmt.Sprintf("%s:%d", host.Target[:len(host.Target)-1], host.Port))
 		}
 	} else {
 		for _, host := range members {
-			hosts = append(hosts, host.Target[:len(host.Target) - 1])
+			hosts = append(hosts, host.Target[:len(host.Target)-1])
 		}
 	}
 
@@ -42,12 +42,15 @@ func SrvRecordHosts(record string) ([]string, error) {
 }
 
 // DestAddrs resolve the hostname to all it'ss IP's
-func DestAddrs(host string, resolver *net.Resolver) ([]string, error) {
+func DestAddrs(ctx context.Context, host string, resolver *net.Resolver, timeout time.Duration) ([]string, error) {
 	ipAddrs := make([]string, 0)
 
-	addrs, err := resolver.LookupIPAddr(context.Background(), host)
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	addrs, err := resolver.LookupIPAddr(ctx, host)
 	if err != nil {
-		return nil, fmt.Errorf("Resolving target: %v", err)
+		return nil, fmt.Errorf("resolving target: %v", err)
 	}
 
 	// Validate IPs
@@ -187,7 +190,7 @@ func HasListDuplicates(m []string) (string, error) {
 
 	for v := range m {
 		if tmp[m[v]] {
-			return m[v], fmt.Errorf("Found duplicated record: %s", m[v])
+			return m[v], fmt.Errorf("found duplicated record: %s", m[v])
 		}
 		tmp[m[v]] = true
 	}

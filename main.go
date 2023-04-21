@@ -25,7 +25,7 @@ import (
 	"github.com/syepes/network_exporter/pkg/common"
 )
 
-const version string = "1.7.1"
+const version string = "1.7.2"
 
 var (
 	listenAddress    = kingpin.Flag("web.listen-address", "The address to listen on for HTTP requests").Default(":9427").String()
@@ -66,16 +66,16 @@ func main() {
 	resolver := getResolver()
 
 	monitorPING = monitor.NewPing(logger, sc, resolver, icmpID)
-	monitorPING.AddTargets()
+	go monitorPING.AddTargets()
 
 	monitorMTR = monitor.NewMTR(logger, sc, resolver, icmpID)
-	monitorMTR.AddTargets()
+	go monitorMTR.AddTargets()
 
 	monitorTCP = monitor.NewTCPPort(logger, sc, resolver)
-	monitorTCP.AddTargets()
+	go monitorTCP.AddTargets()
 
 	monitorHTTPGet = monitor.NewHTTPGet(logger, sc, resolver)
-	monitorHTTPGet.AddTargets()
+	go monitorHTTPGet.AddTargets()
 
 	go startConfigRefresh()
 
@@ -142,18 +142,18 @@ func startServer() {
 	level.Error(logger).Log("msg", "Could not start http", "err", http.ListenAndServe(*listenAddress, mux))
 }
 
-func getResolver() *net.Resolver {
+func getResolver() *config.Resolver {
 	if sc.Cfg.Conf.Nameserver == "" {
 		level.Info(logger).Log("msg", "Configured default DNS resolver")
-		return net.DefaultResolver
+		return &config.Resolver{Resolver: net.DefaultResolver, Timeout: sc.Cfg.Conf.NameserverTimeout.Duration()}
 	}
 
 	level.Info(logger).Log("msg", "Configured custom DNS resolver")
 	dialer := func(ctx context.Context, network, address string) (net.Conn, error) {
-		d := net.Dialer{Timeout: 3 * time.Second}
+		d := net.Dialer{Timeout: sc.Cfg.Conf.NameserverTimeout.Duration()}
 		return d.DialContext(ctx, "udp", sc.Cfg.Conf.Nameserver)
 	}
-	return &net.Resolver{PreferGo: true, Dial: dialer}
+	return &config.Resolver{Resolver: &net.Resolver{PreferGo: true, Dial: dialer}, Timeout: sc.Cfg.Conf.NameserverTimeout.Duration()}
 }
 
 func expVars(w http.ResponseWriter, r *http.Request) {

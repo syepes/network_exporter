@@ -1,8 +1,8 @@
 package monitor
 
 import (
+	"context"
 	"fmt"
-	"net"
 	"strings"
 	"sync"
 	"time"
@@ -19,7 +19,7 @@ import (
 type TCPPort struct {
 	logger   log.Logger
 	sc       *config.SafeConfig
-	resolver *net.Resolver
+	resolver *config.Resolver
 	interval time.Duration
 	timeout  time.Duration
 	targets  map[string]*target.TCPPort
@@ -27,7 +27,7 @@ type TCPPort struct {
 }
 
 // NewTCPPort creates and configures a new Monitoring TCP instance
-func NewTCPPort(logger log.Logger, sc *config.SafeConfig, resolver *net.Resolver) *TCPPort {
+func NewTCPPort(logger log.Logger, sc *config.SafeConfig, resolver *config.Resolver) *TCPPort {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
@@ -68,7 +68,7 @@ func (p *TCPPort) AddTargets() {
 				level.Warn(p.logger).Log("type", "TCP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping target, could not identify host: %v (%v)", v.Host, v.Name))
 				continue
 			}
-			ipAddrs, err := common.DestAddrs(conn[0], p.resolver)
+			ipAddrs, err := common.DestAddrs(context.Background(), conn[0], p.resolver.Resolver, p.resolver.Timeout)
 			if err != nil || len(ipAddrs) == 0 {
 				level.Warn(p.logger).Log("type", "TCP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping resolve target: %s", v.Host), "err", err)
 			}
@@ -89,7 +89,7 @@ func (p *TCPPort) AddTargets() {
 					level.Warn(p.logger).Log("type", "TCP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping target, could not identify host: %v (%v)", target.Host, target.Name))
 					continue
 				}
-				ipAddrs, err := common.DestAddrs(conn[0], p.resolver)
+				ipAddrs, err := common.DestAddrs(context.Background(), conn[0], p.resolver.Resolver, p.resolver.Timeout)
 				if err != nil || len(ipAddrs) == 0 {
 					level.Warn(p.logger).Log("type", "TCP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping resolve target: %s", target.Name), "err", err)
 				}
@@ -102,7 +102,7 @@ func (p *TCPPort) AddTargets() {
 						level.Warn(p.logger).Log("type", "TCP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping target, could not identify host: %v (%v)", target.Host, target.Name))
 						continue
 					}
-					ipAddrs, err := common.DestAddrs(conn[0], p.resolver)
+					ipAddrs, err := common.DestAddrs(context.Background(), conn[0], p.resolver.Resolver, p.resolver.Timeout)
 					if err != nil || len(ipAddrs) == 0 {
 						level.Warn(p.logger).Log("type", "TCP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping resolve target: %s", target.Host), "err", err)
 					}
@@ -158,7 +158,7 @@ func (p *TCPPort) DelTargets() {
 				level.Warn(p.logger).Log("type", "TCP", "func", "DelTargets", "msg", fmt.Sprintf("Skipping target, could not identify host: %v (%v)", v.Host, v.Name))
 				continue
 			}
-			ipAddrs, err := common.DestAddrs(conn[0], p.resolver)
+			ipAddrs, err := common.DestAddrs(context.Background(), conn[0], p.resolver.Resolver, p.resolver.Timeout)
 			if err != nil || len(ipAddrs) == 0 {
 				level.Warn(p.logger).Log("type", "TCP", "func", "DelTargets", "msg", fmt.Sprintf("Skipping resolve target: %s", v.Host), "err", err)
 			}
@@ -213,7 +213,7 @@ func (p *TCPPort) CheckActiveTargets() (err error) {
 			if target.Name != targetName {
 				continue
 			}
-			ipAddrs, err := common.DestAddrs(strings.Split(target.Host, ":")[0], p.resolver)
+			ipAddrs, err := common.DestAddrs(context.Background(), strings.Split(target.Host, ":")[0], p.resolver.Resolver, p.resolver.Timeout)
 			if err != nil || len(ipAddrs) == 0 {
 				return err
 			}

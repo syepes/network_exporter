@@ -2,7 +2,6 @@ package monitor
 
 import (
 	"fmt"
-	"net"
 	"net/url"
 	"sync"
 	"time"
@@ -19,7 +18,7 @@ import (
 type HTTPGet struct {
 	logger   log.Logger
 	sc       *config.SafeConfig
-	resolver *net.Resolver
+	resolver *config.Resolver
 	interval time.Duration
 	timeout  time.Duration
 	targets  map[string]*target.HTTPGet
@@ -27,7 +26,7 @@ type HTTPGet struct {
 }
 
 // NewHTTPGet creates and configures a new Monitoring HTTPGet instance
-func NewHTTPGet(logger log.Logger, sc *config.SafeConfig, resolver *net.Resolver) *HTTPGet {
+func NewHTTPGet(logger log.Logger, sc *config.SafeConfig, resolver *config.Resolver) *HTTPGet {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}

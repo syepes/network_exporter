@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"regexp"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
 	"github.com/syepes/network_exporter/pkg/common"
+
 	yaml "gopkg.in/yaml.v3"
 )
 
@@ -27,31 +29,32 @@ type Targets []struct {
 }
 
 type HTTPGet struct {
-	Interval duration `yaml:"interval" json:"interval"`
-	Timeout  duration `yaml:"timeout" json:"timeout"`
+	Interval duration `yaml:"interval" json:"interval" default:"15s"`
+	Timeout  duration `yaml:"timeout" json:"timeout" default:"14s"`
 }
 
 type TCP struct {
-	Interval duration `yaml:"interval" json:"interval"`
-	Timeout  duration `yaml:"timeout" json:"timeout"`
+	Interval duration `yaml:"interval" json:"interval" default:"5s"`
+	Timeout  duration `yaml:"timeout" json:"timeout" default:"4s"`
 }
 
 type MTR struct {
-	Interval duration `yaml:"interval" json:"interval"`
-	Timeout  duration `yaml:"timeout" json:"timeout"`
-	MaxHops  int      `yaml:"max-hops" json:"max-hops"`
-	Count    int      `yaml:"count" json:"count"`
+	Interval duration `yaml:"interval" json:"interval" default:"5s"`
+	Timeout  duration `yaml:"timeout" json:"timeout" default:"4s"`
+	MaxHops  int      `yaml:"max-hops" json:"max-hops" default:"30"`
+	Count    int      `yaml:"count" json:"count" default:"10"`
 }
 
 type ICMP struct {
-	Interval duration `yaml:"interval" json:"interval"`
-	Timeout  duration `yaml:"timeout" json:"timeout"`
-	Count    int      `yaml:"count" json:"count"`
+	Interval duration `yaml:"interval" json:"interval" default:"5s"`
+	Timeout  duration `yaml:"timeout" json:"timeout" default:"4s"`
+	Count    int      `yaml:"count" json:"count" default:"10"`
 }
 
 type Conf struct {
-	Refresh    duration `yaml:"refresh" json:"refresh"`
-	Nameserver string   `yaml:"nameserver" json:"nameserver"`
+	Refresh           duration `yaml:"refresh" json:"refresh" default:"0s"`
+	Nameserver        string   `yaml:"nameserver" json:"nameserver"`
+	NameserverTimeout duration `yaml:"nameserver_timeout" json:"nameserver_timeout" default:"250ms"`
 }
 
 type Config struct {
@@ -72,6 +75,12 @@ type extraKV struct {
 // UnmarshalYAML is used to unmarshal into map[string]string
 func (b *extraKV) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return unmarshal(&b.Kv)
+}
+
+// SafeConfig Safe configuration reload
+type Resolver struct {
+	Resolver *net.Resolver
+	Timeout  time.Duration
 }
 
 // SafeConfig Safe configuration reload
@@ -169,6 +178,9 @@ func (sc *SafeConfig) ReloadConfig(logger log.Logger, confFile string) (err erro
 	}
 
 	// Config precheck
+	if c.ICMP.Interval <= 0 || c.MTR.Interval <= 0 || c.TCP.Interval <= 0 || c.HTTPGet.Interval <= 0 {
+		return fmt.Errorf("intervals (icmp,mtr,tcp,http_get) must be >0")
+	}
 	if c.MTR.MaxHops < 0 || c.MTR.MaxHops > 65500 {
 		return fmt.Errorf("mtr.max-hops must be between 0 and 65500")
 	}

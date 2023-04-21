@@ -139,7 +139,8 @@ The file `network_exporter.yml` can be either edited before building the docker 
 # Main Config
 conf:
   refresh: 15m
-  nameserver: 192.168.0.1:53
+  nameserver: 192.168.0.1:53 # Optional
+  nameserver_timeout: 250ms # Optional
 
 # Specific Protocol settings
 icmp:

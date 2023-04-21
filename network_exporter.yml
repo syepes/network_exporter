@@ -1,7 +1,8 @@
 # sdsdsd
 conf:
   refresh: 15m
-  nameserver: 8.8.8.8:53
+  # nameserver: 8.8.8.8:53 # Optional
+  nameserver_timeout: 250ms # Optional
 
 icmp:
   interval: 3s
@@ -29,6 +30,9 @@ targets:
     probe:
       - hostname1
       - hostname2
+    labels:
+      dc: home
+      rack: a1
   - name: google-dns1
     host: 8.8.8.8
     type: ICMP
@@ -40,4 +44,12 @@ targets:
     type: ICMP+MTR
   - name: cloudflare-dns-https
     host: 1.1.1.1:443
+    source_ip: 192.168.1.1
     type: TCP
+  - name: download-file-64M
+    host: http://test-debit.free.fr/65536.rnd
+    type: HTTPGet
+  - name: download-file-64M-proxy
+    host: http://test-debit.free.fr/65536.rnd
+    type: HTTPGet
+    proxy: http://localhost:3128

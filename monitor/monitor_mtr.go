@@ -1,8 +1,8 @@
 package monitor
 
 import (
+	"context"
 	"fmt"
-	"net"
 	"sync"
 	"time"
 
@@ -18,7 +18,7 @@ import (
 type MTR struct {
 	logger   log.Logger
 	sc       *config.SafeConfig
-	resolver *net.Resolver
+	resolver *config.Resolver
 	icmpID   *common.IcmpID
 	interval time.Duration
 	timeout  time.Duration
@@ -29,7 +29,7 @@ type MTR struct {
 }
 
 // NewMTR creates and configures a new Monitoring MTR instance
-func NewMTR(logger log.Logger, sc *config.SafeConfig, resolver *net.Resolver, icmpID *common.IcmpID) *MTR {
+func NewMTR(logger log.Logger, sc *config.SafeConfig, resolver *config.Resolver, icmpID *common.IcmpID) *MTR {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
@@ -104,7 +104,7 @@ func (p *MTR) AddTargetDelayed(name string, host string, srcAddr string, labels 
 	defer p.mtx.Unlock()
 
 	// Resolve hostnames
-	ipAddrs, err := common.DestAddrs(host, p.resolver)
+	ipAddrs, err := common.DestAddrs(context.Background(), host, p.resolver.Resolver, p.resolver.Timeout)
 	if err != nil || len(ipAddrs) == 0 {
 		return err
 	}
@@ -181,7 +181,7 @@ func (p *MTR) CheckActiveTargets() (err error) {
 			if target.Name != targetName {
 				continue
 			}
-			ipAddrs, err := common.DestAddrs(target.Host, p.resolver)
+			ipAddrs, err := common.DestAddrs(context.Background(), target.Host, p.resolver.Resolver, p.resolver.Timeout)
 			if err != nil || len(ipAddrs) == 0 {
 				return err
 			}
