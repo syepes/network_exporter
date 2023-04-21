@@ -25,7 +25,7 @@ import (
 	"github.com/syepes/network_exporter/pkg/common"
 )
 
-const version string = "1.7.0"
+const version string = "1.7.1"
 
 var (
 	listenAddress    = kingpin.Flag("web.listen-address", "The address to listen on for HTTP requests").Default(":9427").String()
