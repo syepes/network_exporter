@@ -164,7 +164,7 @@ func listenForSpecific4(conn *icmp.PacketConn, neededBody []byte, needID int, ne
 			continue
 		}
 
-		if pkg_type, ok := x.Type.(ipv4.ICMPType); ok && pkg_type.String() == "time exceeded" {
+		if x.Type.(ipv4.ICMPType) == ipv4.ICMPTypeTimeExceeded {
 			body := x.Body.(*icmp.TimeExceeded).Data
 			index := bytes.Index(body, sent[:4])
 			if index > 0 {
@@ -182,7 +182,7 @@ func listenForSpecific4(conn *icmp.PacketConn, neededBody []byte, needID int, ne
 			}
 		}
 
-		if pkg_type, ok := x.Type.(ipv4.ICMPType); ok && pkg_type.String() == "echo reply" {
+		if x.Type.(ipv4.ICMPType) == ipv4.ICMPTypeEchoReply {
 			b, _ := x.Body.Marshal(protocolICMP)
 			if string(b[4:]) != string(neededBody) || x.Body.(*icmp.Echo).ID != needID {
 				continue
@@ -227,7 +227,7 @@ func listenForSpecific6(conn *icmp.PacketConn, neededBody []byte, needID int, ne
 			}
 		}
 
-		if pkg_type, ok := x.Type.(ipv6.ICMPType); ok && pkg_type == ipv6.ICMPTypeEchoReply {
+		if x.Type.(ipv6.ICMPType) == ipv6.ICMPTypeEchoReply {
 			b, _ := x.Body.Marshal(protocolICMP)
 			if string(b[4:]) != string(neededBody) || x.Body.(*icmp.Echo).ID != needID {
 				continue
