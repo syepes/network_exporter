@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/creasty/defaults"
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
 	"github.com/syepes/network_exporter/pkg/common"
@@ -106,6 +107,10 @@ func (sc *SafeConfig) ReloadConfig(logger log.Logger, confFile string) (err erro
 	decoder := yaml.NewDecoder(f)
 	if err = decoder.Decode(c); err != nil {
 		return fmt.Errorf("parsing config file: %s", err)
+	}
+
+	if err := defaults.Set(c); err != nil {
+		return fmt.Errorf("setting defaults: %s", err)
 	}
 
 	// Validate and Filter config
