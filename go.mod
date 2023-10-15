@@ -22,6 +22,7 @@ require (
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
+	github.com/creasty/defaults v1.7.0 // indirect
 	github.com/go-logfmt/logfmt v0.6.0 // indirect
 	github.com/google/pprof v0.0.0-20230907193218-d3ddc7976beb // indirect
 	github.com/kr/text v0.2.0 // indirect
