@@ -83,7 +83,7 @@ func (t *TCPPort) Stop() {
 }
 
 func (t *TCPPort) portCheck() {
-	data, err := tcp.Port(t.host, t.ip, t.srcAddr, t.port, t.interval, t.timeout)
+	data, err := tcp.Port(t.host, t.ip, t.srcAddr, t.port, t.timeout)
 	if err != nil {
 		level.Error(t.logger).Log("type", "TCP", "func", "port", "msg", fmt.Sprintf("%s", err))
 	}

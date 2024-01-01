@@ -3,7 +3,6 @@ package ping
 import "time"
 
 const defaultTimeout = 5 * time.Second
-const defaultInterval = 10 * time.Millisecond
 const defaultPackerSize = 56
 const defaultCount = 10
 const defaultTTL = 128
@@ -42,7 +41,6 @@ type PingReturn struct {
 type PingOptions struct {
 	count      int
 	timeout    time.Duration
-	interval   time.Duration
 	packetSize int
 }
 
@@ -70,19 +68,6 @@ func (options *PingOptions) Timeout() time.Duration {
 // SetTimeout Setter
 func (options *PingOptions) SetTimeout(timeout time.Duration) {
 	options.timeout = timeout
-}
-
-// Interval Getter
-func (options *PingOptions) Interval() time.Duration {
-	if options.interval == 0 {
-		options.interval = defaultInterval
-	}
-	return options.interval
-}
-
-// SetInterval Setter
-func (options *PingOptions) SetInterval(interval time.Duration) {
-	options.interval = interval
 }
 
 // PacketSize Getter

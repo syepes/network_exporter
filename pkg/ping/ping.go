@@ -10,13 +10,12 @@ import (
 )
 
 // Ping ICMP Operation
-func Ping(addr string, ip string, srcAddr string, count int, interval time.Duration, timeout time.Duration, icmpID int) (*PingResult, error) {
+func Ping(addr string, ip string, srcAddr string, count int, timeout time.Duration, icmpID int) (*PingResult, error) {
 	var out PingResult
 
 	pingOptions := &PingOptions{}
 	pingOptions.SetCount(count)
 	pingOptions.SetTimeout(timeout)
-	pingOptions.SetInterval(interval)
 
 	out, err := runPing(addr, ip, srcAddr, icmpID, pingOptions)
 	if err != nil {
@@ -26,11 +25,10 @@ func Ping(addr string, ip string, srcAddr string, count int, interval time.Durat
 }
 
 // PingString ICMP Operation
-func PingString(addr string, ip string, srcAddr string, count int, timeout time.Duration, interval time.Duration, icmpID int) (result string, err error) {
+func PingString(addr string, ip string, srcAddr string, count int, timeout time.Duration, icmpID int) (result string, err error) {
 	pingOptions := &PingOptions{}
 	pingOptions.SetCount(count)
 	pingOptions.SetTimeout(timeout)
-	pingOptions.SetInterval(interval)
 
 	var buffer bytes.Buffer
 	buffer.WriteString(fmt.Sprintf("Start %v, PING %v (%v)\n", time.Now().Format("2006-01-02 15:04:05"), addr, addr))
@@ -57,7 +55,6 @@ func runPing(ipAddr string, ip string, srcAddr string, icmpID int, option *PingO
 	// Avoid collisions/interference caused by multiple coroutines initiating mtr
 	pid := icmpID
 	timeout := option.Timeout()
-	interval := option.Interval()
 	ttl := defaultTTL
 	pingReturn := PingReturn{}
 
@@ -83,7 +80,6 @@ func runPing(ipAddr string, ip string, srcAddr string, icmpID int, option *PingO
 		pingReturn.success = true
 
 		seq++
-		time.Sleep(interval)
 	}
 
 	pingResult.Success = pingReturn.success

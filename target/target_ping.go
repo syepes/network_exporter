@@ -90,7 +90,7 @@ func (t *PING) Stop() {
 
 func (t *PING) ping() {
 	icmpID := int(t.icmpID.Get())
-	data, err := ping.Ping(t.host, t.ip, t.srcAddr, t.count, t.interval, t.timeout, icmpID)
+	data, err := ping.Ping(t.host, t.ip, t.srcAddr, t.count, t.timeout, icmpID)
 	if err != nil {
 		level.Error(t.logger).Log("type", "ICMP", "func", "ping", "msg", fmt.Sprintf("%s", err))
 	}
