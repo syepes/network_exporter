@@ -26,7 +26,6 @@ builds:
     binary: network_exporter
 archives:
   - format: tar.gz
-    rlcp: true
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}.
       {{- title .Os }}_

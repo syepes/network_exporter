@@ -1,4 +1,4 @@
-BUILDX_VER=v0.11.2
+BUILDX_VER=v0.13.1
 IMAGE_NAME=syepes/network_exporter
 VERSION?=latest
 
@@ -17,7 +17,7 @@ build-push:
 	docker buildx build --push --platform linux/amd64,linux/arm/v7,linux/arm64/v8 -t ${IMAGE_NAME}:${VERSION} .
 
 build-local:
-	goreleaser release --skip-publish --snapshot --clean
+	goreleaser release --skip=publish --snapshot --clean
 
 lint:
 	golangci-lint run
