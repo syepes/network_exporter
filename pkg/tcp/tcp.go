@@ -7,13 +7,12 @@ import (
 )
 
 // Port TCP Operation
-func Port(destAddr string, ip string, srcAddr string, port string, interval time.Duration, timeout time.Duration) (*TCPPortReturn, error) {
+func Port(destAddr string, ip string, srcAddr string, port string, timeout time.Duration) (*TCPPortReturn, error) {
 	var out TCPPortReturn
 	var d net.Dialer
 	var err error
 
 	tcpOptions := &TCPPortOptions{}
-	tcpOptions.SetInterval(interval)
 	tcpOptions.SetTimeout(timeout)
 
 	out.DestAddr = destAddr
