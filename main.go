@@ -28,12 +28,6 @@ import (
 
 const version string = "1.7.7"
 
-type FlagConfig struct {
-	WebListenAddresses []string
-	WebSystemdSocket   bool
-	WebConfigFile      string
-}
-
 var (
 	WebListenAddresses = kingpin.Flag("web.listen-address", "The address to listen on for HTTP requests").Default(":9427").Strings()
 	configFile         = kingpin.Flag("config.file", "Exporter configuration file").Default("/app/cfg/network_exporter.yml").String()
@@ -153,12 +147,12 @@ func startServer() {
 	level.Info(logger).Log("msg", "Starting network_exporter", "version", version)
 	level.Info(logger).Log("msg", fmt.Sprintf("Listening for %s on %s", metricsPath, *WebListenAddresses))
 
-	serverFlags := FlagConfig{
-		WebConfigFile:      *WebConfigFile,
-		WebSystemdSocket:   *WebSystemdSocket,
-		WebListenAddresses: *WebListenAddresses,
+	serverFlags := web.FlagConfig{
+		WebConfigFile:      WebConfigFile,
+		WebSystemdSocket:   WebSystemdSocket,
+		WebListenAddresses: WebListenAddresses,
 	}
-	if err := web.ListenAndServe(server, serverFlags, logger); err != nil {
+	if err := web.ListenAndServe(server, &serverFlags, logger); err != nil {
 		level.Error(logger).Log("msg", "Could not start HTTP server", "err", err)
 	}
 }
