@@ -31,6 +31,7 @@ var (
 	listenAddress    = kingpin.Flag("web.listen-address", "The address to listen on for HTTP requests").Default(":9427").String()
 	configFile       = kingpin.Flag("config.file", "Exporter configuration file").Default("/app/cfg/network_exporter.yml").String()
 	enableProfileing = kingpin.Flag("profiling", "Enable Profiling (pprof + fgprof)").Default("false").Bool()
+	MetricPath       = kingpin.Flag("metrics-path", "metric path").Default("/metrics").String()
 	sc               = &config.SafeConfig{Cfg: &config.Config{}}
 	logger           log.Logger
 	icmpID           *common.IcmpID // goroutine shared counter
@@ -111,7 +112,7 @@ func startConfigRefresh() {
 
 func startServer() {
 	mux := http.NewServeMux()
-	metricsPath := "/metrics"
+	metricsPath := *MetricPath
 
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(collectors.NewGoCollector())
