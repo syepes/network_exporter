@@ -1,0 +1,6 @@
+basic_auth_users:
+  admin: $2a$12$xoIIi98JokkcepIRlObmMOk/tWBcWMMEI3P5ArfoMYACavLsJW0au  # admin:admin
+  # username: bcrypt_password
+tls_server_config:
+  cert_file:
+  key_file:

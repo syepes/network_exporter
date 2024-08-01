@@ -19,6 +19,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/promlog"
 	"github.com/prometheus/common/promlog/flag"
+	"github.com/prometheus/exporter-toolkit/web"
 	"github.com/syepes/network_exporter/collector"
 	"github.com/syepes/network_exporter/config"
 	"github.com/syepes/network_exporter/monitor"
@@ -28,17 +29,19 @@ import (
 const version string = "1.7.7"
 
 var (
-	listenAddress    = kingpin.Flag("web.listen-address", "The address to listen on for HTTP requests").Default(":9427").String()
-	configFile       = kingpin.Flag("config.file", "Exporter configuration file").Default("/app/cfg/network_exporter.yml").String()
-	enableProfileing = kingpin.Flag("profiling", "Enable Profiling (pprof + fgprof)").Default("false").Bool()
-	MetricPath       = kingpin.Flag("metrics-path", "metric path").Default("/metrics").String()
-	sc               = &config.SafeConfig{Cfg: &config.Config{}}
-	logger           log.Logger
-	icmpID           *common.IcmpID // goroutine shared counter
-	monitorPING      *monitor.PING
-	monitorMTR       *monitor.MTR
-	monitorTCP       *monitor.TCPPort
-	monitorHTTPGet   *monitor.HTTPGet
+	WebListenAddresses = kingpin.Flag("web.listen-address", "The address to listen on for HTTP requests").Default(":9427").Strings()
+	configFile         = kingpin.Flag("config.file", "Exporter configuration file").Default("/app/cfg/network_exporter.yml").String()
+	MetricPath         = kingpin.Flag("metrics-path", "metric path").Default("/metrics").String()
+	enableProfileing   = kingpin.Flag("profiling", "Enable Profiling (pprof + fgprof)").Default("false").Bool()
+	WebConfigFile      = kingpin.Flag("web.config.file", "Path to the web configuration file").Default("").String()
+	WebSystemdSocket   = kingpin.Flag("web.system.socket", "WebSystemdSocket").Default("0").Bool()
+	sc                 = &config.SafeConfig{Cfg: &config.Config{}}
+	logger             log.Logger
+	icmpID             *common.IcmpID // goroutine shared counter
+	monitorPING        *monitor.PING
+	monitorMTR         *monitor.MTR
+	monitorTCP         *monitor.TCPPort
+	monitorHTTPGet     *monitor.HTTPGet
 
 	indexHTML = `<!doctype html><html><head> <meta charset="UTF-8"><title>Network Exporter (Version ` + version + `)</title></head><body><h1>Network Exporter</h1><p><a href="%s">Metrics</a></p></body></html>`
 )
@@ -138,9 +141,21 @@ func startServer() {
 		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 	}
 
-	level.Info(logger).Log("msg", "Starting ping exporter", "version", version)
-	level.Info(logger).Log("msg", fmt.Sprintf("Listening for %s on %s", metricsPath, *listenAddress))
-	level.Error(logger).Log("msg", "Could not start http", "err", http.ListenAndServe(*listenAddress, mux))
+	server := &http.Server{
+		Handler: mux,
+	}
+
+	level.Info(logger).Log("msg", "Starting network_exporter", "version", version)
+	level.Info(logger).Log("msg", fmt.Sprintf("Listening for %s on %s", metricsPath, *WebListenAddresses))
+
+	serverFlags := web.FlagConfig{
+		WebConfigFile:      WebConfigFile,
+		WebSystemdSocket:   WebSystemdSocket,
+		WebListenAddresses: WebListenAddresses,
+	}
+	if err := web.ListenAndServe(server, &serverFlags, logger); err != nil {
+		level.Error(logger).Log("msg", "Could not start HTTP server", "err", err)
+	}
 }
 
 func getResolver() *config.Resolver {
