@@ -31,6 +31,7 @@ const version string = "1.7.7"
 var (
 	WebListenAddresses = kingpin.Flag("web.listen-address", "The address to listen on for HTTP requests").Default(":9427").Strings()
 	configFile         = kingpin.Flag("config.file", "Exporter configuration file").Default("/app/cfg/network_exporter.yml").String()
+	MetricPath         = kingpin.Flag("metrics-path", "metric path").Default("/metrics").String()
 	enableProfileing   = kingpin.Flag("profiling", "Enable Profiling (pprof + fgprof)").Default("false").Bool()
 	WebConfigFile      = kingpin.Flag("web.config.file", "Path to the web configuration file").Default("").String()
 	WebSystemdSocket   = kingpin.Flag("web.system.socket", "WebSystemdSocket").Default("0").Bool()
@@ -114,7 +115,7 @@ func startConfigRefresh() {
 
 func startServer() {
 	mux := http.NewServeMux()
-	metricsPath := "/metrics"
+	metricsPath := *MetricPath
 
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(collectors.NewGoCollector())
