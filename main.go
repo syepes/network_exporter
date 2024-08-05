@@ -26,15 +26,15 @@ import (
 	"github.com/syepes/network_exporter/pkg/common"
 )
 
-const version string = "1.7.7"
+const version string = "1.7.8"
 
 var (
 	WebListenAddresses = kingpin.Flag("web.listen-address", "The address to listen on for HTTP requests").Default(":9427").Strings()
-	configFile         = kingpin.Flag("config.file", "Exporter configuration file").Default("/app/cfg/network_exporter.yml").String()
-	MetricPath         = kingpin.Flag("metrics-path", "metric path").Default("/metrics").String()
-	enableProfileing   = kingpin.Flag("profiling", "Enable Profiling (pprof + fgprof)").Default("false").Bool()
-	WebConfigFile      = kingpin.Flag("web.config.file", "Path to the web configuration file").Default("").String()
 	WebSystemdSocket   = kingpin.Flag("web.system.socket", "WebSystemdSocket").Default("0").Bool()
+	WebMetricPath      = kingpin.Flag("web.metrics.path", "metric path").Default("/metrics").String()
+	WebConfigFile      = kingpin.Flag("web.config.file", "Path to the web configuration file").Default("").String()
+	configFile         = kingpin.Flag("config.file", "Exporter configuration file").Default("/app/cfg/network_exporter.yml").String()
+	enableProfileing   = kingpin.Flag("profiling", "Enable Profiling (pprof + fgprof)").Default("false").Bool()
 	sc                 = &config.SafeConfig{Cfg: &config.Config{}}
 	logger             log.Logger
 	icmpID             *common.IcmpID // goroutine shared counter
@@ -115,7 +115,7 @@ func startConfigRefresh() {
 
 func startServer() {
 	mux := http.NewServeMux()
-	metricsPath := *MetricPath
+	webMetricsPath := *WebMetricPath
 
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(collectors.NewGoCollector())
@@ -125,9 +125,9 @@ func startServer() {
 	reg.MustRegister(&collector.TCP{Monitor: monitorTCP})
 	reg.MustRegister(&collector.HTTPGet{Monitor: monitorHTTPGet})
 	h := promhttp.HandlerFor(reg, promhttp.HandlerOpts{})
-	mux.Handle(metricsPath, h)
+	mux.Handle(webMetricsPath, h)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, indexHTML, metricsPath)
+		fmt.Fprintf(w, indexHTML, webMetricsPath)
 	})
 
 	if *enableProfileing {
@@ -146,7 +146,7 @@ func startServer() {
 	}
 
 	level.Info(logger).Log("msg", "Starting network_exporter", "version", version)
-	level.Info(logger).Log("msg", fmt.Sprintf("Listening for %s on %s", metricsPath, *WebListenAddresses))
+	level.Info(logger).Log("msg", fmt.Sprintf("Listening for %s on %s", webMetricsPath, *WebListenAddresses))
 
 	serverFlags := web.FlagConfig{
 		WebConfigFile:      WebConfigFile,
