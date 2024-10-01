@@ -13,8 +13,8 @@ const defaultCount = 10
 
 // MtrResult Calculated results
 type MtrResult struct {
-	DestAddr string           `json:"dest_address"`
-	Hops     []common.IcmpHop `json:"hops"`
+	DestAddr      string                         `json:"dest_address"`
+	Hops          []common.IcmpHop               `json:"hops"`
 	HopSummaryMap map[string]*common.IcmpSummary `json:"hop_summary_map"`
 }
 

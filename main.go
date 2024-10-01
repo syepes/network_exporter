@@ -26,11 +26,12 @@ import (
 	"github.com/syepes/network_exporter/pkg/common"
 )
 
-const version string = "1.7.8"
+const version string = "1.7.9"
 
 var (
 	WebListenAddresses = kingpin.Flag("web.listen-address", "The address to listen on for HTTP requests").Default(":9427").Strings()
 	WebSystemdSocket   = kingpin.Flag("web.system.socket", "WebSystemdSocket").Default("0").Bool()
+	enableIpv6         = kingpin.Flag("ipv6", "ipv6 Enable").Default("true").Bool()
 	WebMetricPath      = kingpin.Flag("web.metrics.path", "metric path").Default("/metrics").String()
 	WebConfigFile      = kingpin.Flag("web.config.file", "Path to the web configuration file").Default("").String()
 	configFile         = kingpin.Flag("config.file", "Exporter configuration file").Default("/app/cfg/network_exporter.yml").String()
@@ -69,10 +70,10 @@ func main() {
 
 	resolver := getResolver()
 
-	monitorPING = monitor.NewPing(logger, sc, resolver, icmpID)
+	monitorPING = monitor.NewPing(logger, sc, resolver, icmpID, *enableIpv6)
 	go monitorPING.AddTargets()
 
-	monitorMTR = monitor.NewMTR(logger, sc, resolver, icmpID)
+	monitorMTR = monitor.NewMTR(logger, sc, resolver, icmpID, *enableIpv6)
 	go monitorMTR.AddTargets()
 
 	monitorTCP = monitor.NewTCPPort(logger, sc, resolver)

@@ -10,7 +10,7 @@ import (
 )
 
 // Mtr Return traceroute object
-func Mtr(addr string, srcAddr string, maxHops int, count int, timeout time.Duration, icmpID int) (*MtrResult, error) {
+func Mtr(addr string, srcAddr string, maxHops int, count int, timeout time.Duration, icmpID int, ipv6 bool) (*MtrResult, error) {
 	var out MtrResult
 	var err error
 
@@ -19,7 +19,7 @@ func Mtr(addr string, srcAddr string, maxHops int, count int, timeout time.Durat
 	options.SetCount(count)
 	options.SetTimeout(timeout)
 
-	out, err = runMtr(addr, srcAddr, icmpID, &options)
+	out, err = runMtr(addr, srcAddr, icmpID, &options, ipv6)
 
 	if err == nil {
 		if len(out.Hops) == 0 {
@@ -33,7 +33,7 @@ func Mtr(addr string, srcAddr string, maxHops int, count int, timeout time.Durat
 }
 
 // MtrString Console print traceroute operation
-func MtrString(addr string, srcAddr string, maxHops int, count int, timeout time.Duration, icmpID int) (result string, err error) {
+func MtrString(addr string, srcAddr string, maxHops int, count int, timeout time.Duration, icmpID int, ipv6 bool) (result string, err error) {
 	options := MtrOptions{}
 	options.SetMaxHops(maxHops)
 	options.SetCount(count)
@@ -43,7 +43,7 @@ func MtrString(addr string, srcAddr string, maxHops int, count int, timeout time
 	var buffer bytes.Buffer
 	buffer.WriteString(fmt.Sprintf("Start: %v, DestAddr: %v\n", time.Now().Format("2006-01-02 15:04:05"), addr))
 
-	out, err = runMtr(addr, srcAddr, icmpID, &options)
+	out, err = runMtr(addr, srcAddr, icmpID, &options, ipv6)
 
 	if err == nil {
 		if len(out.Hops) == 0 {
@@ -83,7 +83,7 @@ func MtrString(addr string, srcAddr string, maxHops int, count int, timeout time
 }
 
 // MTR
-func runMtr(destAddr string, srcAddr string, icmpID int, options *MtrOptions) (result MtrResult, err error) {
+func runMtr(destAddr string, srcAddr string, icmpID int, options *MtrOptions, ipv6 bool) (result MtrResult, err error) {
 	result.Hops = []common.IcmpHop{}
 	result.DestAddr = destAddr
 
@@ -100,7 +100,7 @@ func runMtr(destAddr string, srcAddr string, icmpID int, options *MtrOptions) (r
 				mtrReturns[ttl] = &MtrReturn{ttl: ttl, host: "unknown", succSum: 0, success: false, lastTime: time.Duration(0), sumTime: time.Duration(0), bestTime: time.Duration(0), worstTime: time.Duration(0), avgTime: time.Duration(0)}
 			}
 
-			hopReturn, err := icmp.Icmp(destAddr, srcAddr, ttl, pid, timeout, seq)
+			hopReturn, err := icmp.Icmp(destAddr, srcAddr, ttl, pid, timeout, seq, ipv6)
 			if err != nil || !hopReturn.Success {
 				continue
 			}

@@ -20,7 +20,7 @@ const (
 )
 
 // Icmp Validate IP and check the version
-func Icmp(destAddr string, srcAddr string, ttl int, pid int, timeout time.Duration, seq int) (hop common.IcmpReturn, err error) {
+func Icmp(destAddr string, srcAddr string, ttl int, pid int, timeout time.Duration, seq int, ipv6 bool) (hop common.IcmpReturn, err error) {
 	dstIp := net.ParseIP(destAddr)
 	if dstIp == nil {
 		return hop, fmt.Errorf("destination ip: %v is invalid", destAddr)
@@ -37,13 +37,21 @@ func Icmp(destAddr string, srcAddr string, ttl int, pid int, timeout time.Durati
 		if p4 := dstIp.To4(); len(p4) == net.IPv4len {
 			return icmpIpv4(srcAddr, &ipAddr, ttl, pid, timeout, seq)
 		}
-		return icmpIpv6(srcAddr, &ipAddr, ttl, pid, timeout, seq)
+		if ipv6 {
+			return icmpIpv6(srcAddr, &ipAddr, ttl, pid, timeout, seq)
+		} else {
+			return hop, nil
+		}
 	}
 
 	if p4 := dstIp.To4(); len(p4) == net.IPv4len {
 		return icmpIpv4("0.0.0.0", &ipAddr, ttl, pid, timeout, seq)
 	}
-	return icmpIpv6("::", &ipAddr, ttl, pid, timeout, seq)
+	if ipv6 {
+		return icmpIpv6("::", &ipAddr, ttl, pid, timeout, seq)
+	} else {
+		return hop, nil
+	}
 }
 
 func icmpIpv4(localAddr string, dst net.Addr, ttl int, pid int, timeout time.Duration, seq int) (hop common.IcmpReturn, err error) {

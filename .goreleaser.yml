@@ -1,3 +1,4 @@
+version: 2
 project_name: network_exporter
 dist: artifacts
 before:
@@ -41,7 +42,7 @@ archives:
       - network_exporter.yml
     wrap_in_directory: false
 snapshot:
-  name_template: SNAPSHOT-{{ .Commit }}
+  version_template: SNAPSHOT-{{ .Commit }}
 nfpms:
   - vendor: Sebastian YEPES
     homepage: "https://github.com/syepes/network_exporter"

@@ -23,12 +23,13 @@ type PING struct {
 	interval time.Duration
 	timeout  time.Duration
 	count    int
+	ipv6     bool
 	targets  map[string]*target.PING
 	mtx      sync.RWMutex
 }
 
 // NewPing creates and configures a new Monitoring ICMP instance
-func NewPing(logger log.Logger, sc *config.SafeConfig, resolver *config.Resolver, icmpID *common.IcmpID) *PING {
+func NewPing(logger log.Logger, sc *config.SafeConfig, resolver *config.Resolver, icmpID *common.IcmpID, ipv6 bool) *PING {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
@@ -40,6 +41,7 @@ func NewPing(logger log.Logger, sc *config.SafeConfig, resolver *config.Resolver
 		interval: sc.Cfg.ICMP.Interval.Duration(),
 		timeout:  sc.Cfg.ICMP.Timeout.Duration(),
 		count:    sc.Cfg.ICMP.Count,
+		ipv6:     ipv6,
 		targets:  make(map[string]*target.PING),
 	}
 }
@@ -113,7 +115,7 @@ func (p *PING) AddTargetDelayed(name string, host string, ip string, srcAddr str
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
 
-	target, err := target.NewPing(p.logger, p.icmpID, startupDelay, name, host, ip, srcAddr, p.interval, p.timeout, p.count, labels)
+	target, err := target.NewPing(p.logger, p.icmpID, startupDelay, name, host, ip, srcAddr, p.interval, p.timeout, p.count, labels, p.ipv6)
 	if err != nil {
 		return err
 	}

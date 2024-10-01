@@ -25,6 +25,7 @@ type PING struct {
 	interval time.Duration
 	timeout  time.Duration
 	count    int
+	ipv6     bool
 	labels   map[string]string
 	result   *ping.PingResult
 	stop     chan struct{}
@@ -33,7 +34,7 @@ type PING struct {
 }
 
 // NewPing starts a new monitoring goroutine
-func NewPing(logger log.Logger, icmpID *common.IcmpID, startupDelay time.Duration, name string, host string, ip string, srcAddr string, interval time.Duration, timeout time.Duration, count int, labels map[string]string) (*PING, error) {
+func NewPing(logger log.Logger, icmpID *common.IcmpID, startupDelay time.Duration, name string, host string, ip string, srcAddr string, interval time.Duration, timeout time.Duration, count int, labels map[string]string, ipv6 bool) (*PING, error) {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
@@ -47,6 +48,7 @@ func NewPing(logger log.Logger, icmpID *common.IcmpID, startupDelay time.Duratio
 		interval: interval,
 		timeout:  timeout,
 		count:    count,
+		ipv6:     ipv6,
 		labels:   labels,
 		stop:     make(chan struct{}),
 		result:   &ping.PingResult{},
@@ -90,7 +92,7 @@ func (t *PING) Stop() {
 
 func (t *PING) ping() {
 	icmpID := int(t.icmpID.Get())
-	data, err := ping.Ping(t.host, t.ip, t.srcAddr, t.count, t.timeout, icmpID)
+	data, err := ping.Ping(t.host, t.ip, t.srcAddr, t.count, t.timeout, icmpID, t.ipv6)
 	if err != nil {
 		level.Error(t.logger).Log("type", "ICMP", "func", "ping", "msg", fmt.Sprintf("%s", err))
 	}

@@ -24,12 +24,13 @@ type MTR struct {
 	timeout  time.Duration
 	maxHops  int
 	count    int
+	ipv6     bool
 	targets  map[string]*target.MTR
 	mtx      sync.RWMutex
 }
 
 // NewMTR creates and configures a new Monitoring MTR instance
-func NewMTR(logger log.Logger, sc *config.SafeConfig, resolver *config.Resolver, icmpID *common.IcmpID) *MTR {
+func NewMTR(logger log.Logger, sc *config.SafeConfig, resolver *config.Resolver, icmpID *common.IcmpID, ipv6 bool) *MTR {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
@@ -42,6 +43,7 @@ func NewMTR(logger log.Logger, sc *config.SafeConfig, resolver *config.Resolver,
 		timeout:  sc.Cfg.MTR.Timeout.Duration(),
 		maxHops:  sc.Cfg.MTR.MaxHops,
 		count:    sc.Cfg.MTR.Count,
+		ipv6:     ipv6,
 		targets:  make(map[string]*target.MTR),
 	}
 }
@@ -109,7 +111,7 @@ func (p *MTR) AddTargetDelayed(name string, host string, srcAddr string, labels 
 		return err
 	}
 
-	target, err := target.NewMTR(p.logger, p.icmpID, startupDelay, name, ipAddrs[0], srcAddr, p.interval, p.timeout, p.maxHops, p.count, labels)
+	target, err := target.NewMTR(p.logger, p.icmpID, startupDelay, name, ipAddrs[0], srcAddr, p.interval, p.timeout, p.maxHops, p.count, labels, p.ipv6)
 	if err != nil {
 		return err
 	}
