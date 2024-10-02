@@ -67,8 +67,6 @@ github.com/prometheus/common v0.60.0 h1:+V9PAREWNvJMAuJ1x1BaWl9dewMW4YrHZQbx0sJN
 github.com/prometheus/common v0.60.0/go.mod h1:h0LYf1R1deLSKtD4Vdg8gy4RuOvENW2J/h19V5NADQw=
 github.com/prometheus/exporter-toolkit v0.12.0 h1:DkE5RcEZR3lQA2QD5JLVQIf41dFKNsVMXFhgqcif7fo=
 github.com/prometheus/exporter-toolkit v0.12.0/go.mod h1:fQH0KtTn0yrrS0S82kqppRjDDiwMfIQUwT+RBRRhwUc=
-github.com/prometheus/exporter-toolkit v0.13.0 h1:lmA0Q+8IaXgmFRKw09RldZmZdnvu9wwcDLIXGmTPw1c=
-github.com/prometheus/exporter-toolkit v0.13.0/go.mod h1:2uop99EZl80KdXhv/MxVI2181fMcwlsumFOqBecGkG0=
 github.com/prometheus/procfs v0.15.1 h1:YagwOFzUgYfKKHX6Dr+sHT7km/hxC76UB0learggepc=
 github.com/prometheus/procfs v0.15.1/go.mod h1:fB45yRUv8NstnjriLhBQLuOUt+WW4BsoGhij/e3PBqk=
 github.com/rogpeppe/go-internal v1.10.0 h1:TMyTOH3F/DB16zRVcYyreMH6GnZZrwQVAoYjRBZyWFQ=
