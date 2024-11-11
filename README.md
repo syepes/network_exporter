@@ -274,7 +274,7 @@ Will be resolved to 3 separate targets:
 ## Deployment
 
 This deployment example will permit you to have as many Ping Stations as you need (LAN or WIFI) devices but at the same time decoupling the data collection from the storage and visualization.
-This [docker compose](https://docs.docker.com/compose/) will deploy and configure all the components plus setup Grafana with the Datasource and [Dashboard](https://github.com/syepes/network_exporter/blob/master/dist/deploy/cfg/provisioning/dashboards/network_exporter.json)
+This [docker compose](https://github.com/syepes/network_exporter/blob/master/dist/deploy/docker-compose.yml) will deploy and configure all the components plus setup Grafana with the Datasource and [Dashboard](https://github.com/syepes/network_exporter/blob/master/dist/deploy/cfg/provisioning/dashboards/network_exporter.json)
 
 [Deployment example](https://github.com/syepes/network_exporter/blob/master/dist/deploy/)
 
