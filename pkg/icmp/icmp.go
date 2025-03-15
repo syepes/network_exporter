@@ -1,7 +1,6 @@
 package icmp
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"net"
@@ -174,19 +173,22 @@ func listenForSpecific4(conn *icmp.PacketConn, neededBody []byte, needID int, ne
 
 		if x.Type.(ipv4.ICMPType) == ipv4.ICMPTypeTimeExceeded {
 			body := x.Body.(*icmp.TimeExceeded).Data
-			index := bytes.Index(body, sent[:4])
-			if index > 0 {
-				x, _ := icmp.ParseMessage(protocolICMP, body[index:])
-				switch x.Body.(type) {
-				case *icmp.Echo:
-					// Verification
-					msg := x.Body.(*icmp.Echo)
-					if msg.ID == needID && msg.Seq == needSeq {
-						return peer.String(), []byte{}, nil
-					}
-				default:
-					// ignore
+			oh, err := ipv4.ParseHeader(body)
+			if err != nil {
+				continue
+			}
+			x, err := icmp.ParseMessage(protocolICMP, body[oh.Len:])
+			if err != nil {
+				continue
+			}
+
+			switch x.Body.(type) {
+			case *icmp.Echo:
+				msg := x.Body.(*icmp.Echo)
+				if msg.ID == needID && msg.Seq == needSeq {
+					return peer.String(), []byte{}, nil
 				}
+			default:
 			}
 		}
 
