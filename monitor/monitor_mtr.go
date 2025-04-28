@@ -2,12 +2,11 @@ package monitor
 
 import (
 	"context"
-	"fmt"
+	"log/slog"
+	"os"
 	"sync"
 	"time"
 
-	"github.com/go-kit/log"
-	"github.com/go-kit/log/level"
 	"github.com/syepes/network_exporter/config"
 	"github.com/syepes/network_exporter/pkg/common"
 	"github.com/syepes/network_exporter/pkg/mtr"
@@ -16,35 +15,35 @@ import (
 
 // MTR manages the goroutines responsible for collecting MTR data
 type MTR struct {
-	logger   log.Logger
-	sc       *config.SafeConfig
-	resolver *config.Resolver
-	icmpID   *common.IcmpID
-	interval time.Duration
-	timeout  time.Duration
-	maxHops  int
-	count    int
-	ipv6     bool
-	targets  map[string]*target.MTR
-	mtx      sync.RWMutex
+	logger    *slog.Logger
+	sc        *config.SafeConfig
+	resolver  *config.Resolver
+	icmpID    *common.IcmpID
+	interval  time.Duration
+	timeout   time.Duration
+	maxHops   int
+	count     int
+	ipv6      bool
+	targets   map[string]*target.MTR
+	mtx       sync.RWMutex
 }
 
 // NewMTR creates and configures a new Monitoring MTR instance
-func NewMTR(logger log.Logger, sc *config.SafeConfig, resolver *config.Resolver, icmpID *common.IcmpID, ipv6 bool) *MTR {
+func NewMTR(logger *slog.Logger, sc *config.SafeConfig, resolver *config.Resolver, icmpID *common.IcmpID, ipv6 bool) *MTR {
 	if logger == nil {
-		logger = log.NewNopLogger()
+		logger = slog.New(slog.NewTextHandler(os.Stderr, nil))
 	}
 	return &MTR{
-		logger:   logger,
-		sc:       sc,
-		resolver: resolver,
-		icmpID:   icmpID,
-		interval: sc.Cfg.MTR.Interval.Duration(),
-		timeout:  sc.Cfg.MTR.Timeout.Duration(),
-		maxHops:  sc.Cfg.MTR.MaxHops,
-		count:    sc.Cfg.MTR.Count,
-		ipv6:     ipv6,
-		targets:  make(map[string]*target.MTR),
+		logger:    logger,
+		sc:        sc,
+		resolver:  resolver,
+		icmpID:    icmpID,
+		interval:  sc.Cfg.MTR.Interval.Duration(),
+		timeout:   sc.Cfg.MTR.Timeout.Duration(),
+		maxHops:   sc.Cfg.MTR.MaxHops,
+		count:     sc.Cfg.MTR.Count,
+		ipv6:      ipv6,
+		targets:   make(map[string]*target.MTR),
 	}
 }
 
@@ -60,7 +59,7 @@ func (p *MTR) Stop() {
 
 // AddTargets adds newly added targets from the configuration
 func (p *MTR) AddTargets() {
-	level.Debug(p.logger).Log("type", "MTR", "func", "AddTargets", "msg", fmt.Sprintf("Current Targets: %d, cfg: %d", len(p.targets), countTargets(p.sc, "MTR")))
+	p.logger.Debug("Current Targets", "type", "MTR", "func", "AddTargets", "count", len(p.targets), "configured", countTargets(p.sc, "MTR"))
 
 	targetActiveTmp := []string{}
 	for _, v := range p.targets {
@@ -75,7 +74,7 @@ func (p *MTR) AddTargets() {
 	}
 
 	targetAdd := common.CompareList(targetActiveTmp, targetConfigTmp)
-	level.Debug(p.logger).Log("type", "MTR", "func", "AddTargets", "msg", fmt.Sprintf("targetName: %v", targetAdd))
+	p.logger.Debug("Target names to add", "type", "MTR", "func", "AddTargets", "targets", targetAdd)
 
 	for _, targetName := range targetAdd {
 		for _, target := range p.sc.Cfg.Targets {
@@ -86,7 +85,7 @@ func (p *MTR) AddTargets() {
 			if target.Type == "MTR" || target.Type == "ICMP+MTR" {
 				err := p.AddTarget(target.Name, target.Host, target.SourceIp, target.Labels.Kv)
 				if err != nil {
-					level.Warn(p.logger).Log("type", "MTR", "func", "AddTargets", "msg", fmt.Sprintf("Skipping target: %s", target.Host), "err", err)
+					p.logger.Warn("Skipping target", "type", "MTR", "func", "AddTargets", "host", target.Host, "err", err)
 				}
 			}
 		}
@@ -100,7 +99,7 @@ func (p *MTR) AddTarget(name string, host string, srcAddr string, labels map[str
 
 // AddTargetDelayed is AddTarget with a startup delay
 func (p *MTR) AddTargetDelayed(name string, host string, srcAddr string, labels map[string]string, startupDelay time.Duration) (err error) {
-	level.Info(p.logger).Log("type", "MTR", "func", "AddTargetDelayed", "msg", fmt.Sprintf("Adding Target: %s (%s) in %s", name, host, startupDelay))
+	p.logger.Info("Adding Target", "type", "MTR", "func", "AddTargetDelayed", "name", name, "host", host, "delay", startupDelay)
 
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
@@ -122,7 +121,7 @@ func (p *MTR) AddTargetDelayed(name string, host string, srcAddr string, labels 
 
 // DelTargets deletes/stops the removed targets from the configuration
 func (p *MTR) DelTargets() {
-	level.Debug(p.logger).Log("type", "MTR", "func", "DelTargets", "msg", fmt.Sprintf("Current Targets: %d, cfg: %d", len(p.targets), countTargets(p.sc, "MTR")))
+	p.logger.Debug("Current Targets", "type", "MTR", "func", "DelTargets", "count", len(p.targets), "configured", countTargets(p.sc, "MTR"))
 
 	targetActiveTmp := []string{}
 	for _, v := range p.targets {
@@ -153,7 +152,7 @@ func (p *MTR) DelTargets() {
 
 // RemoveTarget removes a target from the monitoring list
 func (p *MTR) RemoveTarget(key string) {
-	level.Info(p.logger).Log("type", "MTR", "func", "RemoveTarget", "msg", fmt.Sprintf("Removing Target: %s", key))
+	p.logger.Info("Removing Target", "type", "MTR", "func", "RemoveTarget", "target", key)
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
 	p.removeTarget(key)
@@ -171,7 +170,7 @@ func (p *MTR) removeTarget(key string) {
 
 // Read target if IP was changed (DNS record)
 func (p *MTR) CheckActiveTargets() (err error) {
-	level.Debug(p.logger).Log("type", "MTR", "func", "CheckActiveTargets", "msg", fmt.Sprintf("Current Targets: %d, cfg: %d", len(p.targets), countTargets(p.sc, "MTR")))
+	p.logger.Debug("Current Targets", "type", "MTR", "func", "CheckActiveTargets", "count", len(p.targets), "configured", countTargets(p.sc, "MTR"))
 
 	targetActiveTmp := make(map[string]string)
 	for _, v := range p.targets {
@@ -200,7 +199,7 @@ func (p *MTR) CheckActiveTargets() (err error) {
 				p.RemoveTarget(targetName)
 				err := p.AddTarget(target.Name, target.Host, target.SourceIp, target.Labels.Kv)
 				if err != nil {
-					level.Warn(p.logger).Log("type", "MTR", "func", "CheckActiveTargets", "msg", fmt.Sprintf("Skipping target: %s", target.Host), "err", err)
+					p.logger.Warn("Skipping target", "type", "MTR", "func", "CheckActiveTargets", "host", target.Host, "err", err)
 				}
 			}
 		}
@@ -220,7 +219,7 @@ func (p *MTR) ExportMetrics() map[string]*mtr.MtrResult {
 		metrics := target.Compute()
 
 		if metrics != nil {
-			// level.Debug(p.logger).Log("type", "ICMP", "func", "ExportMetrics", "msg", fmt.Sprintf("Name: %s, Metrics: %+v, Labels: %+v", name, metrics, target.Labels()))
+			// p.logger.Debug("Export metrics", "type", "MTR", "func", "ExportMetrics", "name", name, "metrics", metrics, "labels", target.Labels())
 			m[name] = metrics
 		}
 	}

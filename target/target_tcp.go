@@ -2,48 +2,47 @@ package target
 
 import (
 	"encoding/json"
-	"fmt"
+	"log/slog"
+	"os"
 	"sync"
 	"time"
 
-	"github.com/go-kit/log"
-	"github.com/go-kit/log/level"
 	"github.com/syepes/network_exporter/pkg/tcp"
 )
 
 // TCPPort Object
 type TCPPort struct {
-	logger   log.Logger
-	name     string
-	host     string
-	ip       string
-	srcAddr  string
-	port     string
-	interval time.Duration
-	timeout  time.Duration
-	labels   map[string]string
-	result   *tcp.TCPPortReturn
-	stop     chan struct{}
-	wg       sync.WaitGroup
+	logger    *slog.Logger
+	name      string
+	host      string
+	ip        string
+	srcAddr   string
+	port      string
+	interval  time.Duration
+	timeout   time.Duration
+	labels    map[string]string
+	result    *tcp.TCPPortReturn
+	stop      chan struct{}
+	wg        sync.WaitGroup
 	sync.RWMutex
 }
 
 // NewTCPPort starts a new monitoring goroutine
-func NewTCPPort(logger log.Logger, startupDelay time.Duration, name string, host string, ip string, srcAddr string, port string, interval time.Duration, timeout time.Duration, labels map[string]string) (*TCPPort, error) {
+func NewTCPPort(logger *slog.Logger, startupDelay time.Duration, name string, host string, ip string, srcAddr string, port string, interval time.Duration, timeout time.Duration, labels map[string]string) (*TCPPort, error) {
 	if logger == nil {
-		logger = log.NewNopLogger()
+		logger = slog.New(slog.NewTextHandler(os.Stderr, nil))
 	}
 	t := &TCPPort{
-		logger:   logger,
-		name:     name,
-		host:     host,
-		ip:       ip,
-		srcAddr:  srcAddr,
-		port:     port,
-		interval: interval,
-		timeout:  timeout,
-		labels:   labels,
-		stop:     make(chan struct{}),
+		logger:    logger,
+		name:      name,
+		host:      host,
+		ip:        ip,
+		srcAddr:   srcAddr,
+		port:      port,
+		interval:  interval,
+		timeout:   timeout,
+		labels:    labels,
+		stop:      make(chan struct{}),
 	}
 	t.wg.Add(1)
 	go t.run(startupDelay)
@@ -85,14 +84,14 @@ func (t *TCPPort) Stop() {
 func (t *TCPPort) portCheck() {
 	data, err := tcp.Port(t.host, t.ip, t.srcAddr, t.port, t.timeout)
 	if err != nil {
-		level.Error(t.logger).Log("type", "TCP", "func", "port", "msg", fmt.Sprintf("%s", err))
+		t.logger.Error("TCP Port check failed", "type", "TCP", "func", "port", "err", err)
 	}
 
 	bytes, err2 := json.Marshal(data)
 	if err2 != nil {
-		level.Error(t.logger).Log("type", "TCP", "func", "port", "msg", fmt.Sprintf("%s", err2))
+		t.logger.Error("Failed to marshal result", "type", "TCP", "func", "port", "err", err2)
 	}
-	level.Debug(t.logger).Log("type", "TCP", "func", "port", "msg", bytes)
+	t.logger.Debug("TCP Port result", "type", "TCP", "func", "port", "result", string(bytes))
 
 	t.Lock()
 	defer t.Unlock()

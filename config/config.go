@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"log/slog"
 	"net"
 	"os"
 	"regexp"
@@ -10,8 +11,6 @@ import (
 	"time"
 
 	"github.com/creasty/defaults"
-	"github.com/go-kit/log"
-	"github.com/go-kit/log/level"
 	"github.com/syepes/network_exporter/pkg/common"
 
 	yaml "gopkg.in/yaml.v3"
@@ -91,7 +90,7 @@ type SafeConfig struct {
 }
 
 // ReloadConfig Safe configuration reload
-func (sc *SafeConfig) ReloadConfig(logger log.Logger, confFile string) (err error) {
+func (sc *SafeConfig) ReloadConfig(logger *slog.Logger, confFile string) (err error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		panic(err)
@@ -120,20 +119,20 @@ func (sc *SafeConfig) ReloadConfig(logger log.Logger, confFile string) (err erro
 		if common.SrvRecordCheck(t.Host) {
 			found := re.MatchString(t.Type)
 			if !found {
-				level.Error(logger).Log("type", "Config", "func", "ReloadConfig", "msg", fmt.Sprintf("Target '%s' has unknown check type '%s' must be one of (ICMP|MTR|ICMP+MTR|TCP|HTTPGet)", t.Name, t.Type))
+				logger.Error("Unknown check type", "type", "Config", "func", "ReloadConfig", "target", t.Name, "check_type", t.Type, "allowed", "(ICMP|MTR|ICMP+MTR|TCP|HTTPGet)")
 				continue
 			}
 			// Check that SRV record's type is TCP, if config's type is TCP
 			if t.Type == "TCP" {
 				if !strings.EqualFold(t.Type, strings.Split(t.Host, ".")[1][1:]) {
-					level.Error(logger).Log("type", "Config", "func", "ReloadConfig", "msg", fmt.Sprintf("Target %s type '%s' doesn't match SRV record proto '%s'", t.Name, t.Type, strings.Split(t.Host, ".")[1][1:]))
+					logger.Error("Target type doesn't match SRV record protocol", "type", "Config", "func", "ReloadConfig", "target", t.Name, "check_type", t.Type, "srv_proto", strings.Split(t.Host, ".")[1][1:])
 					continue
 				}
 			}
 
 			srv_record_hosts, err := common.SrvRecordHosts(t.Host)
 			if err != nil {
-				level.Error(logger).Log("type", "Config", "func", "ReloadConfig", "msg", (fmt.Sprintf("Error processing SRV {target %s}: %s", t.Host, err)))
+				logger.Error("Error processing SRV record", "type", "Config", "func", "ReloadConfig", "target", t.Host, "err", err)
 				continue
 			}
 
@@ -157,7 +156,7 @@ func (sc *SafeConfig) ReloadConfig(logger log.Logger, confFile string) (err erro
 		} else {
 			found := re.MatchString(t.Type)
 			if !found {
-				level.Error(logger).Log("type", "Config", "func", "ReloadConfig", "msg", "Target '%s' has unknown check type '%s' must be one of (ICMP|MTR|ICMP+MTR|TCP|HTTPGet)", t.Name, t.Type)
+				logger.Error("Unknown check type", "type", "Config", "func", "ReloadConfig", "target", t.Name, "check_type", t.Type, "allowed", "(ICMP|MTR|ICMP+MTR|TCP|HTTPGet)")
 				continue
 			}
 

@@ -2,46 +2,45 @@ package target
 
 import (
 	"encoding/json"
-	"fmt"
+	"log/slog"
+	"os"
 	"sync"
 	"time"
 
-	"github.com/go-kit/log"
-	"github.com/go-kit/log/level"
 	"github.com/syepes/network_exporter/pkg/http"
 )
 
 // HTTPGet Object
 type HTTPGet struct {
-	logger   log.Logger
-	name     string
-	url      string
-	srcAddr  string
-	proxy    string
-	interval time.Duration
-	timeout  time.Duration
-	labels   map[string]string
-	result   *http.HTTPReturn
-	stop     chan struct{}
-	wg       sync.WaitGroup
+	logger    *slog.Logger
+	name      string
+	url       string
+	srcAddr   string
+	proxy     string
+	interval  time.Duration
+	timeout   time.Duration
+	labels    map[string]string
+	result    *http.HTTPReturn
+	stop      chan struct{}
+	wg        sync.WaitGroup
 	sync.RWMutex
 }
 
 // NewHTTPGet starts a new monitoring goroutine
-func NewHTTPGet(logger log.Logger, startupDelay time.Duration, name string, url string, srcAddr string, proxy string, interval time.Duration, timeout time.Duration, labels map[string]string) (*HTTPGet, error) {
+func NewHTTPGet(logger *slog.Logger, startupDelay time.Duration, name string, url string, srcAddr string, proxy string, interval time.Duration, timeout time.Duration, labels map[string]string) (*HTTPGet, error) {
 	if logger == nil {
-		logger = log.NewNopLogger()
+		logger = slog.New(slog.NewTextHandler(os.Stderr, nil))
 	}
 	t := &HTTPGet{
-		logger:   logger,
-		name:     name,
-		url:      url,
-		srcAddr:  srcAddr,
-		proxy:    proxy,
-		interval: interval,
-		timeout:  timeout,
-		labels:   labels,
-		stop:     make(chan struct{}),
+		logger:    logger,
+		name:      name,
+		url:       url,
+		srcAddr:   srcAddr,
+		proxy:     proxy,
+		interval:  interval,
+		timeout:   timeout,
+		labels:    labels,
+		stop:      make(chan struct{}),
 	}
 	t.wg.Add(1)
 	go t.run(startupDelay)
@@ -87,21 +86,21 @@ func (t *HTTPGet) httpGetCheck() {
 	if t.proxy != "" {
 		data, err = http.HTTPGetProxy(t.url, t.timeout, t.proxy)
 		if err != nil {
-			level.Error(t.logger).Log("type", "HTTPGet", "func", "httpGetCheck", "msg", fmt.Sprintf("%s", err))
+			t.logger.Error("HTTP Get with proxy failed", "type", "HTTPGet", "func", "httpGetCheck", "err", err)
 		}
 
 	} else {
 		data, err = http.HTTPGet(t.url, t.srcAddr, t.timeout)
 		if err != nil {
-			level.Error(t.logger).Log("type", "HTTPGet", "func", "httpGetCheck", "msg", fmt.Sprintf("%s", err))
+			t.logger.Error("HTTP Get failed", "type", "HTTPGet", "func", "httpGetCheck", "err", err)
 		}
 	}
 
 	bytes, err2 := json.Marshal(data)
 	if err2 != nil {
-		level.Error(t.logger).Log("type", "HTTPGet", "func", "httpGetCheck", "msg", fmt.Sprintf("%s", err2))
+		t.logger.Error("Failed to marshal result", "type", "HTTPGet", "func", "httpGetCheck", "err", err2)
 	}
-	level.Debug(t.logger).Log("type", "HTTPGet", "func", "httpGetCheck", "msg", bytes)
+	t.logger.Debug("HTTP Get result", "type", "HTTPGet", "func", "httpGetCheck", "result", string(bytes))
 
 	t.Lock()
 	defer t.Unlock()

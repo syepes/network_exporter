@@ -2,12 +2,11 @@ package monitor
 
 import (
 	"context"
-	"fmt"
+	"log/slog"
+	"os"
 	"sync"
 	"time"
 
-	"github.com/go-kit/log"
-	"github.com/go-kit/log/level"
 	"github.com/syepes/network_exporter/config"
 	"github.com/syepes/network_exporter/pkg/common"
 	"github.com/syepes/network_exporter/pkg/ping"
@@ -16,7 +15,7 @@ import (
 
 // PING manages the goroutines responsible for collecting ICMP data
 type PING struct {
-	logger   log.Logger
+	logger   *slog.Logger
 	sc       *config.SafeConfig
 	resolver *config.Resolver
 	icmpID   *common.IcmpID
@@ -29,9 +28,9 @@ type PING struct {
 }
 
 // NewPing creates and configures a new Monitoring ICMP instance
-func NewPing(logger log.Logger, sc *config.SafeConfig, resolver *config.Resolver, icmpID *common.IcmpID, ipv6 bool) *PING {
+func NewPing(logger *slog.Logger, sc *config.SafeConfig, resolver *config.Resolver, icmpID *common.IcmpID, ipv6 bool) *PING {
 	if logger == nil {
-		logger = log.NewNopLogger()
+		logger = slog.New(slog.NewTextHandler(os.Stderr, nil))
 	}
 	return &PING{
 		logger:   logger,
@@ -58,7 +57,7 @@ func (p *PING) Stop() {
 
 // AddTargets adds newly added targets from the configuration
 func (p *PING) AddTargets() {
-	level.Debug(p.logger).Log("type", "ICMP", "func", "AddTargets", "msg", fmt.Sprintf("Current Targets: %d, cfg: %d", len(p.targets), countTargets(p.sc, "ICMP")))
+	p.logger.Debug("Current Targets", "type", "ICMP", "func", "AddTargets", "count", len(p.targets), "configured", countTargets(p.sc, "ICMP"))
 
 	targetActiveTmp := []string{}
 	for _, v := range p.targets {
@@ -70,7 +69,7 @@ func (p *PING) AddTargets() {
 		if v.Type == "ICMP" || v.Type == "ICMP+MTR" {
 			ipAddrs, err := common.DestAddrs(context.Background(), v.Host, p.resolver.Resolver, p.resolver.Timeout)
 			if err != nil || len(ipAddrs) == 0 {
-				level.Warn(p.logger).Log("type", "ICMP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping resolve target: %s", v.Host), "err", err)
+				p.logger.Warn("Skipping resolve target", "type", "ICMP", "func", "AddTargets", "host", v.Host, "err", err)
 			}
 			for _, ipAddr := range ipAddrs {
 				targetConfigTmp = common.AppendIfMissing(targetConfigTmp, v.Name+" "+ipAddr)
@@ -79,14 +78,14 @@ func (p *PING) AddTargets() {
 	}
 
 	targetAdd := common.CompareList(targetActiveTmp, targetConfigTmp)
-	level.Debug(p.logger).Log("type", "ICMP", "func", "AddTargets", "msg", fmt.Sprintf("targetName: %v", targetAdd))
+	p.logger.Debug("Target names to add", "type", "ICMP", "func", "AddTargets", "targets", targetAdd)
 
 	for _, targetName := range targetAdd {
 		for _, target := range p.sc.Cfg.Targets {
 			if target.Type == "ICMP" || target.Type == "ICMP+MTR" {
 				ipAddrs, err := common.DestAddrs(context.Background(), target.Host, p.resolver.Resolver, p.resolver.Timeout)
 				if err != nil || len(ipAddrs) == 0 {
-					level.Warn(p.logger).Log("type", "ICMP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping resolve target: %s", target.Host), "err", err)
+					p.logger.Warn("Skipping resolve target", "type", "ICMP", "func", "AddTargets", "host", target.Host, "err", err)
 				}
 
 				for _, ipAddr := range ipAddrs {
@@ -95,7 +94,7 @@ func (p *PING) AddTargets() {
 					}
 					err := p.AddTarget(target.Name+" "+ipAddr, target.Host, ipAddr, target.SourceIp, target.Labels.Kv)
 					if err != nil {
-						level.Warn(p.logger).Log("type", "ICMP", "func", "AddTargets", "msg", fmt.Sprintf("Skipping target. Host: %s IP: %s", target.Host, ipAddr), "err", err)
+						p.logger.Warn("Skipping target", "type", "ICMP", "func", "AddTargets", "host", target.Host, "ip", ipAddr, "err", err)
 					}
 				}
 			}
@@ -110,7 +109,7 @@ func (p *PING) AddTarget(name string, host string, ip string, srcAddr string, la
 
 // AddTargetDelayed is AddTarget with a startup delay
 func (p *PING) AddTargetDelayed(name string, host string, ip string, srcAddr string, labels map[string]string, startupDelay time.Duration) (err error) {
-	level.Info(p.logger).Log("type", "ICMP", "func", "AddTargetDelayed", "msg", fmt.Sprintf("Adding Target: %s (%s/%s) in %s", name, host, ip, startupDelay))
+	p.logger.Info("Adding Target", "type", "ICMP", "func", "AddTargetDelayed", "name", name, "host", host, "ip", ip, "delay", startupDelay)
 
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
@@ -126,7 +125,7 @@ func (p *PING) AddTargetDelayed(name string, host string, ip string, srcAddr str
 
 // DelTargets deletes/stops the removed targets from the configuration
 func (p *PING) DelTargets() {
-	level.Debug(p.logger).Log("type", "ICMP", "func", "DelTargets", "msg", fmt.Sprintf("Current Targets: %d, cfg: %d", len(p.targets), countTargets(p.sc, "ICMP")))
+	p.logger.Debug("Current Targets", "type", "ICMP", "func", "DelTargets", "count", len(p.targets), "configured", countTargets(p.sc, "ICMP"))
 
 	targetActiveTmp := []string{}
 	for _, v := range p.targets {
@@ -140,7 +139,7 @@ func (p *PING) DelTargets() {
 		if v.Type == "ICMP" || v.Type == "ICMP+MTR" {
 			ipAddrs, err := common.DestAddrs(context.Background(), v.Host, p.resolver.Resolver, p.resolver.Timeout)
 			if err != nil || len(ipAddrs) == 0 {
-				level.Warn(p.logger).Log("type", "ICMP", "func", "DelTargets", "msg", fmt.Sprintf("Skipping resolve target: %s", v.Host), "err", err)
+				p.logger.Warn("Skipping resolve target", "type", "ICMP", "func", "DelTargets", "host", v.Host, "err", err)
 			}
 			for _, ipAddr := range ipAddrs {
 				targetConfigTmp = common.AppendIfMissing(targetConfigTmp, v.Name+" "+ipAddr)
@@ -163,7 +162,7 @@ func (p *PING) DelTargets() {
 
 // RemoveTarget removes a target from the monitoring list
 func (p *PING) RemoveTarget(key string) {
-	level.Info(p.logger).Log("type", "ICMP", "func", "RemoveTarget", "msg", fmt.Sprintf("Removing Target: %s", key))
+	p.logger.Info("Removing Target", "type", "ICMP", "func", "RemoveTarget", "target", key)
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
 	p.removeTarget(key)
@@ -181,7 +180,7 @@ func (p *PING) removeTarget(key string) {
 
 // Read target if IP was changed (DNS record)
 func (p *PING) CheckActiveTargets() (err error) {
-	level.Debug(p.logger).Log("type", "ICMP", "func", "CheckActiveTargets", "msg", fmt.Sprintf("Current Targets: %d, cfg: %d", len(p.targets), countTargets(p.sc, "ICMP")))
+	p.logger.Debug("Current Targets", "type", "ICMP", "func", "CheckActiveTargets", "count", len(p.targets), "configured", countTargets(p.sc, "ICMP"))
 
 	targetActiveTmp := make(map[string]string)
 	for _, v := range p.targets {
@@ -211,13 +210,13 @@ func (p *PING) CheckActiveTargets() (err error) {
 
 				ipAddrs, err := common.DestAddrs(context.Background(), target.Host, p.resolver.Resolver, p.resolver.Timeout)
 				if err != nil || len(ipAddrs) == 0 {
-					level.Warn(p.logger).Log("type", "ICMP", "func", "CheckActiveTargets", "msg", fmt.Sprintf("Skipping resolve target: %s", target.Host), "err", err)
+					p.logger.Warn("Skipping resolve target", "type", "ICMP", "func", "CheckActiveTargets", "host", target.Host, "err", err)
 				}
 
 				for _, ipAddr := range ipAddrs {
 					err := p.AddTarget(target.Name+" "+ipAddr, target.Host, ipAddr, target.SourceIp, target.Labels.Kv)
 					if err != nil {
-						level.Warn(p.logger).Log("type", "ICMP", "func", "CheckActiveTargets", "msg", fmt.Sprintf("Skipping target. Host: %s IP: %s", target.Host, ipAddr), "err", err)
+						p.logger.Warn("Skipping target", "type", "ICMP", "func", "CheckActiveTargets", "host", target.Host, "ip", ipAddr, "err", err)
 					}
 				}
 			}
@@ -238,7 +237,7 @@ func (p *PING) ExportMetrics() map[string]*ping.PingResult {
 		metrics := target.Compute()
 
 		if metrics != nil {
-			// level.Debug(p.logger).Log("type", "ICMP", "func", "ExportMetrics", "msg", fmt.Sprintf("Name: %s, Metrics: %+v, Labels: %+v", name, metrics, target.Labels()))
+			// p.logger.Debug("Export metrics", "type", "ICMP", "func", "ExportMetrics", "name", name, "metrics", metrics, "labels", target.Labels())
 			m[name] = metrics
 		}
 	}

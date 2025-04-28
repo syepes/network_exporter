@@ -7,8 +7,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-
-	"github.com/go-kit/log/level"
 )
 
 func reloadSignal() {
@@ -20,10 +18,10 @@ func reloadSignal() {
 		for {
 			select {
 			case <-hup:
-				level.Debug(logger).Log("msg", "Signal: HUP")
-				level.Info(logger).Log("msg", "ReLoading config")
+				logger.Debug("msg", "Signal: HUP")
+				logger.Info("msg", "ReLoading config")
 				if err := sc.ReloadConfig(logger, *configFile); err != nil {
-					level.Error(logger).Log("msg", "Reloading config skipped", "err", err)
+					logger.Error("msg", "Reloading config skipped", "err", err)
 					continue
 				} else {
 					monitorPING.DelTargets()

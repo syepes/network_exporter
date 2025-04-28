@@ -1,13 +1,12 @@
 package monitor
 
 import (
-	"fmt"
+	"log/slog"
 	"net/url"
+	"os"
 	"sync"
 	"time"
 
-	"github.com/go-kit/log"
-	"github.com/go-kit/log/level"
 	"github.com/syepes/network_exporter/config"
 	"github.com/syepes/network_exporter/pkg/common"
 	"github.com/syepes/network_exporter/pkg/http"
@@ -16,27 +15,27 @@ import (
 
 // HTTPGet manages the goroutines responsible for collecting HTTPGet data
 type HTTPGet struct {
-	logger   log.Logger
-	sc       *config.SafeConfig
-	resolver *config.Resolver
-	interval time.Duration
-	timeout  time.Duration
-	targets  map[string]*target.HTTPGet
-	mtx      sync.RWMutex
+	logger     *slog.Logger
+	sc         *config.SafeConfig
+	resolver   *config.Resolver
+	interval   time.Duration
+	timeout    time.Duration
+	targets    map[string]*target.HTTPGet
+	mtx        sync.RWMutex
 }
 
 // NewHTTPGet creates and configures a new Monitoring HTTPGet instance
-func NewHTTPGet(logger log.Logger, sc *config.SafeConfig, resolver *config.Resolver) *HTTPGet {
+func NewHTTPGet(logger *slog.Logger, sc *config.SafeConfig, resolver *config.Resolver) *HTTPGet {
 	if logger == nil {
-		logger = log.NewNopLogger()
+		logger = slog.New(slog.NewTextHandler(os.Stderr, nil))
 	}
 	return &HTTPGet{
-		logger:   logger,
-		sc:       sc,
-		resolver: resolver,
-		interval: sc.Cfg.HTTPGet.Interval.Duration(),
-		timeout:  sc.Cfg.HTTPGet.Timeout.Duration(),
-		targets:  make(map[string]*target.HTTPGet),
+		logger:     logger,
+		sc:         sc,
+		resolver:   resolver,
+		interval:   sc.Cfg.HTTPGet.Interval.Duration(),
+		timeout:    sc.Cfg.HTTPGet.Timeout.Duration(),
+		targets:    make(map[string]*target.HTTPGet),
 	}
 }
 
@@ -52,7 +51,7 @@ func (p *HTTPGet) Stop() {
 
 // AddTargets adds newly added targets from the configuration
 func (p *HTTPGet) AddTargets() {
-	level.Debug(p.logger).Log("type", "HTTPGet", "func", "AddTargets", "msg", fmt.Sprintf("Current Targets: %d, cfg: %d", len(p.targets), countTargets(p.sc, "HTTPGet")))
+	p.logger.Debug("Current Targets", "type", "HTTPGet", "func", "AddTargets", "count", len(p.targets), "configured", countTargets(p.sc, "HTTPGet"))
 
 	targetActiveTmp := []string{}
 	for _, v := range p.targets {
@@ -67,7 +66,7 @@ func (p *HTTPGet) AddTargets() {
 	}
 
 	targetAdd := common.CompareList(targetActiveTmp, targetConfigTmp)
-	level.Debug(p.logger).Log("type", "HTTPGet", "func", "AddTargets", "msg", fmt.Sprintf("targetName: %v", targetAdd))
+	p.logger.Debug("Target names to add", "type", "HTTPGet", "func", "AddTargets", "targets", targetAdd)
 
 	for _, targetName := range targetAdd {
 		for _, target := range p.sc.Cfg.Targets {
@@ -78,12 +77,12 @@ func (p *HTTPGet) AddTargets() {
 				if target.Proxy != "" {
 					err := p.AddTarget(target.Name, target.Host, target.SourceIp, target.Proxy, target.Labels.Kv)
 					if err != nil {
-						level.Warn(p.logger).Log("type", "HTTPGet", "func", "AddTargets", "msg", fmt.Sprintf("Skipping target: %s", target.Host), "err", err)
+						p.logger.Warn("Skipping target", "type", "HTTPGet", "func", "AddTargets", "host", target.Host, "err", err)
 					}
 				} else {
 					err := p.AddTarget(target.Name, target.Host, target.SourceIp, "", target.Labels.Kv)
 					if err != nil {
-						level.Warn(p.logger).Log("type", "HTTPGet", "func", "AddTargets", "msg", fmt.Sprintf("Skipping target: %s", target.Host), "err", err)
+						p.logger.Warn("Skipping target", "type", "HTTPGet", "func", "AddTargets", "host", target.Host, "err", err)
 					}
 				}
 			}
@@ -99,9 +98,9 @@ func (p *HTTPGet) AddTarget(name string, url string, srcAddr string, proxy strin
 // AddTargetDelayed is AddTarget with a startup delay
 func (p *HTTPGet) AddTargetDelayed(name string, urlStr string, srcAddr string, proxy string, labels map[string]string, startupDelay time.Duration) (err error) {
 	if proxy != "" {
-		level.Info(p.logger).Log("type", "HTTPGet", "func", "AddTargetDelayed", "msg", fmt.Sprintf("Adding Target: %s (%s) with proxy (%s) in %s", name, urlStr, proxy, startupDelay))
+		p.logger.Info("Adding Target", "type", "HTTPGet", "func", "AddTargetDelayed", "name", name, "url", urlStr, "proxy", proxy, "delay", startupDelay)
 	} else {
-		level.Info(p.logger).Log("type", "HTTPGet", "func", "AddTargetDelayed", "msg", fmt.Sprintf("Adding Target: %s (%s) in %s", name, urlStr, startupDelay))
+		p.logger.Info("Adding Target", "type", "HTTPGet", "func", "AddTargetDelayed", "name", name, "url", urlStr, "delay", startupDelay)
 	}
 
 	p.mtx.Lock()
@@ -132,7 +131,7 @@ func (p *HTTPGet) AddTargetDelayed(name string, urlStr string, srcAddr string, p
 
 // DelTargets deletes/stops the removed targets from the configuration
 func (p *HTTPGet) DelTargets() {
-	level.Debug(p.logger).Log("type", "HTTPGet", "func", "DelTargets", "msg", fmt.Sprintf("Current Targets: %d, cfg: %d", len(p.targets), countTargets(p.sc, "HTTPGet")))
+	p.logger.Debug("Current Targets", "type", "HTTPGet", "func", "DelTargets", "count", len(p.targets), "configured", countTargets(p.sc, "HTTPGet"))
 
 	targetActiveTmp := []string{}
 	for _, v := range p.targets {
@@ -163,7 +162,7 @@ func (p *HTTPGet) DelTargets() {
 
 // RemoveTarget removes a target from the monitoring list
 func (p *HTTPGet) RemoveTarget(key string) {
-	level.Info(p.logger).Log("type", "HTTPGet", "func", "RemoveTarget", "msg", fmt.Sprintf("Removing Target: %s", key))
+	p.logger.Info("Removing Target", "type", "HTTPGet", "func", "RemoveTarget", "target", key)
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
 	p.removeTarget(key)
@@ -191,7 +190,7 @@ func (p *HTTPGet) ExportMetrics() map[string]*http.HTTPReturn {
 		metrics := target.Compute()
 
 		if metrics != nil {
-			// level.Debug(p.logger).Log("type", "HTTPGet", "func", "ExportMetrics", "msg", fmt.Sprintf("Name: %s, Metrics: %+v, Labels: %+v", name, metrics, target.Labels()))
+			// p.logger.Debug("Export metrics", "type", "HTTPGet", "func", "ExportMetrics", "name", name, "metrics", metrics, "labels", target.Labels())
 			m[name] = metrics
 		}
 	}
