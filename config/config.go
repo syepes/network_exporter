@@ -111,7 +111,7 @@ func parse(data []byte, c *Config) error {
 }
 
 // ReloadConfig Safe configuration reload
-func (sc *SafeConfig) ReloadConfig(logger *slog.Logger, confFile string) (err error) {
+func (sc *SafeConfig) ReloadConfig(logger *slog.Logger, confFile string, confFileHeaders http.Header) (err error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		panic(err)
@@ -122,7 +122,18 @@ func (sc *SafeConfig) ReloadConfig(logger *slog.Logger, confFile string) (err er
 	if isHTTPURL(confFile) {
 		logger.Debug("Loading config from HTTP")
 
-		resp, err := http.Get(confFile)
+		req, err := http.NewRequest("GET", confFile, nil)
+		if err != nil {
+			return fmt.Errorf("creating request: %s", err)
+		}
+
+		for key, values := range confFileHeaders {
+			for _, value := range values {
+				req.Header.Add(key, value)
+			}
+		}
+
+		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			return fmt.Errorf("fetching config file: %s", err)
 		}
