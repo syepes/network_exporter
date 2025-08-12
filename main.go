@@ -51,11 +51,11 @@ var (
 type HTTPHeaderValue http.Header
 
 func (h *HTTPHeaderValue) Set(value string) error {
-	parts := strings.SplitN(value, "=", 2)
-	if len(parts) != 2 {
+	name, value, found := strings.Cut(value, "=")
+	if !found {
 		return fmt.Errorf("expected HEADER=VALUE got '%s'", value)
 	}
-	(*http.Header)(h).Add(parts[0], parts[1])
+	(*http.Header)(h).Add(name, value)
 	return nil
 }
 
