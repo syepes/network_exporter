@@ -23,10 +23,10 @@ func Mtr(addr string, srcAddr string, maxHops int, count int, timeout time.Durat
 
 	if err == nil {
 		if len(out.Hops) == 0 {
-			return nil, fmt.Errorf("MTR Expected at least one hop")
+			return &out, fmt.Errorf("MTR Expected at least one hop")
 		}
 	} else {
-		return nil, fmt.Errorf("MTR Failed due to an error: %v", err)
+		return &out, fmt.Errorf("MTR Failed due to an error: %v", err)
 	}
 
 	return &out, nil
