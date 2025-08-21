@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/alecthomas/kingpin/v2"
@@ -34,6 +35,7 @@ var (
 	WebMetricPath      = kingpin.Flag("web.metrics.path", "metric path").Default("/metrics").String()
 	WebConfigFile      = kingpin.Flag("web.config.file", "Path to the web configuration file").Default("").String()
 	configFile         = kingpin.Flag("config.file", "Exporter configuration file").Default("/app/cfg/network_exporter.yml").String()
+	configFileHeaders  = HTTPHeader(kingpin.Flag("config.file.header", "Headers for loading configuration file from URL"))
 	enableProfileing   = kingpin.Flag("profiling", "Enable Profiling (pprof + fgprof)").Default("false").Bool()
 	sc                 = &config.SafeConfig{Cfg: &config.Config{}}
 	logger             *slog.Logger
@@ -45,6 +47,26 @@ var (
 
 	indexHTML = `<!doctype html><html><head> <meta charset="UTF-8"><title>Network Exporter (Version ` + version + `)</title></head><body><h1>Network Exporter</h1><p><a href="%s">Metrics</a></p></body></html>`
 )
+
+type HTTPHeaderValue http.Header
+
+func (h *HTTPHeaderValue) Set(value string) error {
+	name, value, found := strings.Cut(value, "=")
+	if !found {
+		return fmt.Errorf("expected HEADER=VALUE got '%s'", value)
+	}
+	(*http.Header)(h).Add(name, value)
+	return nil
+}
+
+func (h *HTTPHeaderValue) String() string {
+	return ""
+}
+func HTTPHeader(s kingpin.Settings) (target *http.Header) {
+	target = &http.Header{}
+	s.SetValue((*HTTPHeaderValue)(target))
+	return
+}
 
 func init() {
 	promslogConfig := &promslog.Config{}
@@ -60,7 +82,7 @@ func main() {
 	logger.Info("msg", "Starting network_exporter", "version", version)
 
 	logger.Info("msg", "Loading config")
-	if err := sc.ReloadConfig(logger, *configFile); err != nil {
+	if err := sc.ReloadConfig(logger, *configFile, *configFileHeaders); err != nil {
 		logger.Error("msg", "Loading config", "err", err)
 		os.Exit(1)
 	}
@@ -94,7 +116,7 @@ func startConfigRefresh() {
 
 	for range time.NewTicker(interval).C {
 		logger.Info("msg", "ReLoading config")
-		if err := sc.ReloadConfig(logger, *configFile); err != nil {
+		if err := sc.ReloadConfig(logger, *configFile, *configFileHeaders); err != nil {
 			logger.Error("msg", "Reloading config skipped", "err", err)
 			continue
 		} else {

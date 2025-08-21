@@ -2,8 +2,11 @@ package config
 
 import (
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
+	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -89,22 +92,76 @@ type SafeConfig struct {
 	sync.RWMutex
 }
 
+func isHTTPURL(s string) bool {
+	u, err := url.Parse(s)
+	if err != nil {
+		return false
+	}
+	return u.Scheme == "http" || u.Scheme == "https"
+}
+
+func parse(data []byte, c *Config) error {
+	err := yaml.Unmarshal(data, &c)
+
+	if err != nil {
+		return fmt.Errorf("unmarshaling config: %s", err)
+	}
+
+	return nil
+}
+
 // ReloadConfig Safe configuration reload
-func (sc *SafeConfig) ReloadConfig(logger *slog.Logger, confFile string) (err error) {
+func (sc *SafeConfig) ReloadConfig(logger *slog.Logger, confFile string, confFileHeaders http.Header) (err error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		panic(err)
 	}
 
-	var c = &Config{}
-	f, err := os.Open(confFile)
-	if err != nil {
-		return fmt.Errorf("reading config file: %s", err)
-	}
-	defer f.Close()
+	var data []byte
 
-	decoder := yaml.NewDecoder(f)
-	if err = decoder.Decode(c); err != nil {
+	if isHTTPURL(confFile) {
+		logger.Debug("Loading config from HTTP")
+
+		req, err := http.NewRequest("GET", confFile, nil)
+		if err != nil {
+			return fmt.Errorf("creating request: %s", err)
+		}
+
+		for key, values := range confFileHeaders {
+			for _, value := range values {
+				req.Header.Add(key, value)
+			}
+		}
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return fmt.Errorf("fetching config file: %s", err)
+		}
+		defer resp.Body.Close()
+
+		data, err = io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("reading config file: %s", err)
+		}
+	} else {
+		logger.Debug("Loading config from file")
+
+		f, err := os.Open(confFile)
+		if err != nil {
+			return fmt.Errorf("reading config file: %s", err)
+		}
+		defer f.Close()
+
+		data, err = io.ReadAll(f)
+		if err != nil {
+			return fmt.Errorf("reading config file: %s", err)
+		}
+	}
+
+	var c = &Config{}
+
+	err = parse(data, c)
+	if err != nil {
 		return fmt.Errorf("parsing config file: %s", err)
 	}
 
