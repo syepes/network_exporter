@@ -3,7 +3,9 @@ package monitor
 import (
 	"context"
 	"log/slog"
+	"math/rand"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,33 +17,37 @@ import (
 
 // PING manages the goroutines responsible for collecting ICMP data
 type PING struct {
-	logger   *slog.Logger
-	sc       *config.SafeConfig
-	resolver *config.Resolver
-	icmpID   *common.IcmpID
-	interval time.Duration
-	timeout  time.Duration
-	count    int
-	ipv6     bool
-	targets  map[string]*target.PING
-	mtx      sync.RWMutex
+	logger            *slog.Logger
+	sc                *config.SafeConfig
+	resolver          *config.Resolver
+	icmpID            *common.IcmpID
+	interval          time.Duration
+	timeout           time.Duration
+	count             int
+	payloadSize       int
+	ipv6              bool
+	maxConcurrentJobs int
+	targets           map[string]*target.PING
+	mtx               sync.RWMutex
 }
 
 // NewPing creates and configures a new Monitoring ICMP instance
-func NewPing(logger *slog.Logger, sc *config.SafeConfig, resolver *config.Resolver, icmpID *common.IcmpID, ipv6 bool) *PING {
+func NewPing(logger *slog.Logger, sc *config.SafeConfig, resolver *config.Resolver, icmpID *common.IcmpID, ipv6 bool, maxConcurrentJobs int) *PING {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(os.Stderr, nil))
 	}
 	return &PING{
-		logger:   logger,
-		sc:       sc,
-		resolver: resolver,
-		icmpID:   icmpID,
-		interval: sc.Cfg.ICMP.Interval.Duration(),
-		timeout:  sc.Cfg.ICMP.Timeout.Duration(),
-		count:    sc.Cfg.ICMP.Count,
-		ipv6:     ipv6,
-		targets:  make(map[string]*target.PING),
+		logger:            logger,
+		sc:                sc,
+		resolver:          resolver,
+		icmpID:            icmpID,
+		interval:          sc.Cfg.ICMP.Interval.Duration(),
+		timeout:           sc.Cfg.ICMP.Timeout.Duration(),
+		count:             sc.Cfg.ICMP.Count,
+		payloadSize:       sc.Cfg.ICMP.PayloadSize,
+		ipv6:              ipv6,
+		maxConcurrentJobs: maxConcurrentJobs,
+		targets:           make(map[string]*target.PING),
 	}
 }
 
@@ -67,7 +73,7 @@ func (p *PING) AddTargets() {
 	targetConfigTmp := []string{}
 	for _, v := range p.sc.Cfg.Targets {
 		if v.Type == "ICMP" || v.Type == "ICMP+MTR" {
-			ipAddrs, err := common.DestAddrs(context.Background(), v.Host, p.resolver.Resolver, p.resolver.Timeout)
+			ipAddrs, err := common.DestAddrs(context.Background(), v.Host, p.resolver.Resolver, p.resolver.Timeout, p.ipv6)
 			if err != nil || len(ipAddrs) == 0 {
 				p.logger.Warn("Skipping resolve target", "type", "ICMP", "func", "AddTargets", "host", v.Host, "err", err)
 			}
@@ -83,7 +89,7 @@ func (p *PING) AddTargets() {
 	for _, targetName := range targetAdd {
 		for _, target := range p.sc.Cfg.Targets {
 			if target.Type == "ICMP" || target.Type == "ICMP+MTR" {
-				ipAddrs, err := common.DestAddrs(context.Background(), target.Host, p.resolver.Resolver, p.resolver.Timeout)
+				ipAddrs, err := common.DestAddrs(context.Background(), target.Host, p.resolver.Resolver, p.resolver.Timeout, p.ipv6)
 				if err != nil || len(ipAddrs) == 0 {
 					p.logger.Warn("Skipping resolve target", "type", "ICMP", "func", "AddTargets", "host", target.Host, "err", err)
 				}
@@ -92,7 +98,9 @@ func (p *PING) AddTargets() {
 					if target.Name+" "+ipAddr != targetName {
 						continue
 					}
-					err := p.AddTarget(target.Name+" "+ipAddr, target.Host, ipAddr, target.SourceIp, target.Labels.Kv)
+					// Add jitter to prevent thundering herd (0-10% of interval)
+					jitter := time.Duration(rand.Int63n(int64(p.interval / 10)))
+					err := p.AddTargetDelayed(target.Name+" "+ipAddr, target.Host, ipAddr, target.SourceIp, target.Labels.Kv, jitter)
 					if err != nil {
 						p.logger.Warn("Skipping target", "type", "ICMP", "func", "AddTargets", "host", target.Host, "ip", ipAddr, "err", err)
 					}
@@ -114,7 +122,7 @@ func (p *PING) AddTargetDelayed(name string, host string, ip string, srcAddr str
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
 
-	target, err := target.NewPing(p.logger, p.icmpID, startupDelay, name, host, ip, srcAddr, p.interval, p.timeout, p.count, labels, p.ipv6)
+	target, err := target.NewPing(p.logger, p.icmpID, startupDelay, name, host, ip, srcAddr, p.interval, p.timeout, p.count, p.payloadSize, labels, p.ipv6, p.maxConcurrentJobs)
 	if err != nil {
 		return err
 	}
@@ -137,7 +145,7 @@ func (p *PING) DelTargets() {
 	targetConfigTmp := []string{}
 	for _, v := range p.sc.Cfg.Targets {
 		if v.Type == "ICMP" || v.Type == "ICMP+MTR" {
-			ipAddrs, err := common.DestAddrs(context.Background(), v.Host, p.resolver.Resolver, p.resolver.Timeout)
+			ipAddrs, err := common.DestAddrs(context.Background(), v.Host, p.resolver.Resolver, p.resolver.Timeout, p.ipv6)
 			if err != nil || len(ipAddrs) == 0 {
 				p.logger.Warn("Skipping resolve target", "type", "ICMP", "func", "DelTargets", "host", v.Host, "err", err)
 			}
@@ -189,32 +197,24 @@ func (p *PING) CheckActiveTargets() (err error) {
 
 	for targetName, targetIp := range targetActiveTmp {
 		for _, target := range p.sc.Cfg.Targets {
-			if target.Name != targetName {
+			if target.Type != "ICMP" && target.Type != "ICMP+MTR" {
 				continue
 			}
-			ipAddrs, err := common.DestAddrs(context.Background(), target.Host, p.resolver.Resolver, p.resolver.Timeout)
+			if !strings.HasPrefix(targetName, target.Name+" ") {
+				continue
+			}
+			ipAddrs, err := common.DestAddrs(context.Background(), target.Host, p.resolver.Resolver, p.resolver.Timeout, p.ipv6)
 			if err != nil || len(ipAddrs) == 0 {
 				return err
 			}
 
-			if !func(ips []string, target string) bool {
-				for _, ip := range ips {
-					if ip == target {
-						return true
-					}
-				}
-				return false
-			}(ipAddrs, targetIp) {
-
-				p.RemoveTarget(targetName + " " + targetIp)
-
-				ipAddrs, err := common.DestAddrs(context.Background(), target.Host, p.resolver.Resolver, p.resolver.Timeout)
-				if err != nil || len(ipAddrs) == 0 {
-					p.logger.Warn("Skipping resolve target", "type", "ICMP", "func", "CheckActiveTargets", "host", target.Host, "err", err)
-				}
+			if !common.ContainsString(ipAddrs, targetIp) {
+				p.RemoveTarget(targetName)
 
 				for _, ipAddr := range ipAddrs {
-					err := p.AddTarget(target.Name+" "+ipAddr, target.Host, ipAddr, target.SourceIp, target.Labels.Kv)
+					// Add jitter to prevent thundering herd (0-10% of interval)
+					jitter := time.Duration(rand.Int63n(int64(p.interval / 10)))
+					err := p.AddTargetDelayed(target.Name+" "+ipAddr, target.Host, ipAddr, target.SourceIp, target.Labels.Kv, jitter)
 					if err != nil {
 						p.logger.Warn("Skipping target", "type", "ICMP", "func", "CheckActiveTargets", "host", target.Host, "ip", ipAddr, "err", err)
 					}

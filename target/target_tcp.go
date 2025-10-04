@@ -12,37 +12,39 @@ import (
 
 // TCPPort Object
 type TCPPort struct {
-	logger    *slog.Logger
-	name      string
-	host      string
-	ip        string
-	srcAddr   string
-	port      string
-	interval  time.Duration
-	timeout   time.Duration
-	labels    map[string]string
-	result    *tcp.TCPPortReturn
-	stop      chan struct{}
-	wg        sync.WaitGroup
+	logger            *slog.Logger
+	name              string
+	host              string
+	ip                string
+	srcAddr           string
+	port              string
+	interval          time.Duration
+	timeout           time.Duration
+	maxConcurrentJobs int
+	labels            map[string]string
+	result            *tcp.TCPPortReturn
+	stop              chan struct{}
+	wg                sync.WaitGroup
 	sync.RWMutex
 }
 
 // NewTCPPort starts a new monitoring goroutine
-func NewTCPPort(logger *slog.Logger, startupDelay time.Duration, name string, host string, ip string, srcAddr string, port string, interval time.Duration, timeout time.Duration, labels map[string]string) (*TCPPort, error) {
+func NewTCPPort(logger *slog.Logger, startupDelay time.Duration, name string, host string, ip string, srcAddr string, port string, interval time.Duration, timeout time.Duration, labels map[string]string, maxConcurrentJobs int) (*TCPPort, error) {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(os.Stderr, nil))
 	}
 	t := &TCPPort{
-		logger:    logger,
-		name:      name,
-		host:      host,
-		ip:        ip,
-		srcAddr:   srcAddr,
-		port:      port,
-		interval:  interval,
-		timeout:   timeout,
-		labels:    labels,
-		stop:      make(chan struct{}),
+		logger:            logger,
+		name:              name,
+		host:              host,
+		ip:                ip,
+		srcAddr:           srcAddr,
+		port:              port,
+		interval:          interval,
+		timeout:           timeout,
+		maxConcurrentJobs: maxConcurrentJobs,
+		labels:            labels,
+		stop:              make(chan struct{}),
 	}
 	t.wg.Add(1)
 	go t.run(startupDelay)
@@ -54,15 +56,33 @@ func (t *TCPPort) run(startupDelay time.Duration) {
 		select {
 		case <-time.After(startupDelay):
 		case <-t.stop:
+			t.wg.Done()
+			return
 		}
 	}
 
-	waitChan := make(chan struct{}, MaxConcurrentJobs)
+	waitChan := make(chan struct{}, t.maxConcurrentJobs)
+
+	// Execute first probe immediately (after jitter delay)
+	// This ensures targets start probing as quickly as possible
+	select {
+	case <-t.stop:
+		t.wg.Done()
+		return
+	default:
+		waitChan <- struct{}{}
+		go func() {
+			t.portCheck()
+			<-waitChan
+		}()
+	}
+
 	tick := time.NewTicker(t.interval)
+	defer tick.Stop()
+
 	for {
 		select {
 		case <-t.stop:
-			tick.Stop()
 			t.wg.Done()
 			return
 		case <-tick.C:

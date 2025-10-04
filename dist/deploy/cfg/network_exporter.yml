@@ -6,12 +6,16 @@ icmp:
   interval: 15s
   timeout: 5s
   count: 10
+  payload_size: 56  # Optional: ICMP payload size in bytes (default: 56)
 
 mtr:
   interval: 15s
   timeout: 500ms
   max-hops: 30
   count: 3
+  payload_size: 56  # Optional: ICMP payload size in bytes (default: 56)
+  protocol: icmp    # Optional: "icmp" or "tcp" (default: icmp)
+  tcp_port: 80      # Optional: Default port for TCP traceroute (default: 80)
 
 tcp:
   interval: 15s

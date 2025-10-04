@@ -26,7 +26,7 @@ import (
 	"github.com/syepes/network_exporter/pkg/common"
 )
 
-const version string = "1.7.10"
+const version string = "1.8.0"
 
 var (
 	WebListenAddresses = kingpin.Flag("web.listen-address", "The address to listen on for HTTP requests").Default(":9427").Strings()
@@ -37,23 +37,32 @@ var (
 	configFile         = kingpin.Flag("config.file", "Exporter configuration file").Default("/app/cfg/network_exporter.yml").String()
 	configFileHeaders  = HTTPHeader(kingpin.Flag("config.file.header", "Headers for loading configuration file from URL"))
 	enableProfileing   = kingpin.Flag("profiling", "Enable Profiling (pprof + fgprof)").Default("false").Bool()
-	sc                 = &config.SafeConfig{Cfg: &config.Config{}}
-	logger             *slog.Logger
-	icmpID             *common.IcmpID // goroutine shared counter
-	monitorPING        *monitor.PING
-	monitorMTR         *monitor.MTR
-	monitorTCP         *monitor.TCPPort
-	monitorHTTPGet     *monitor.HTTPGet
+	// SCALING: maxConcurrentJobs controls how many probe operations can run concurrently per target.
+	// Higher values increase throughput but consume more resources (memory, CPU, file descriptors).
+	// Default: 3 operations per target
+	// Recommended ranges based on target count:
+	//   - Small deployments (<100 targets): 3-5
+	//   - Medium deployments (100-1000 targets): 2-3
+	//   - Large deployments (>1000 targets): 1-2
+	maxConcurrentJobs = kingpin.Flag("max-concurrent-jobs", "Maximum concurrent probe operations per target (affects memory and CPU usage)").Default("3").Int()
+	sc                = &config.SafeConfig{Cfg: &config.Config{}}
+	logger            *slog.Logger
+	// SCALING: icmpID is a shared counter across all PING and MTR targets (see pkg/common/type.go for limits)
+	icmpID         *common.IcmpID
+	monitorPING    *monitor.PING
+	monitorMTR     *monitor.MTR
+	monitorTCP     *monitor.TCPPort
+	monitorHTTPGet *monitor.HTTPGet
 
 	indexHTML = `<!doctype html><html><head> <meta charset="UTF-8"><title>Network Exporter (Version ` + version + `)</title></head><body><h1>Network Exporter</h1><p><a href="%s">Metrics</a></p></body></html>`
 )
 
 type HTTPHeaderValue http.Header
 
-func (h *HTTPHeaderValue) Set(value string) error {
-	name, value, found := strings.Cut(value, "=")
+func (h *HTTPHeaderValue) Set(input string) error {
+	name, value, found := strings.Cut(input, "=")
 	if !found {
-		return fmt.Errorf("expected HEADER=VALUE got '%s'", value)
+		return fmt.Errorf("expected HEADER=VALUE got '%s'", input)
 	}
 	(*http.Header)(h).Add(name, value)
 	return nil
@@ -91,16 +100,16 @@ func main() {
 
 	resolver := getResolver()
 
-	monitorPING = monitor.NewPing(logger, sc, resolver, icmpID, *enableIpv6)
+	monitorPING = monitor.NewPing(logger, sc, resolver, icmpID, *enableIpv6, *maxConcurrentJobs)
 	go monitorPING.AddTargets()
 
-	monitorMTR = monitor.NewMTR(logger, sc, resolver, icmpID, *enableIpv6)
+	monitorMTR = monitor.NewMTR(logger, sc, resolver, icmpID, *enableIpv6, *maxConcurrentJobs)
 	go monitorMTR.AddTargets()
 
-	monitorTCP = monitor.NewTCPPort(logger, sc, resolver)
+	monitorTCP = monitor.NewTCPPort(logger, sc, resolver, *enableIpv6, *maxConcurrentJobs)
 	go monitorTCP.AddTargets()
 
-	monitorHTTPGet = monitor.NewHTTPGet(logger, sc, resolver)
+	monitorHTTPGet = monitor.NewHTTPGet(logger, sc, resolver, *maxConcurrentJobs)
 	go monitorHTTPGet.AddTargets()
 
 	go startConfigRefresh()
@@ -114,24 +123,26 @@ func startConfigRefresh() {
 		return
 	}
 
-	for range time.NewTicker(interval).C {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for range ticker.C {
 		logger.Info("msg", "ReLoading config")
 		if err := sc.ReloadConfig(logger, *configFile, *configFileHeaders); err != nil {
 			logger.Error("msg", "Reloading config skipped", "err", err)
 			continue
-		} else {
-			monitorPING.DelTargets()
-			_ = monitorPING.CheckActiveTargets()
-			monitorPING.AddTargets()
-			monitorMTR.DelTargets()
-			_ = monitorMTR.CheckActiveTargets()
-			monitorMTR.AddTargets()
-			monitorTCP.DelTargets()
-			_ = monitorTCP.CheckActiveTargets()
-			monitorTCP.AddTargets()
-			monitorHTTPGet.DelTargets()
-			monitorHTTPGet.AddTargets()
 		}
+		monitorPING.DelTargets()
+		_ = monitorPING.CheckActiveTargets()
+		monitorPING.AddTargets()
+		monitorMTR.DelTargets()
+		_ = monitorMTR.CheckActiveTargets()
+		monitorMTR.AddTargets()
+		monitorTCP.DelTargets()
+		_ = monitorTCP.CheckActiveTargets()
+		monitorTCP.AddTargets()
+		monitorHTTPGet.DelTargets()
+		monitorHTTPGet.AddTargets()
 	}
 }
 
@@ -189,7 +200,7 @@ func getResolver() *config.Resolver {
 	logger.Info("msg", "Configured custom DNS resolver")
 	dialer := func(ctx context.Context, network, address string) (net.Conn, error) {
 		d := net.Dialer{Timeout: sc.Cfg.Conf.NameserverTimeout.Duration()}
-		return d.DialContext(ctx, "udp", sc.Cfg.Conf.Nameserver)
+		return d.DialContext(ctx, network, sc.Cfg.Conf.Nameserver)
 	}
 	return &config.Resolver{Resolver: &net.Resolver{PreferGo: true, Dial: dialer}, Timeout: sc.Cfg.Conf.NameserverTimeout.Duration()}
 }

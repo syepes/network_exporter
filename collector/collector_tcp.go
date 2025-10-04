@@ -1,6 +1,7 @@
 package collector
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 
@@ -16,7 +17,42 @@ var (
 	tcpTargetsDesc = prometheus.NewDesc("tcp_targets", "Number of active targets", nil, nil)
 	tcpStateDesc   = prometheus.NewDesc("tcp_up", "Exporter state", nil, nil)
 	tcpMutex       = &sync.Mutex{}
+	// Descriptor cache for custom labels
+	tcpDescCache      = make(map[string]*tcpDescriptorSet)
+	tcpDescCacheMutex sync.RWMutex
 )
+
+// tcpDescriptorSet holds all descriptors for a specific label set
+type tcpDescriptorSet struct {
+	time   *prometheus.Desc
+	status *prometheus.Desc
+}
+
+// getTCPDescriptors returns cached or creates new descriptors for a label set
+func getTCPDescriptors(labels prometheus.Labels) *tcpDescriptorSet {
+	cacheKey := fmt.Sprintf("%v", labels)
+
+	tcpDescCacheMutex.RLock()
+	if descSet, exists := tcpDescCache[cacheKey]; exists {
+		tcpDescCacheMutex.RUnlock()
+		return descSet
+	}
+	tcpDescCacheMutex.RUnlock()
+
+	tcpDescCacheMutex.Lock()
+	defer tcpDescCacheMutex.Unlock()
+
+	if descSet, exists := tcpDescCache[cacheKey]; exists {
+		return descSet
+	}
+
+	descSet := &tcpDescriptorSet{
+		time:   prometheus.NewDesc("tcp_connection_seconds", "Connection time in seconds", tcpLabelNames, labels),
+		status: prometheus.NewDesc("tcp_connection_status", "Connection Status", tcpLabelNames, labels),
+	}
+	tcpDescCache[cacheKey] = descSet
+	return descSet
+}
 
 // TCP prom
 type TCP struct {
@@ -62,15 +98,15 @@ func (p *TCP) Collect(ch chan<- prometheus.Metric) {
 		l = append(l, metric.DestPort)
 		l2 := prometheus.Labels(p.labels[target])
 
-		tcpTimeDesc = prometheus.NewDesc("tcp_connection_seconds", "Connection time in seconds", tcpLabelNames, l2)
-		tcpStatusDesc = prometheus.NewDesc("tcp_connection_status", "Connection Status", tcpLabelNames, l2)
+		// Get cached descriptors for this label set
+		descs := getTCPDescriptors(l2)
 
-		ch <- prometheus.MustNewConstMetric(tcpTimeDesc, prometheus.GaugeValue, metric.ConTime.Seconds(), l...)
+		ch <- prometheus.MustNewConstMetric(descs.time, prometheus.GaugeValue, metric.ConTime.Seconds(), l...)
 
 		if metric.Success {
-			ch <- prometheus.MustNewConstMetric(tcpStatusDesc, prometheus.GaugeValue, 1, l...)
+			ch <- prometheus.MustNewConstMetric(descs.status, prometheus.GaugeValue, 1, l...)
 		} else {
-			ch <- prometheus.MustNewConstMetric(tcpStatusDesc, prometheus.GaugeValue, 0, l...)
+			ch <- prometheus.MustNewConstMetric(descs.status, prometheus.GaugeValue, 0, l...)
 		}
 	}
 	ch <- prometheus.MustNewConstMetric(tcpTargetsDesc, prometheus.GaugeValue, float64(len(targets)))

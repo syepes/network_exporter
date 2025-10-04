@@ -19,7 +19,7 @@ const (
 )
 
 // Icmp Validate IP and check the version
-func Icmp(destAddr string, srcAddr string, ttl int, pid int, timeout time.Duration, seq int, ipv6 bool) (hop common.IcmpReturn, err error) {
+func Icmp(destAddr string, srcAddr string, ttl int, pid int, timeout time.Duration, seq int, payloadSize int, ipv6 bool) (hop common.IcmpReturn, err error) {
 	dstIp := net.ParseIP(destAddr)
 	if dstIp == nil {
 		return hop, fmt.Errorf("destination ip: %v is invalid", destAddr)
@@ -34,26 +34,26 @@ func Icmp(destAddr string, srcAddr string, ttl int, pid int, timeout time.Durati
 		}
 
 		if p4 := dstIp.To4(); len(p4) == net.IPv4len {
-			return icmpIpv4(srcAddr, &ipAddr, ttl, pid, timeout, seq)
+			return icmpIpv4(srcAddr, &ipAddr, ttl, pid, timeout, seq, payloadSize)
 		}
 		if ipv6 {
-			return icmpIpv6(srcAddr, &ipAddr, ttl, pid, timeout, seq)
+			return icmpIpv6(srcAddr, &ipAddr, ttl, pid, timeout, seq, payloadSize)
 		} else {
 			return hop, nil
 		}
 	}
 
 	if p4 := dstIp.To4(); len(p4) == net.IPv4len {
-		return icmpIpv4("0.0.0.0", &ipAddr, ttl, pid, timeout, seq)
+		return icmpIpv4("0.0.0.0", &ipAddr, ttl, pid, timeout, seq, payloadSize)
 	}
 	if ipv6 {
-		return icmpIpv6("::", &ipAddr, ttl, pid, timeout, seq)
+		return icmpIpv6("::", &ipAddr, ttl, pid, timeout, seq, payloadSize)
 	} else {
 		return hop, nil
 	}
 }
 
-func icmpIpv4(localAddr string, dst net.Addr, ttl int, pid int, timeout time.Duration, seq int) (hop common.IcmpReturn, err error) {
+func icmpIpv4(localAddr string, dst net.Addr, ttl int, pid int, timeout time.Duration, seq int, payloadSize int) (hop common.IcmpReturn, err error) {
 	hop.Success = false
 	start := time.Now()
 	c, err := icmp.ListenPacket("ip4:icmp", localAddr)
@@ -70,15 +70,24 @@ func icmpIpv4(localAddr string, dst net.Addr, ttl int, pid int, timeout time.Dur
 		return hop, err
 	}
 
+	// Create payload: 4-byte sequence number + (payloadSize - 4) filler bytes
 	bs := make([]byte, 4)
 	binary.LittleEndian.PutUint32(bs, uint32(seq))
+
+	// Generate dynamic payload with specified size
+	payload := make([]byte, payloadSize)
+	copy(payload, bs) // First 4 bytes are sequence number
+	for i := 4; i < payloadSize; i++ {
+		payload[i] = 'x' // Fill remaining bytes
+	}
+
 	wm := icmp.Message{
 		Type: ipv4.ICMPTypeEcho,
 		Code: 0,
 		Body: &icmp.Echo{
 			ID:   pid,
 			Seq:  seq,
-			Data: append(bs, 'x'),
+			Data: payload,
 		},
 	}
 
@@ -91,7 +100,7 @@ func icmpIpv4(localAddr string, dst net.Addr, ttl int, pid int, timeout time.Dur
 		return hop, err
 	}
 
-	peer, _, err := listenForSpecific4(c, append(bs, 'x'), pid, seq, wb)
+	peer, _, err := listenForSpecific4(c, payload, pid, seq, wb)
 	if err != nil {
 		return hop, err
 	}
@@ -103,7 +112,7 @@ func icmpIpv4(localAddr string, dst net.Addr, ttl int, pid int, timeout time.Dur
 	return hop, err
 }
 
-func icmpIpv6(localAddr string, dst net.Addr, ttl, pid int, timeout time.Duration, seq int) (hop common.IcmpReturn, err error) {
+func icmpIpv6(localAddr string, dst net.Addr, ttl, pid int, timeout time.Duration, seq int, payloadSize int) (hop common.IcmpReturn, err error) {
 	hop.Success = false
 	start := time.Now()
 	c, err := icmp.ListenPacket("ip6:ipv6-icmp", localAddr)
@@ -120,15 +129,24 @@ func icmpIpv6(localAddr string, dst net.Addr, ttl, pid int, timeout time.Duratio
 		return hop, err
 	}
 
+	// Create payload: 4-byte sequence number + (payloadSize - 4) filler bytes
 	bs := make([]byte, 4)
 	binary.LittleEndian.PutUint32(bs, uint32(seq))
+
+	// Generate dynamic payload with specified size
+	payload := make([]byte, payloadSize)
+	copy(payload, bs) // First 4 bytes are sequence number
+	for i := 4; i < payloadSize; i++ {
+		payload[i] = 'x' // Fill remaining bytes
+	}
+
 	wm := icmp.Message{
 		Type: ipv6.ICMPTypeEchoRequest,
 		Code: 0,
 		Body: &icmp.Echo{
 			ID:   pid,
 			Seq:  seq,
-			Data: append(bs, 'x'),
+			Data: payload,
 		},
 	}
 	wb, err := wm.Marshal(nil)
@@ -140,7 +158,7 @@ func icmpIpv6(localAddr string, dst net.Addr, ttl, pid int, timeout time.Duratio
 		return hop, err
 	}
 
-	peer, _, err := listenForSpecific6(c, append(bs, 'x'), pid, seq)
+	peer, _, err := listenForSpecific6(c, payload, pid, seq)
 	if err != nil {
 		return hop, err
 	}
@@ -158,7 +176,7 @@ func listenForSpecific4(conn *icmp.PacketConn, neededBody []byte, needID int, ne
 		b := make([]byte, 1500)
 		n, peer, err := conn.ReadFrom(b)
 		if err != nil {
-			if neterr, ok := err.(*net.OpError); ok || neterr.Temporary() {
+			if neterr, ok := err.(*net.OpError); ok && neterr.Temporary() {
 				return "", []byte{}, neterr
 			}
 		}
@@ -209,7 +227,7 @@ func listenForSpecific6(conn *icmp.PacketConn, neededBody []byte, needID int, ne
 		b := make([]byte, 1500)
 		n, peer, err := conn.ReadFrom(b)
 		if err != nil {
-			if neterr, ok := err.(*net.OpError); ok {
+			if neterr, ok := err.(*net.OpError); ok && neterr.Temporary() {
 				return "", []byte{}, neterr
 			}
 		}

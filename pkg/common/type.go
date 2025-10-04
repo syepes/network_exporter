@@ -5,12 +5,22 @@ import (
 	"time"
 )
 
-// IcmpID ICMP Echo Unique ID for each coroutine
+// IcmpID ICMP Echo Unique ID for each coroutine.
+//
+// SCALING LIMITS:
+// The ICMP ID counter is shared across all PING and MTR operations and cycles from 1-65500.
+// This limits the total concurrent ICMP operations to approximately 65,500 across all targets.
+// With default settings (3 concurrent jobs per target), this supports:
+//   - ~20,000 PING targets (assuming 3 operations each)
+//   - ~1,000 MTR targets (MTR uses more ICMP IDs per operation)
+// The counter automatically resets when reaching 65500 to prevent exhaustion.
 type IcmpID struct {
 	icmpID int32
 }
 
-// Get ICMP Echo Unique ID
+// Get ICMP Echo Unique ID.
+// Returns a unique ICMP ID for the current operation, automatically cycling
+// from 1 to 65500 to prevent ID exhaustion in high-scale deployments.
 func (c *IcmpID) Get() int32 {
 	for {
 		val := atomic.LoadInt32(&c.icmpID)
