@@ -12,35 +12,37 @@ import (
 
 // HTTPGet Object
 type HTTPGet struct {
-	logger    *slog.Logger
-	name      string
-	url       string
-	srcAddr   string
-	proxy     string
-	interval  time.Duration
-	timeout   time.Duration
-	labels    map[string]string
-	result    *http.HTTPReturn
-	stop      chan struct{}
-	wg        sync.WaitGroup
+	logger            *slog.Logger
+	name              string
+	url               string
+	srcAddr           string
+	proxy             string
+	interval          time.Duration
+	timeout           time.Duration
+	maxConcurrentJobs int
+	labels            map[string]string
+	result            *http.HTTPReturn
+	stop              chan struct{}
+	wg                sync.WaitGroup
 	sync.RWMutex
 }
 
 // NewHTTPGet starts a new monitoring goroutine
-func NewHTTPGet(logger *slog.Logger, startupDelay time.Duration, name string, url string, srcAddr string, proxy string, interval time.Duration, timeout time.Duration, labels map[string]string) (*HTTPGet, error) {
+func NewHTTPGet(logger *slog.Logger, startupDelay time.Duration, name string, url string, srcAddr string, proxy string, interval time.Duration, timeout time.Duration, labels map[string]string, maxConcurrentJobs int) (*HTTPGet, error) {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(os.Stderr, nil))
 	}
 	t := &HTTPGet{
-		logger:    logger,
-		name:      name,
-		url:       url,
-		srcAddr:   srcAddr,
-		proxy:     proxy,
-		interval:  interval,
-		timeout:   timeout,
-		labels:    labels,
-		stop:      make(chan struct{}),
+		logger:            logger,
+		name:              name,
+		url:               url,
+		srcAddr:           srcAddr,
+		proxy:             proxy,
+		interval:          interval,
+		timeout:           timeout,
+		maxConcurrentJobs: maxConcurrentJobs,
+		labels:            labels,
+		stop:              make(chan struct{}),
 	}
 	t.wg.Add(1)
 	go t.run(startupDelay)
@@ -52,15 +54,33 @@ func (t *HTTPGet) run(startupDelay time.Duration) {
 		select {
 		case <-time.After(startupDelay):
 		case <-t.stop:
+			t.wg.Done()
+			return
 		}
 	}
 
-	waitChan := make(chan struct{}, MaxConcurrentJobs)
+	waitChan := make(chan struct{}, t.maxConcurrentJobs)
+
+	// Execute first probe immediately (after jitter delay)
+	// This ensures targets start probing as quickly as possible
+	select {
+	case <-t.stop:
+		t.wg.Done()
+		return
+	default:
+		waitChan <- struct{}{}
+		go func() {
+			t.httpGetCheck()
+			<-waitChan
+		}()
+	}
+
 	tick := time.NewTicker(t.interval)
+	defer tick.Stop()
+
 	for {
 		select {
 		case <-t.stop:
-			tick.Stop()
 			t.wg.Done()
 			return
 		case <-tick.C:

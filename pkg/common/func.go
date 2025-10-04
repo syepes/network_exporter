@@ -11,15 +11,20 @@ import (
 
 func SrvRecordCheck(record string) bool {
 	record_split := strings.Split(record, ".")
-	if strings.HasPrefix(record_split[0], "_") && strings.HasPrefix(record_split[1], "_") {
-		return true
-	} else {
+	if len(record_split) < 2 {
 		return false
 	}
+	if strings.HasPrefix(record_split[0], "_") && strings.HasPrefix(record_split[1], "_") {
+		return true
+	}
+	return false
 }
 
 func SrvRecordHosts(record string) ([]string, error) {
 	record_split := strings.Split(record, ".")
+	if len(record_split) < 3 {
+		return nil, fmt.Errorf("invalid SRV record format: %s", record)
+	}
 	service := record_split[0][1:]
 	proto := record_split[1][1:]
 
@@ -42,7 +47,7 @@ func SrvRecordHosts(record string) ([]string, error) {
 }
 
 // DestAddrs resolve the hostname to all it'ss IP's
-func DestAddrs(ctx context.Context, host string, resolver *net.Resolver, timeout time.Duration) ([]string, error) {
+func DestAddrs(ctx context.Context, host string, resolver *net.Resolver, timeout time.Duration, enableIPv6 bool) ([]string, error) {
 	ipAddrs := make([]string, 0)
 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
@@ -53,12 +58,18 @@ func DestAddrs(ctx context.Context, host string, resolver *net.Resolver, timeout
 		return nil, fmt.Errorf("resolving target: %v", err)
 	}
 
-	// Validate IPs
+	// Validate IPs and filter by IPv4/IPv6
 	for _, addr := range addrs {
 		ipAddr, err := net.ResolveIPAddr("ip", addr.IP.String())
 		if err != nil {
 			continue
 		}
+
+		// Filter IPv6 addresses if IPv6 is disabled
+		if !enableIPv6 && ipAddr.IP.To4() == nil {
+			continue
+		}
+
 		ipAddrs = append(ipAddrs, ipAddr.IP.String())
 	}
 
@@ -95,7 +106,7 @@ func TimeRange(values []time.Duration) time.Duration {
 		return time.Duration(0)
 	}
 	min := values[0]
-	max := time.Duration(0)
+	max := values[0]
 	for _, v := range values {
 		if v < min {
 			min = v
@@ -141,6 +152,9 @@ func TimeUncorrectedDeviation(values []time.Duration) float64 {
 
 // TimeCorrectedDeviation Calculates standard deviation using Bessel's correction which uses n-1 in the SD formula to correct bias of small sample size
 func TimeCorrectedDeviation(values []time.Duration) float64 {
+	if len(values) <= 1 {
+		return 0.0
+	}
 	sd := TimeSquaredDeviation(values)
 	return math.Sqrt(sd / (float64(len(values)) - 1))
 }

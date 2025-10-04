@@ -26,19 +26,18 @@ func reloadSignal() {
 				if err := sc.ReloadConfig(logger, *configFile, *configFileHeaders); err != nil {
 					logger.Error("msg", "Reloading config skipped", "err", err)
 					continue
-				} else {
-					monitorPING.DelTargets()
-					_ = monitorPING.CheckActiveTargets()
-					monitorPING.AddTargets()
-					monitorMTR.DelTargets()
-					_ = monitorMTR.CheckActiveTargets()
-					monitorMTR.AddTargets()
-					monitorTCP.DelTargets()
-					_ = monitorTCP.CheckActiveTargets()
-					monitorTCP.AddTargets()
-					monitorHTTPGet.DelTargets()
-					monitorHTTPGet.AddTargets()
 				}
+				monitorPING.DelTargets()
+				_ = monitorPING.CheckActiveTargets()
+				monitorPING.AddTargets()
+				monitorMTR.DelTargets()
+				_ = monitorMTR.CheckActiveTargets()
+				monitorMTR.AddTargets()
+				monitorTCP.DelTargets()
+				_ = monitorTCP.CheckActiveTargets()
+				monitorTCP.AddTargets()
+				monitorHTTPGet.DelTargets()
+				monitorHTTPGet.AddTargets()
 			case <-susr:
 				logger.Debug("msg", "Signal: USR1")
 				fmt.Printf("PING: %+v\n", monitorPING)

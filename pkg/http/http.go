@@ -23,8 +23,17 @@ func HTTPGet(destURL string, srcAddr string, timeout time.Duration) (*HTTPReturn
 		return &out, err
 	}
 
+	// Configure transport with connection pooling for better scalability
+	transport := &http.Transport{
+		MaxIdleConns:        100,             // Total max idle connections across all hosts
+		MaxIdleConnsPerHost: 10,              // Max idle connections per host
+		IdleConnTimeout:     90 * time.Second, // How long idle connections are kept
+		MaxConnsPerHost:     0,               // 0 = unlimited, prevents connection exhaustion per host
+	}
+
 	client := &http.Client{
-		Timeout: timeout,
+		Timeout:   timeout,
+		Transport: transport,
 	}
 
 	if srcAddr != "" {
@@ -34,12 +43,17 @@ func HTTPGet(destURL string, srcAddr string, timeout time.Duration) (*HTTPReturn
 			return &out, fmt.Errorf("source ip: %v is invalid, HTTP target: %v", srcAddr, destURL)
 		}
 		transport := &http.Transport{
-			Dial: (&net.Dialer{
+			DialContext: (&net.Dialer{
 				LocalAddr: &net.TCPAddr{
 					IP:   srcIp,
 					Port: 0,
 				},
-			}).Dial}
+			}).DialContext,
+			MaxIdleConns:        100,
+			MaxIdleConnsPerHost: 10,
+			IdleConnTimeout:     90 * time.Second,
+			MaxConnsPerHost:     0,
+		}
 
 		client = &http.Client{
 			Timeout:   timeout,
@@ -110,9 +124,13 @@ func HTTPGetProxy(destURL string, timeout time.Duration, proxyURL string) (*HTTP
 		return &out, err
 	}
 
-	// Control timeout and proxy
+	// Control timeout, proxy, and connection pooling for better scalability
 	transport := &http.Transport{
-		Proxy: http.ProxyURL(pURL),
+		Proxy:               http.ProxyURL(pURL),
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 10,
+		IdleConnTimeout:     90 * time.Second,
+		MaxConnsPerHost:     0,
 	}
 	client := &http.Client{
 		Transport: transport,

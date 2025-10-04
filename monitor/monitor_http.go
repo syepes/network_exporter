@@ -2,6 +2,7 @@ package monitor
 
 import (
 	"log/slog"
+	"math/rand"
 	"net/url"
 	"os"
 	"sync"
@@ -15,27 +16,29 @@ import (
 
 // HTTPGet manages the goroutines responsible for collecting HTTPGet data
 type HTTPGet struct {
-	logger     *slog.Logger
-	sc         *config.SafeConfig
-	resolver   *config.Resolver
-	interval   time.Duration
-	timeout    time.Duration
-	targets    map[string]*target.HTTPGet
-	mtx        sync.RWMutex
+	logger            *slog.Logger
+	sc                *config.SafeConfig
+	resolver          *config.Resolver
+	interval          time.Duration
+	timeout           time.Duration
+	maxConcurrentJobs int
+	targets           map[string]*target.HTTPGet
+	mtx               sync.RWMutex
 }
 
 // NewHTTPGet creates and configures a new Monitoring HTTPGet instance
-func NewHTTPGet(logger *slog.Logger, sc *config.SafeConfig, resolver *config.Resolver) *HTTPGet {
+func NewHTTPGet(logger *slog.Logger, sc *config.SafeConfig, resolver *config.Resolver, maxConcurrentJobs int) *HTTPGet {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(os.Stderr, nil))
 	}
 	return &HTTPGet{
-		logger:     logger,
-		sc:         sc,
-		resolver:   resolver,
-		interval:   sc.Cfg.HTTPGet.Interval.Duration(),
-		timeout:    sc.Cfg.HTTPGet.Timeout.Duration(),
-		targets:    make(map[string]*target.HTTPGet),
+		logger:            logger,
+		sc:                sc,
+		resolver:          resolver,
+		interval:          sc.Cfg.HTTPGet.Interval.Duration(),
+		timeout:           sc.Cfg.HTTPGet.Timeout.Duration(),
+		maxConcurrentJobs: maxConcurrentJobs,
+		targets:           make(map[string]*target.HTTPGet),
 	}
 }
 
@@ -74,13 +77,15 @@ func (p *HTTPGet) AddTargets() {
 				continue
 			}
 			if target.Type == "HTTPGet" {
+				// Add jitter to prevent thundering herd (0-10% of interval)
+				jitter := time.Duration(rand.Int63n(int64(p.interval / 10)))
 				if target.Proxy != "" {
-					err := p.AddTarget(target.Name, target.Host, target.SourceIp, target.Proxy, target.Labels.Kv)
+					err := p.AddTargetDelayed(target.Name, target.Host, target.SourceIp, target.Proxy, target.Labels.Kv, jitter)
 					if err != nil {
 						p.logger.Warn("Skipping target", "type", "HTTPGet", "func", "AddTargets", "host", target.Host, "err", err)
 					}
 				} else {
-					err := p.AddTarget(target.Name, target.Host, target.SourceIp, "", target.Labels.Kv)
+					err := p.AddTargetDelayed(target.Name, target.Host, target.SourceIp, "", target.Labels.Kv, jitter)
 					if err != nil {
 						p.logger.Warn("Skipping target", "type", "HTTPGet", "func", "AddTargets", "host", target.Host, "err", err)
 					}
@@ -120,7 +125,7 @@ func (p *HTTPGet) AddTargetDelayed(name string, urlStr string, srcAddr string, p
 		}
 	}
 
-	target, err := target.NewHTTPGet(p.logger, startupDelay, name, dURL.String(), srcAddr, proxy, p.interval, p.timeout, labels)
+	target, err := target.NewHTTPGet(p.logger, startupDelay, name, dURL.String(), srcAddr, proxy, p.interval, p.timeout, labels, p.maxConcurrentJobs)
 	if err != nil {
 		return err
 	}

@@ -42,16 +42,20 @@ type TCP struct {
 }
 
 type MTR struct {
-	Interval duration `yaml:"interval" json:"interval" default:"5s"`
-	Timeout  duration `yaml:"timeout" json:"timeout" default:"4s"`
-	MaxHops  int      `yaml:"max-hops" json:"max-hops" default:"30"`
-	Count    int      `yaml:"count" json:"count" default:"10"`
+	Interval    duration `yaml:"interval" json:"interval" default:"5s"`
+	Timeout     duration `yaml:"timeout" json:"timeout" default:"4s"`
+	MaxHops     int      `yaml:"max-hops" json:"max-hops" default:"30"`
+	Count       int      `yaml:"count" json:"count" default:"10"`
+	PayloadSize int      `yaml:"payload_size" json:"payload_size" default:"56"`
+	Protocol    string   `yaml:"protocol" json:"protocol" default:"icmp"`
+	TcpPort     string   `yaml:"tcp_port" json:"tcp_port" default:"80"`
 }
 
 type ICMP struct {
-	Interval duration `yaml:"interval" json:"interval" default:"5s"`
-	Timeout  duration `yaml:"timeout" json:"timeout" default:"4s"`
-	Count    int      `yaml:"count" json:"count" default:"10"`
+	Interval    duration `yaml:"interval" json:"interval" default:"5s"`
+	Timeout     duration `yaml:"timeout" json:"timeout" default:"4s"`
+	Count       int      `yaml:"count" json:"count" default:"10"`
+	PayloadSize int      `yaml:"payload_size" json:"payload_size" default:"56"`
 }
 
 type Conf struct {
@@ -114,7 +118,7 @@ func parse(data []byte, c *Config) error {
 func (sc *SafeConfig) ReloadConfig(logger *slog.Logger, confFile string, confFileHeaders http.Header) (err error) {
 	hostname, err := os.Hostname()
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("getting hostname: %s", err)
 	}
 
 	var data []byte
@@ -133,7 +137,18 @@ func (sc *SafeConfig) ReloadConfig(logger *slog.Logger, confFile string, confFil
 			}
 		}
 
-		resp, err := http.DefaultClient.Do(req)
+		// Configure transport with connection pooling for better scalability
+		transport := &http.Transport{
+			MaxIdleConns:        100,
+			MaxIdleConnsPerHost: 10,
+			IdleConnTimeout:     90 * time.Second,
+			MaxConnsPerHost:     0,
+		}
+		client := &http.Client{
+			Timeout:   30 * time.Second,
+			Transport: transport,
+		}
+		resp, err := client.Do(req)
 		if err != nil {
 			return fmt.Errorf("fetching config file: %s", err)
 		}
@@ -205,7 +220,7 @@ func (sc *SafeConfig) ReloadConfig(logger *slog.Logger, confFile string, confFil
 					for _, p := range sub_target.Probe {
 						if p == hostname {
 							targets = append(targets, sub_target)
-							continue
+							break
 						}
 					}
 				}
@@ -224,7 +239,7 @@ func (sc *SafeConfig) ReloadConfig(logger *slog.Logger, confFile string, confFil
 				for _, p := range t.Probe {
 					if p == hostname {
 						targets = append(targets, t)
-						continue
+						break
 					}
 				}
 			}
@@ -247,6 +262,9 @@ func (sc *SafeConfig) ReloadConfig(logger *slog.Logger, confFile string, confFil
 	}
 	if c.MTR.Count < 0 || c.MTR.Count > 65500 {
 		return fmt.Errorf("mtr.count must be between 0 and 65500")
+	}
+	if c.MTR.Protocol != "icmp" && c.MTR.Protocol != "tcp" {
+		return fmt.Errorf("mtr.protocol must be 'icmp' or 'tcp'")
 	}
 
 	sc.Lock()
@@ -283,10 +301,10 @@ func (d *duration) Set(dur time.Duration) {
 // HasDuplicateTargets Find duplicates with same type
 func HasDuplicateTargets(m Targets) (bool, error) {
 	tmp := map[string]map[string]bool{
-		"TCP":     map[string]bool{},
-		"ICMP":    map[string]bool{},
-		"MTR":     map[string]bool{},
-		"HTTPGet": map[string]bool{},
+		"TCP":     make(map[string]bool),
+		"ICMP":    make(map[string]bool),
+		"MTR":     make(map[string]bool),
+		"HTTPGet": make(map[string]bool),
 	}
 
 	for _, t := range m {

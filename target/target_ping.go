@@ -11,46 +11,50 @@ import (
 	"github.com/syepes/network_exporter/pkg/ping"
 )
 
-const MaxConcurrentJobs = 3
+const MaxConcurrentJobs = 3 // DEPRECATED: Use maxConcurrentJobs parameter instead
 
 // PING Object
 type PING struct {
-	logger   *slog.Logger
-	icmpID   *common.IcmpID
-	name     string
-	host     string
-	ip       string
-	srcAddr  string
-	interval time.Duration
-	timeout  time.Duration
-	count    int
-	ipv6     bool
-	labels   map[string]string
-	result   *ping.PingResult
-	stop     chan struct{}
-	wg       sync.WaitGroup
+	logger            *slog.Logger
+	icmpID            *common.IcmpID
+	name              string
+	host              string
+	ip                string
+	srcAddr           string
+	interval          time.Duration
+	timeout           time.Duration
+	count             int
+	payloadSize       int
+	ipv6              bool
+	maxConcurrentJobs int
+	labels            map[string]string
+	result            *ping.PingResult
+	stop              chan struct{}
+	wg                sync.WaitGroup
 	sync.RWMutex
 }
 
 // NewPing starts a new monitoring goroutine
-func NewPing(logger *slog.Logger, icmpID *common.IcmpID, startupDelay time.Duration, name string, host string, ip string, srcAddr string, interval time.Duration, timeout time.Duration, count int, labels map[string]string, ipv6 bool) (*PING, error) {
+func NewPing(logger *slog.Logger, icmpID *common.IcmpID, startupDelay time.Duration, name string, host string, ip string, srcAddr string, interval time.Duration, timeout time.Duration, count int, payloadSize int, labels map[string]string, ipv6 bool, maxConcurrentJobs int) (*PING, error) {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(os.Stderr, nil))
 	}
 	t := &PING{
-		logger:   logger,
-		icmpID:   icmpID,
-		name:     name,
-		host:     host,
-		ip:       ip,
-		srcAddr:  srcAddr,
-		interval: interval,
-		timeout:  timeout,
-		count:    count,
-		ipv6:     ipv6,
-		labels:   labels,
-		stop:     make(chan struct{}),
-		result:   &ping.PingResult{},
+		logger:            logger,
+		icmpID:            icmpID,
+		name:              name,
+		host:              host,
+		ip:                ip,
+		srcAddr:           srcAddr,
+		interval:          interval,
+		timeout:           timeout,
+		count:             count,
+		payloadSize:       payloadSize,
+		ipv6:              ipv6,
+		maxConcurrentJobs: maxConcurrentJobs,
+		labels:            labels,
+		stop:              make(chan struct{}),
+		result:            &ping.PingResult{},
 	}
 	t.wg.Add(1)
 	go t.run(startupDelay)
@@ -62,15 +66,33 @@ func (t *PING) run(startupDelay time.Duration) {
 		select {
 		case <-time.After(startupDelay):
 		case <-t.stop:
+			t.wg.Done()
+			return
 		}
 	}
 
-	waitChan := make(chan struct{}, MaxConcurrentJobs)
+	waitChan := make(chan struct{}, t.maxConcurrentJobs)
+
+	// Execute first probe immediately (after jitter delay)
+	// This ensures targets start probing as quickly as possible
+	select {
+	case <-t.stop:
+		t.wg.Done()
+		return
+	default:
+		waitChan <- struct{}{}
+		go func() {
+			t.ping()
+			<-waitChan
+		}()
+	}
+
 	tick := time.NewTicker(t.interval)
+	defer tick.Stop()
+
 	for {
 		select {
 		case <-t.stop:
-			tick.Stop()
 			t.wg.Done()
 			return
 		case <-tick.C:
@@ -91,7 +113,7 @@ func (t *PING) Stop() {
 
 func (t *PING) ping() {
 	icmpID := int(t.icmpID.Get())
-	data, err := ping.Ping(t.host, t.ip, t.srcAddr, t.count, t.timeout, icmpID, t.ipv6)
+	data, err := ping.Ping(t.host, t.ip, t.srcAddr, t.count, t.timeout, icmpID, t.payloadSize, t.ipv6)
 	if err != nil {
 		t.logger.Error("Ping failed", "type", "ICMP", "func", "ping", "err", err)
 	}

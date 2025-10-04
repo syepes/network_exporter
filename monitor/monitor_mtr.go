@@ -3,7 +3,9 @@ package monitor
 import (
 	"context"
 	"log/slog"
+	"math/rand"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,35 +17,43 @@ import (
 
 // MTR manages the goroutines responsible for collecting MTR data
 type MTR struct {
-	logger    *slog.Logger
-	sc        *config.SafeConfig
-	resolver  *config.Resolver
-	icmpID    *common.IcmpID
-	interval  time.Duration
-	timeout   time.Duration
-	maxHops   int
-	count     int
-	ipv6      bool
-	targets   map[string]*target.MTR
-	mtx       sync.RWMutex
+	logger            *slog.Logger
+	sc                *config.SafeConfig
+	resolver          *config.Resolver
+	icmpID            *common.IcmpID
+	interval          time.Duration
+	timeout           time.Duration
+	maxHops           int
+	count             int
+	payloadSize       int
+	protocol          string
+	tcpPort           string
+	ipv6              bool
+	maxConcurrentJobs int
+	targets           map[string]*target.MTR
+	mtx               sync.RWMutex
 }
 
 // NewMTR creates and configures a new Monitoring MTR instance
-func NewMTR(logger *slog.Logger, sc *config.SafeConfig, resolver *config.Resolver, icmpID *common.IcmpID, ipv6 bool) *MTR {
+func NewMTR(logger *slog.Logger, sc *config.SafeConfig, resolver *config.Resolver, icmpID *common.IcmpID, ipv6 bool, maxConcurrentJobs int) *MTR {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(os.Stderr, nil))
 	}
 	return &MTR{
-		logger:    logger,
-		sc:        sc,
-		resolver:  resolver,
-		icmpID:    icmpID,
-		interval:  sc.Cfg.MTR.Interval.Duration(),
-		timeout:   sc.Cfg.MTR.Timeout.Duration(),
-		maxHops:   sc.Cfg.MTR.MaxHops,
-		count:     sc.Cfg.MTR.Count,
-		ipv6:      ipv6,
-		targets:   make(map[string]*target.MTR),
+		logger:            logger,
+		sc:                sc,
+		resolver:          resolver,
+		icmpID:            icmpID,
+		interval:          sc.Cfg.MTR.Interval.Duration(),
+		timeout:           sc.Cfg.MTR.Timeout.Duration(),
+		maxHops:           sc.Cfg.MTR.MaxHops,
+		count:             sc.Cfg.MTR.Count,
+		payloadSize:       sc.Cfg.MTR.PayloadSize,
+		protocol:          sc.Cfg.MTR.Protocol,
+		tcpPort:           sc.Cfg.MTR.TcpPort,
+		ipv6:              ipv6,
+		maxConcurrentJobs: maxConcurrentJobs,
+		targets:           make(map[string]*target.MTR),
 	}
 }
 
@@ -83,7 +93,9 @@ func (p *MTR) AddTargets() {
 			}
 
 			if target.Type == "MTR" || target.Type == "ICMP+MTR" {
-				err := p.AddTarget(target.Name, target.Host, target.SourceIp, target.Labels.Kv)
+				// Add jitter to prevent thundering herd (0-10% of interval)
+				jitter := time.Duration(rand.Int63n(int64(p.interval / 10)))
+				err := p.AddTargetDelayed(target.Name, target.Host, target.SourceIp, target.Labels.Kv, jitter)
 				if err != nil {
 					p.logger.Warn("Skipping target", "type", "MTR", "func", "AddTargets", "host", target.Host, "err", err)
 				}
@@ -104,13 +116,25 @@ func (p *MTR) AddTargetDelayed(name string, host string, srcAddr string, labels 
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
 
+	// Parse port from host if specified (for TCP protocol)
+	targetHost := host
+	targetPort := p.tcpPort // Use default port from config
+	if p.protocol == "tcp" && strings.Contains(host, ":") {
+		// Extract port from host string (e.g., "example.com:443")
+		parts := strings.Split(host, ":")
+		if len(parts) == 2 {
+			targetHost = parts[0]
+			targetPort = parts[1]
+		}
+	}
+
 	// Resolve hostnames
-	ipAddrs, err := common.DestAddrs(context.Background(), host, p.resolver.Resolver, p.resolver.Timeout)
+	ipAddrs, err := common.DestAddrs(context.Background(), targetHost, p.resolver.Resolver, p.resolver.Timeout, p.ipv6)
 	if err != nil || len(ipAddrs) == 0 {
 		return err
 	}
 
-	target, err := target.NewMTR(p.logger, p.icmpID, startupDelay, name, ipAddrs[0], srcAddr, p.interval, p.timeout, p.maxHops, p.count, labels, p.ipv6)
+	target, err := target.NewMTR(p.logger, p.icmpID, startupDelay, name, ipAddrs[0], srcAddr, p.interval, p.timeout, p.maxHops, p.count, p.payloadSize, p.protocol, targetPort, labels, p.ipv6, p.maxConcurrentJobs)
 	if err != nil {
 		return err
 	}
@@ -182,7 +206,7 @@ func (p *MTR) CheckActiveTargets() (err error) {
 			if target.Name != targetName {
 				continue
 			}
-			ipAddrs, err := common.DestAddrs(context.Background(), target.Host, p.resolver.Resolver, p.resolver.Timeout)
+			ipAddrs, err := common.DestAddrs(context.Background(), target.Host, p.resolver.Resolver, p.resolver.Timeout, p.ipv6)
 			if err != nil || len(ipAddrs) == 0 {
 				return err
 			}
@@ -197,7 +221,9 @@ func (p *MTR) CheckActiveTargets() (err error) {
 			}(ipAddrs, targetIp) {
 
 				p.RemoveTarget(targetName)
-				err := p.AddTarget(target.Name, target.Host, target.SourceIp, target.Labels.Kv)
+				// Add jitter to prevent thundering herd (0-10% of interval)
+				jitter := time.Duration(rand.Int63n(int64(p.interval / 10)))
+				err := p.AddTargetDelayed(target.Name, target.Host, target.SourceIp, target.Labels.Kv, jitter)
 				if err != nil {
 					p.logger.Warn("Skipping target", "type", "MTR", "func", "CheckActiveTargets", "host", target.Host, "err", err)
 				}

@@ -1,19 +1,23 @@
-# sdsdsd
+# Network Exporter Configuration
 conf:
   refresh: 15m
-  # nameserver: 8.8.8.8:53 # Optional
-  nameserver_timeout: 250ms # Optional
+  # nameserver: 8.8.8.8:53 # Optional: Custom DNS server
+  nameserver_timeout: 250ms # Optional: DNS resolution timeout
 
 icmp:
   interval: 3s
   timeout: 1s
   count: 6
+  payload_size: 56  # Optional: ICMP payload size in bytes (default: 56, range: 4-1472)
 
 mtr:
   interval: 3s
   timeout: 500ms
   max-hops: 30
   count: 6
+  payload_size: 56  # Optional: ICMP payload size in bytes (default: 56, range: 4-1472)
+  protocol: icmp    # Optional: Protocol for traceroute - "icmp" or "tcp" (default: icmp)
+  tcp_port: 80      # Optional: Default port for TCP traceroute (default: 80)
 
 tcp:
   interval: 3s
@@ -24,6 +28,7 @@ http_get:
   timeout: 5s
 
 targets:
+  # ICMP Ping with custom labels and probe assignment
   - name: internal
     host: 192.168.0.1
     type: ICMP
@@ -33,23 +38,44 @@ targets:
     labels:
       dc: home
       rack: a1
+
+  # Basic ICMP Ping
   - name: google-dns1
     host: 8.8.8.8
     type: ICMP
+
+  # MTR Traceroute (uses ICMP by default from config)
   - name: google-dns2
     host: 8.8.4.4
     type: MTR
+
+  # Combined ICMP Ping + MTR Traceroute
   - name: cloudflare-dns
     host: 1.1.1.1
     type: ICMP+MTR
+
+  # TCP Port Check with custom source IP
   - name: cloudflare-dns-https
     host: 1.1.1.1:443
     source_ip: 192.168.1.1
     type: TCP
+
+  # HTTP Get Check
   - name: download-file-64M
     host: http://test-debit.free.fr/65536.rnd
     type: HTTPGet
+
+  # HTTP Get Check with Proxy
   - name: download-file-64M-proxy
     host: http://test-debit.free.fr/65536.rnd
     type: HTTPGet
     proxy: http://localhost:3128
+
+  # TCP Traceroute Examples (requires mtr.protocol: tcp in config above)
+  # - name: web-server-https
+  #   host: example.com:443    # Explicit port overrides tcp_port default
+  #   type: MTR
+  #
+  # - name: web-server-http
+  #   host: example.com        # Uses tcp_port default (80)
+  #   type: MTR

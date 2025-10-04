@@ -20,6 +20,93 @@ This exporter gathers either ICMP, MTR, TCP Port or HTTP Get stats and exports t
 - Configurable logging levels and format (text or json)
 - Configurable DNS Server
 - Configurable Source IP per target `source_ip` (optional), The IP has to be configured on one of the instance's interfaces
+- **Configurable concurrency control per target type**
+- **HTTP connection pooling for better performance**
+- **Startup jitter to prevent thundering herd**
+- **Configurable ICMP payload size** for PING and MTR probes
+- **TCP-based MTR traceroute** option for firewall-friendly network path discovery
+
+## Performance and Scaling
+
+The network_exporter is designed to efficiently handle large numbers of targets. Here are the key considerations:
+
+### Scaling Limits
+
+With default settings (`--max-concurrent-jobs=3`):
+
+| Target Type | Recommended Limit | Notes |
+|-------------|------------------|-------|
+| **PING** | 5,000 - 10,000 targets | Limited by ICMP ID counter (~65,500 concurrent operations) |
+| **MTR** | 500 - 1,000 targets | MTR uses multiple ICMP IDs per operation |
+| **TCP** | 10,000 - 20,000 targets | Limited by file descriptors and network capacity |
+| **HTTPGet** | 5,000 - 10,000 targets | Limited by HTTP connection pooling and memory |
+
+### Performance Tuning
+
+#### Understanding Concurrency
+
+The `--max-concurrent-jobs` parameter controls **per-target** concurrency, not total system concurrency.
+
+**Formula:** `Total System Concurrency = Number of Targets × max-concurrent-jobs`
+
+**Why lower per-target concurrency for large deployments?**
+
+Each concurrent operation consumes system resources (file descriptors, memory, CPU). With many targets, total concurrency can quickly overwhelm the system:
+
+| Targets | max-concurrent-jobs | Total Concurrent Operations | Resource Impact |
+|---------|---------------------|----------------------------|-----------------|
+| 100 | 5 | 100 × 5 = **500** | ✓ Low - system handles easily |
+| 100 | 2 | 100 × 2 = **200** | ✓ Low - but slower per target |
+| 1,000 | 5 | 1,000 × 5 = **5,000** | ⚠️ High - may cause issues |
+| 1,000 | 2 | 1,000 × 2 = **2,000** | ✓ Moderate - manageable |
+| 5,000 | 5 | 5,000 × 5 = **25,000** | ❌ Very High - will exhaust resources |
+| 5,000 | 2 | 5,000 × 2 = **10,000** | ✓ Moderate - optimized for scale |
+
+**The Tradeoff:**
+- **Higher per-target concurrency** = Faster individual target probing, but higher total resource usage
+- **Lower per-target concurrency** = Slower individual target probing, but prevents resource exhaustion at scale
+
+#### Concurrency Recommendations
+
+```bash
+# Default: 3 concurrent operations per target (100 targets × 3 = 300 operations)
+./network_exporter --max-concurrent-jobs=3
+
+# Small deployments (<100 targets): Use higher per-target concurrency
+# Example: 50 targets × 5 = 250 total concurrent operations
+./network_exporter --max-concurrent-jobs=5
+
+# Medium deployments (100-1000 targets): Use default
+# Example: 500 targets × 3 = 1,500 total concurrent operations
+./network_exporter --max-concurrent-jobs=3
+
+# Large deployments (>1000 targets): Use lower per-target concurrency
+# Example: 5,000 targets × 2 = 10,000 total concurrent operations (manageable)
+# vs. 5,000 targets × 5 = 25,000 operations (resource exhaustion!)
+./network_exporter --max-concurrent-jobs=2
+```
+
+#### Resource Requirements
+
+- **Memory:** ~50-100MB baseline + ~1-5KB per target
+- **CPU:** Mostly I/O bound, scales with total concurrent operations
+- **File Descriptors:** Set `ulimit -n` to at least `(targets × max-concurrent-jobs) + 1000`
+
+**Example for 5,000 targets:**
+```bash
+# Calculate file descriptor needs: 5,000 targets × 2 jobs = 10,000 + buffer
+ulimit -n 20000
+
+# Run with optimized settings (10,000 total concurrent operations)
+./network_exporter --max-concurrent-jobs=2
+```
+
+### Built-in Optimizations
+
+1. **HTTP Connection Pooling:** Automatic connection reuse with configurable limits (100 max idle connections, 10 per host)
+2. **Startup Jitter:** 0-10% interval jitter prevents all targets from starting simultaneously
+3. **ICMP ID Cycling:** Automatic counter reset prevents ID exhaustion in high-scale deployments
+4. **DNS Caching:** Resolved IPs are cached and only updated when DNS records change
 
 ### Exported metrics
 
@@ -118,19 +205,54 @@ To run the network_exporter as a Docker container by builing your own image or u
 
 ```bash
 docker build -t syepes/network_exporter .
+
 # Default mode
-docker run --privileged --cap-add NET_ADMIN --cap-add NET_RAW -p 9427:9427 -v $PWD/network_exporter.yml:/app/cfg/network_exporter.yml:ro --name network_exporter syepes/network_exporter
+docker run --privileged --cap-add NET_ADMIN --cap-add NET_RAW -p 9427:9427 \
+  -v $PWD/network_exporter.yml:/app/cfg/network_exporter.yml:ro \
+  --name network_exporter syepes/network_exporter
+
 # Debug level
-docker run --privileged --cap-add NET_ADMIN --cap-add NET_RAW -p 9427:9427 -v $PWD/network_exporter.yml:/app/cfg/network_exporter.yml:ro --name network_exporter syepes/network_exporter /app/network_exporter --log.level=debug
+docker run --privileged --cap-add NET_ADMIN --cap-add NET_RAW -p 9427:9427 \
+  -v $PWD/network_exporter.yml:/app/cfg/network_exporter.yml:ro \
+  --name network_exporter syepes/network_exporter \
+  /app/network_exporter --log.level=debug
+
+# Large deployment (e.g., 5000 targets): Lower per-target concurrency
+# Total concurrency: 5000 targets × 2 = 10,000 concurrent operations
+docker run --privileged --cap-add NET_ADMIN --cap-add NET_RAW -p 9427:9427 \
+  -v $PWD/network_exporter.yml:/app/cfg/network_exporter.yml:ro \
+  --ulimit nofile=20000:20000 \
+  --name network_exporter syepes/network_exporter \
+  /app/network_exporter --max-concurrent-jobs=2
+
+# Small deployment (e.g., 50 targets): Higher per-target concurrency
+# Total concurrency: 50 targets × 5 = 250 concurrent operations
+docker run --privileged --cap-add NET_ADMIN --cap-add NET_RAW -p 9427:9427 \
+  -v $PWD/network_exporter.yml:/app/cfg/network_exporter.yml:ro \
+  --name network_exporter syepes/network_exporter \
+  /app/network_exporter --max-concurrent-jobs=5
 ```
 
 ## Configuration
+
+### Command-Line Flags
 
 To see all available configuration flags:
 
 ```bash
 ./network_exporter -h
 ```
+
+**Key flags:**
+- `--config.file` - Path to the YAML configuration file (default: `/app/cfg/network_exporter.yml`)
+- `--max-concurrent-jobs` - Maximum concurrent probe operations per target (default: `3`)
+- `--ipv6` - Enable IPv6 support (default: `true`)
+- `--web.listen-address` - Address to listen on for HTTP requests (default: `:9427`)
+- `--log.level` - Logging level: debug, info, warn, error (default: `info`)
+- `--log.format` - Logging format: logfmt, json (default: `logfmt`)
+- `--profiling` - Enable profiling endpoints (pprof + fgprof) (default: `false`)
+
+### YAML Configuration
 
 The configuration (YAML) is mainly separated into three sections Main, Protocols and Targets.
 The file `network_exporter.yml` can be either edited before building the docker container or changed it runtime.
@@ -147,12 +269,16 @@ icmp:
   interval: 3s
   timeout: 1s
   count: 6
+  payload_size: 56  # Optional, ICMP payload size in bytes (default: 56)
 
 mtr:
   interval: 3s
   timeout: 500ms
   max-hops: 30
   count: 6
+  payload_size: 56  # Optional, ICMP payload size in bytes (default: 56)
+  protocol: icmp    # Optional, Protocol to use: "icmp" or "tcp" (default: "icmp")
+  tcp_port: 80      # Optional, Default port for TCP traceroute (default: "80")
 
 tcp:
   interval: 3s
@@ -195,7 +321,157 @@ targets:
     proxy: http://localhost:3128
 ```
 
-Source IP
+**Payload Size**
+
+The `payload_size` parameter (optional) configures the ICMP packet payload size in bytes for ICMP and MTR probes. The default is **56 bytes**, which matches the standard `ping` and `traceroute` utilities.
+
+- **Minimum:** 4 bytes (space for sequence number)
+- **Default:** 56 bytes (standard ping/traceroute payload)
+- **Maximum:** Limited by MTU (typically 1472 bytes for IPv4, 1452 for IPv6)
+
+**Use cases:**
+- **Path MTU Discovery:** Test different packet sizes to identify MTU issues
+- **Network Stress Testing:** Use larger payloads to simulate higher bandwidth usage
+- **Performance Testing:** Measure latency with varying packet sizes
+
+```yaml
+icmp:
+  interval: 3s
+  timeout: 1s
+  count: 6
+  payload_size: 56    # Standard size (default)
+
+mtr:
+  interval: 3s
+  timeout: 500ms
+  max-hops: 30
+  count: 6
+  payload_size: 1400  # Larger payload for MTU testing
+```
+
+**MTR Protocol Selection**
+
+The `protocol` parameter (optional) allows you to choose between ICMP and TCP for MTR (traceroute) operations. The default is **icmp**, which is the standard traceroute protocol.
+
+**ICMP Protocol (default):**
+```yaml
+mtr:
+  protocol: icmp     # Standard ICMP Echo traceroute
+  payload_size: 56
+```
+
+**TCP Protocol:**
+```yaml
+mtr:
+  protocol: tcp      # TCP SYN-based traceroute
+  tcp_port: 443     # Default port for TCP traceroute
+```
+
+**Key Differences:**
+
+| Feature | ICMP Traceroute | TCP Traceroute |
+|---------|----------------|----------------|
+| **Protocol** | ICMP Echo Request | TCP SYN packets |
+| **Firewall Bypass** | Often blocked by firewalls | More likely to pass through firewalls |
+| **Path Accuracy** | May take different path | Follows actual application traffic path |
+| **Port Required** | No | Yes (default: 80) |
+| **Use Case** | General network diagnosis | Testing connectivity to specific services |
+
+**TCP Traceroute Benefits:**
+- **Firewall-Friendly:** Many firewalls block ICMP/UDP but allow TCP traffic
+- **Real-World Path:** Tests the actual path TCP connections will take
+- **Service-Specific:** Can test connectivity to specific ports (80, 443, etc.)
+
+**TCP Port Configuration:**
+
+You can specify the port in two ways:
+
+1. **Global default (tcp_port in config):**
+   ```yaml
+   mtr:
+     protocol: tcp
+     tcp_port: 443    # All MTR targets use port 443 by default
+
+   targets:
+     - name: google-https
+       host: google.com
+       type: MTR
+   ```
+
+2. **Per-target port (in host string):**
+   ```yaml
+   mtr:
+     protocol: tcp
+     tcp_port: 80     # Default fallback
+
+   targets:
+     - name: web-service
+       host: example.com:443    # Explicit port 443
+       type: MTR
+
+     - name: api-service
+       host: api.example.com:8080   # Explicit port 8080
+       type: MTR
+
+     - name: default-service
+       host: service.com       # Uses tcp_port default (80)
+       type: MTR
+   ```
+
+**Example Configurations:**
+
+```yaml
+# ICMP traceroute (default behavior)
+mtr:
+  interval: 5s
+  timeout: 4s
+  max-hops: 30
+  count: 10
+  protocol: icmp
+
+targets:
+  - name: google-dns
+    host: 8.8.8.8
+    type: MTR
+
+# TCP traceroute to HTTPS services
+mtr:
+  interval: 5s
+  timeout: 4s
+  max-hops: 30
+  count: 10
+  protocol: tcp
+  tcp_port: 443
+
+targets:
+  - name: website-https
+    host: example.com:443
+    type: MTR
+
+  - name: api-server
+    host: api.example.com:8443
+    type: MTR
+
+# Mixed: Use ICMP but support custom ports per target
+mtr:
+  interval: 5s
+  timeout: 4s
+  max-hops: 30
+  count: 10
+  protocol: tcp
+  tcp_port: 80      # Default
+
+targets:
+  - name: web-http
+    host: example.com        # Uses port 80
+    type: MTR
+
+  - name: web-https
+    host: example.com:443    # Uses port 443
+    type: MTR
+```
+
+**Source IP**
 
 `source_ip` parameter will try to assign IP for request sent to specific target. This IP has to be configure on one of the interfaces of the OS.
 Supported for all types of the checks
