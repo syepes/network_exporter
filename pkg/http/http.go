@@ -8,8 +8,105 @@ import (
 	"net/http"
 	"net/http/httptrace"
 	"net/url"
+	"sync"
 	"time"
 )
+
+var (
+	// Reusable HTTP transports for connection pooling
+	defaultTransport     *http.Transport
+	defaultTransportOnce sync.Once
+	// Transport cache for source IP specific transports
+	sourceIPTransports     = make(map[string]*http.Transport)
+	sourceIPTransportMutex sync.RWMutex
+	// Transport cache for proxy transports
+	proxyTransports     = make(map[string]*http.Transport)
+	proxyTransportMutex sync.RWMutex
+)
+
+// getDefaultTransport returns a singleton HTTP transport with connection pooling
+func getDefaultTransport() *http.Transport {
+	defaultTransportOnce.Do(func() {
+		defaultTransport = &http.Transport{
+			MaxIdleConns:        100,
+			MaxIdleConnsPerHost: 10,
+			IdleConnTimeout:     90 * time.Second,
+			MaxConnsPerHost:     0,
+		}
+	})
+	return defaultTransport
+}
+
+// getSourceIPTransport returns or creates a transport for a specific source IP
+func getSourceIPTransport(srcAddr string) *http.Transport {
+	sourceIPTransportMutex.RLock()
+	transport, exists := sourceIPTransports[srcAddr]
+	sourceIPTransportMutex.RUnlock()
+
+	if exists {
+		return transport
+	}
+
+	// Create new transport for this source IP
+	sourceIPTransportMutex.Lock()
+	defer sourceIPTransportMutex.Unlock()
+
+	// Double-check after acquiring write lock
+	if transport, exists := sourceIPTransports[srcAddr]; exists {
+		return transport
+	}
+
+	srcIp := net.ParseIP(srcAddr)
+	transport = &http.Transport{
+		DialContext: (&net.Dialer{
+			LocalAddr: &net.TCPAddr{
+				IP:   srcIp,
+				Port: 0,
+			},
+		}).DialContext,
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 10,
+		IdleConnTimeout:     90 * time.Second,
+		MaxConnsPerHost:     0,
+	}
+	sourceIPTransports[srcAddr] = transport
+	return transport
+}
+
+// getProxyTransport returns or creates a transport for a specific proxy URL
+func getProxyTransport(proxyURL string) (*http.Transport, error) {
+	proxyTransportMutex.RLock()
+	transport, exists := proxyTransports[proxyURL]
+	proxyTransportMutex.RUnlock()
+
+	if exists {
+		return transport, nil
+	}
+
+	// Create new transport for this proxy
+	proxyTransportMutex.Lock()
+	defer proxyTransportMutex.Unlock()
+
+	// Double-check after acquiring write lock
+	if transport, exists := proxyTransports[proxyURL]; exists {
+		return transport, nil
+	}
+
+	pURL, err := url.Parse(proxyURL)
+	if err != nil {
+		return nil, err
+	}
+
+	transport = &http.Transport{
+		Proxy:               http.ProxyURL(pURL),
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 10,
+		IdleConnTimeout:     90 * time.Second,
+		MaxConnsPerHost:     0,
+	}
+	proxyTransports[proxyURL] = transport
+	return transport, nil
+}
 
 // HTTPGet Http Get Trace Operation
 func HTTPGet(destURL string, srcAddr string, timeout time.Duration) (*HTTPReturn, error) {
@@ -23,42 +120,22 @@ func HTTPGet(destURL string, srcAddr string, timeout time.Duration) (*HTTPReturn
 		return &out, err
 	}
 
-	// Configure transport with connection pooling for better scalability
-	transport := &http.Transport{
-		MaxIdleConns:        100,             // Total max idle connections across all hosts
-		MaxIdleConnsPerHost: 10,              // Max idle connections per host
-		IdleConnTimeout:     90 * time.Second, // How long idle connections are kept
-		MaxConnsPerHost:     0,               // 0 = unlimited, prevents connection exhaustion per host
-	}
-
-	client := &http.Client{
-		Timeout:   timeout,
-		Transport: transport,
-	}
-
+	// Reuse transport for connection pooling
+	var transport *http.Transport
 	if srcAddr != "" {
 		srcIp := net.ParseIP(srcAddr)
 		if srcIp == nil {
 			out.Success = false
 			return &out, fmt.Errorf("source ip: %v is invalid, HTTP target: %v", srcAddr, destURL)
 		}
-		transport := &http.Transport{
-			DialContext: (&net.Dialer{
-				LocalAddr: &net.TCPAddr{
-					IP:   srcIp,
-					Port: 0,
-				},
-			}).DialContext,
-			MaxIdleConns:        100,
-			MaxIdleConnsPerHost: 10,
-			IdleConnTimeout:     90 * time.Second,
-			MaxConnsPerHost:     0,
-		}
+		transport = getSourceIPTransport(srcAddr)
+	} else {
+		transport = getDefaultTransport()
+	}
 
-		client = &http.Client{
-			Timeout:   timeout,
-			Transport: transport,
-		}
+	client := &http.Client{
+		Timeout:   timeout,
+		Transport: transport,
 	}
 
 	req, err := http.NewRequest("GET", dURL.String(), nil)
@@ -118,20 +195,13 @@ func HTTPGetProxy(destURL string, timeout time.Duration, proxyURL string) (*HTTP
 		return &out, err
 	}
 
-	pURL, err := url.Parse(proxyURL)
+	// Reuse transport for connection pooling
+	transport, err := getProxyTransport(proxyURL)
 	if err != nil {
 		out.Success = false
 		return &out, err
 	}
 
-	// Control timeout, proxy, and connection pooling for better scalability
-	transport := &http.Transport{
-		Proxy:               http.ProxyURL(pURL),
-		MaxIdleConns:        100,
-		MaxIdleConnsPerHost: 10,
-		IdleConnTimeout:     90 * time.Second,
-		MaxConnsPerHost:     0,
-	}
 	client := &http.Client{
 		Transport: transport,
 		Timeout:   timeout,

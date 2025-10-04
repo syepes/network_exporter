@@ -1,6 +1,7 @@
 package collector
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 
@@ -20,7 +21,54 @@ var (
 	icmpTargetsDesc        = prometheus.NewDesc("ping_targets", "Number of active targets", nil, nil)
 	icmpStateDesc          = prometheus.NewDesc("ping_up", "Exporter state", nil, nil)
 	icmpMutex              = &sync.Mutex{}
+	// Descriptor cache for custom labels
+	icmpDescCache      = make(map[string]*descriptorSet)
+	icmpDescCacheMutex sync.RWMutex
 )
+
+// descriptorSet holds all descriptors for a specific label set
+type descriptorSet struct {
+	status         *prometheus.Desc
+	rtt            *prometheus.Desc
+	sntSummary     *prometheus.Desc
+	sntFailSummary *prometheus.Desc
+	sntTimeSummary *prometheus.Desc
+	loss           *prometheus.Desc
+}
+
+// getDescriptors returns cached or creates new descriptors for a label set
+func getDescriptors(labels prometheus.Labels) *descriptorSet {
+	// Create cache key from labels
+	cacheKey := fmt.Sprintf("%v", labels)
+
+	// Try read lock first
+	icmpDescCacheMutex.RLock()
+	if descSet, exists := icmpDescCache[cacheKey]; exists {
+		icmpDescCacheMutex.RUnlock()
+		return descSet
+	}
+	icmpDescCacheMutex.RUnlock()
+
+	// Create new descriptor set
+	icmpDescCacheMutex.Lock()
+	defer icmpDescCacheMutex.Unlock()
+
+	// Double-check after acquiring write lock
+	if descSet, exists := icmpDescCache[cacheKey]; exists {
+		return descSet
+	}
+
+	descSet := &descriptorSet{
+		status:         prometheus.NewDesc("ping_status", "Ping Status", icmpLabelNames, labels),
+		rtt:            prometheus.NewDesc("ping_rtt_seconds", "Round Trip Time in seconds", append(icmpLabelNames, "type"), labels),
+		sntSummary:     prometheus.NewDesc("ping_rtt_snt_count", "Packet sent count", icmpLabelNames, labels),
+		sntFailSummary: prometheus.NewDesc("ping_rtt_snt_fail_count", "Packet sent fail count", icmpLabelNames, labels),
+		sntTimeSummary: prometheus.NewDesc("ping_rtt_snt_seconds", "Packet sent time total", icmpLabelNames, labels),
+		loss:           prometheus.NewDesc("ping_loss_percent", "Packet loss in percent", icmpLabelNames, labels),
+	}
+	icmpDescCache[cacheKey] = descSet
+	return descSet
+}
 
 // PING prom
 type PING struct {
@@ -65,31 +113,27 @@ func (p *PING) Collect(ch chan<- prometheus.Metric) {
 		l = append(l, metric.DestIp)
 		l2 := prometheus.Labels(p.labels[target])
 
-		icmpStatusDesc = prometheus.NewDesc("ping_status", "Ping Status", icmpLabelNames, l2)
-		icmpRttDesc = prometheus.NewDesc("ping_rtt_seconds", "Round Trip Time in seconds", append(icmpLabelNames, "type"), l2)
-		icmpSntSummaryDesc = prometheus.NewDesc("ping_rtt_snt_count", "Packet sent count", icmpLabelNames, l2)
-		icmpSntFailSummaryDesc = prometheus.NewDesc("ping_rtt_snt_fail_count", "Packet sent fail count", icmpLabelNames, l2)
-		icmpSntTimeSummaryDesc = prometheus.NewDesc("ping_rtt_snt_seconds", "Packet sent time total", icmpLabelNames, l2)
-		icmpLossDesc = prometheus.NewDesc("ping_loss_percent", "Packet loss in percent", icmpLabelNames, l2)
+		// Get cached descriptors for this label set
+		descs := getDescriptors(l2)
 
 		if metric.Success {
-			ch <- prometheus.MustNewConstMetric(icmpStatusDesc, prometheus.GaugeValue, 1, l...)
+			ch <- prometheus.MustNewConstMetric(descs.status, prometheus.GaugeValue, 1, l...)
 		} else {
-			ch <- prometheus.MustNewConstMetric(icmpStatusDesc, prometheus.GaugeValue, 0, l...)
+			ch <- prometheus.MustNewConstMetric(descs.status, prometheus.GaugeValue, 0, l...)
 		}
 
-		ch <- prometheus.MustNewConstMetric(icmpRttDesc, prometheus.GaugeValue, metric.BestTime.Seconds(), append(l, "best")...)
-		ch <- prometheus.MustNewConstMetric(icmpRttDesc, prometheus.GaugeValue, metric.AvgTime.Seconds(), append(l, "mean")...)
-		ch <- prometheus.MustNewConstMetric(icmpRttDesc, prometheus.GaugeValue, metric.WorstTime.Seconds(), append(l, "worst")...)
-		ch <- prometheus.MustNewConstMetric(icmpRttDesc, prometheus.GaugeValue, metric.SumTime.Seconds(), append(l, "sum")...)
-		ch <- prometheus.MustNewConstMetric(icmpRttDesc, prometheus.GaugeValue, metric.SquaredDeviationTime.Seconds(), append(l, "sd")...)
-		ch <- prometheus.MustNewConstMetric(icmpRttDesc, prometheus.GaugeValue, metric.UncorrectedSDTime.Seconds(), append(l, "usd")...)
-		ch <- prometheus.MustNewConstMetric(icmpRttDesc, prometheus.GaugeValue, metric.CorrectedSDTime.Seconds(), append(l, "csd")...)
-		ch <- prometheus.MustNewConstMetric(icmpRttDesc, prometheus.GaugeValue, metric.RangeTime.Seconds(), append(l, "range")...)
-		ch <- prometheus.MustNewConstMetric(icmpSntSummaryDesc, prometheus.GaugeValue, float64(metric.SntSummary), l...)
-		ch <- prometheus.MustNewConstMetric(icmpSntFailSummaryDesc, prometheus.GaugeValue, float64(metric.SntFailSummary), l...)
-		ch <- prometheus.MustNewConstMetric(icmpSntTimeSummaryDesc, prometheus.GaugeValue, metric.SntTimeSummary.Seconds(), l...)
-		ch <- prometheus.MustNewConstMetric(icmpLossDesc, prometheus.GaugeValue, metric.DropRate, l...)
+		ch <- prometheus.MustNewConstMetric(descs.rtt, prometheus.GaugeValue, metric.BestTime.Seconds(), append(l, "best")...)
+		ch <- prometheus.MustNewConstMetric(descs.rtt, prometheus.GaugeValue, metric.AvgTime.Seconds(), append(l, "mean")...)
+		ch <- prometheus.MustNewConstMetric(descs.rtt, prometheus.GaugeValue, metric.WorstTime.Seconds(), append(l, "worst")...)
+		ch <- prometheus.MustNewConstMetric(descs.rtt, prometheus.GaugeValue, metric.SumTime.Seconds(), append(l, "sum")...)
+		ch <- prometheus.MustNewConstMetric(descs.rtt, prometheus.GaugeValue, metric.SquaredDeviationTime.Seconds(), append(l, "sd")...)
+		ch <- prometheus.MustNewConstMetric(descs.rtt, prometheus.GaugeValue, metric.UncorrectedSDTime.Seconds(), append(l, "usd")...)
+		ch <- prometheus.MustNewConstMetric(descs.rtt, prometheus.GaugeValue, metric.CorrectedSDTime.Seconds(), append(l, "csd")...)
+		ch <- prometheus.MustNewConstMetric(descs.rtt, prometheus.GaugeValue, metric.RangeTime.Seconds(), append(l, "range")...)
+		ch <- prometheus.MustNewConstMetric(descs.sntSummary, prometheus.GaugeValue, float64(metric.SntSummary), l...)
+		ch <- prometheus.MustNewConstMetric(descs.sntFailSummary, prometheus.GaugeValue, float64(metric.SntFailSummary), l...)
+		ch <- prometheus.MustNewConstMetric(descs.sntTimeSummary, prometheus.GaugeValue, metric.SntTimeSummary.Seconds(), l...)
+		ch <- prometheus.MustNewConstMetric(descs.loss, prometheus.GaugeValue, metric.DropRate, l...)
 	}
 	ch <- prometheus.MustNewConstMetric(icmpTargetsDesc, prometheus.GaugeValue, float64(len(targets)))
 }

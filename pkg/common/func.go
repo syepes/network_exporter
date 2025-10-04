@@ -160,8 +160,18 @@ func TimeCorrectedDeviation(values []time.Duration) float64 {
 }
 
 // CompareList Compare two lists and return a list with the difference
+// Returns elements in b that are not in a
 func CompareList(a, b []string) []string {
-	var tmpList []string
+	// Early exit for common cases
+	if len(b) == 0 {
+		return nil
+	}
+	if len(a) == 0 {
+		return b
+	}
+
+	// Pre-size the result slice to avoid allocations
+	tmpList := make([]string, 0, len(b))
 	ma := make(map[string]bool, len(a))
 	for _, ka := range a {
 		ma[ka] = true
@@ -182,6 +192,16 @@ func AppendIfMissing(slice []string, i string) []string {
 		}
 	}
 	return append(slice, i)
+}
+
+// ContainsString checks if a target string is in a list of strings
+func ContainsString(list []string, target string) bool {
+	for _, item := range list {
+		if item == target {
+			return true
+		}
+	}
+	return false
 }
 
 // HasMapDuplicates Find duplicates in a map keys

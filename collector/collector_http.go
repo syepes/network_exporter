@@ -1,6 +1,7 @@
 package collector
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 
@@ -17,7 +18,44 @@ var (
 	httpTargetsDesc = prometheus.NewDesc("http_get_targets", "Number of active targets", nil, nil)
 	httpStateDesc   = prometheus.NewDesc("http_get_up", "Exporter state", nil, nil)
 	httpMutex       = &sync.Mutex{}
+	// Descriptor cache for custom labels
+	httpDescCache      = make(map[string]*httpDescriptorSet)
+	httpDescCacheMutex sync.RWMutex
 )
+
+// httpDescriptorSet holds all descriptors for a specific label set
+type httpDescriptorSet struct {
+	time   *prometheus.Desc
+	size   *prometheus.Desc
+	status *prometheus.Desc
+}
+
+// getHTTPDescriptors returns cached or creates new descriptors for a label set
+func getHTTPDescriptors(labels prometheus.Labels) *httpDescriptorSet {
+	cacheKey := fmt.Sprintf("%v", labels)
+
+	httpDescCacheMutex.RLock()
+	if descSet, exists := httpDescCache[cacheKey]; exists {
+		httpDescCacheMutex.RUnlock()
+		return descSet
+	}
+	httpDescCacheMutex.RUnlock()
+
+	httpDescCacheMutex.Lock()
+	defer httpDescCacheMutex.Unlock()
+
+	if descSet, exists := httpDescCache[cacheKey]; exists {
+		return descSet
+	}
+
+	descSet := &httpDescriptorSet{
+		time:   prometheus.NewDesc("http_get_seconds", "HTTP Get Drill Down time in seconds", append(httpLabelNames, "type"), labels),
+		size:   prometheus.NewDesc("http_get_content_bytes", "HTTP Get Content Size in bytes", httpLabelNames, labels),
+		status: prometheus.NewDesc("http_get_status", "HTTP Get Status", httpLabelNames, labels),
+	}
+	httpDescCache[cacheKey] = descSet
+	return descSet
+}
 
 // HTTPGet prom
 type HTTPGet struct {
@@ -61,29 +99,28 @@ func (p *HTTPGet) Collect(ch chan<- prometheus.Metric) {
 		l = append(l, metric.DestAddr)
 		l2 := prometheus.Labels(p.labels[target])
 
-		httpTimeDesc = prometheus.NewDesc("http_get_seconds", "HTTP Get Drill Down time in seconds", append(httpLabelNames, "type"), l2)
-		httpSizeDesc = prometheus.NewDesc("http_get_content_bytes", "HTTP Get Content Size in bytes", httpLabelNames, l2)
-		httpStatusDesc = prometheus.NewDesc("http_get_status", "HTTP Get Status", httpLabelNames, l2)
+		// Get cached descriptors for this label set
+		descs := getHTTPDescriptors(l2)
 
 		if metric.Success {
-			ch <- prometheus.MustNewConstMetric(httpStatusDesc, prometheus.GaugeValue, float64(metric.Status), l...)
+			ch <- prometheus.MustNewConstMetric(descs.status, prometheus.GaugeValue, float64(metric.Status), l...)
 		} else {
-			ch <- prometheus.MustNewConstMetric(httpStatusDesc, prometheus.GaugeValue, 0, l...)
+			ch <- prometheus.MustNewConstMetric(descs.status, prometheus.GaugeValue, 0, l...)
 		}
 
-		ch <- prometheus.MustNewConstMetric(httpSizeDesc, prometheus.GaugeValue, float64(metric.ContentLength), l...)
-		ch <- prometheus.MustNewConstMetric(httpTimeDesc, prometheus.GaugeValue, metric.DNSLookup.Seconds(), append(l, "DNSLookup")...)
-		ch <- prometheus.MustNewConstMetric(httpTimeDesc, prometheus.GaugeValue, metric.TCPConnection.Seconds(), append(l, "TCPConnection")...)
-		ch <- prometheus.MustNewConstMetric(httpTimeDesc, prometheus.GaugeValue, metric.TLSHandshake.Seconds(), append(l, "TLSHandshake")...)
+		ch <- prometheus.MustNewConstMetric(descs.size, prometheus.GaugeValue, float64(metric.ContentLength), l...)
+		ch <- prometheus.MustNewConstMetric(descs.time, prometheus.GaugeValue, metric.DNSLookup.Seconds(), append(l, "DNSLookup")...)
+		ch <- prometheus.MustNewConstMetric(descs.time, prometheus.GaugeValue, metric.TCPConnection.Seconds(), append(l, "TCPConnection")...)
+		ch <- prometheus.MustNewConstMetric(descs.time, prometheus.GaugeValue, metric.TLSHandshake.Seconds(), append(l, "TLSHandshake")...)
 		if !metric.TLSEarliestCertExpiry.IsZero() {
-			ch <- prometheus.MustNewConstMetric(httpTimeDesc, prometheus.GaugeValue, float64(metric.TLSEarliestCertExpiry.Unix()), append(l, "TLSEarliestCertExpiry")...)
+			ch <- prometheus.MustNewConstMetric(descs.time, prometheus.GaugeValue, float64(metric.TLSEarliestCertExpiry.Unix()), append(l, "TLSEarliestCertExpiry")...)
 		}
 		if !metric.TLSLastChainExpiry.IsZero() {
-			ch <- prometheus.MustNewConstMetric(httpTimeDesc, prometheus.GaugeValue, float64(metric.TLSLastChainExpiry.Unix()), append(l, "TLSLastChainExpiry")...)
+			ch <- prometheus.MustNewConstMetric(descs.time, prometheus.GaugeValue, float64(metric.TLSLastChainExpiry.Unix()), append(l, "TLSLastChainExpiry")...)
 		}
-		ch <- prometheus.MustNewConstMetric(httpTimeDesc, prometheus.GaugeValue, metric.ServerProcessing.Seconds(), append(l, "ServerProcessing")...)
-		ch <- prometheus.MustNewConstMetric(httpTimeDesc, prometheus.GaugeValue, metric.ContentTransfer.Seconds(), append(l, "ContentTransfer")...)
-		ch <- prometheus.MustNewConstMetric(httpTimeDesc, prometheus.GaugeValue, metric.Total.Seconds(), append(l, "Total")...)
+		ch <- prometheus.MustNewConstMetric(descs.time, prometheus.GaugeValue, metric.ServerProcessing.Seconds(), append(l, "ServerProcessing")...)
+		ch <- prometheus.MustNewConstMetric(descs.time, prometheus.GaugeValue, metric.ContentTransfer.Seconds(), append(l, "ContentTransfer")...)
+		ch <- prometheus.MustNewConstMetric(descs.time, prometheus.GaugeValue, metric.Total.Seconds(), append(l, "Total")...)
 	}
 	ch <- prometheus.MustNewConstMetric(httpTargetsDesc, prometheus.GaugeValue, float64(len(targets)))
 }

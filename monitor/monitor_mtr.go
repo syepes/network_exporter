@@ -211,15 +211,7 @@ func (p *MTR) CheckActiveTargets() (err error) {
 				return err
 			}
 
-			if !func(ips []string, target string) bool {
-				for _, ip := range ips {
-					if ip == target {
-						return true
-					}
-				}
-				return false
-			}(ipAddrs, targetIp) {
-
+			if !common.ContainsString(ipAddrs, targetIp) {
 				p.RemoveTarget(targetName)
 				// Add jitter to prevent thundering herd (0-10% of interval)
 				jitter := time.Duration(rand.Int63n(int64(p.interval / 10)))

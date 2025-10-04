@@ -208,15 +208,7 @@ func (p *PING) CheckActiveTargets() (err error) {
 				return err
 			}
 
-			if !func(ips []string, target string) bool {
-				for _, ip := range ips {
-					if ip == target {
-						return true
-					}
-				}
-				return false
-			}(ipAddrs, targetIp) {
-
+			if !common.ContainsString(ipAddrs, targetIp) {
 				p.RemoveTarget(targetName)
 
 				for _, ipAddr := range ipAddrs {

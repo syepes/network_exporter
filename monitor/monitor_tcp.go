@@ -85,40 +85,42 @@ func (p *TCPPort) AddTargets() {
 	targetAdd := common.CompareList(targetActiveTmp, targetConfigTmp)
 	p.logger.Debug("Target names to add", "type", "TCP", "func", "AddTargets", "targets", targetAdd)
 
-	for _, targetName := range targetAdd {
-		for _, target := range p.sc.Cfg.Targets {
-			if target.Type == "TCP" {
-				conn := strings.Split(target.Host, ":")
-				if len(conn) != 2 {
-					p.logger.Warn("Skipping target, could not identify host", "type", "TCP", "func", "AddTargets", "host", target.Host, "name", target.Name)
-					continue
-				}
-				ipAddrs, err := common.DestAddrs(context.Background(), conn[0], p.resolver.Resolver, p.resolver.Timeout, p.ipv6)
-				if err != nil || len(ipAddrs) == 0 {
-					p.logger.Warn("Skipping resolve target", "type", "TCP", "func", "AddTargets", "name", target.Name, "err", err)
-				}
-				for _, ipAddr := range ipAddrs {
-					if target.Name+" "+ipAddr != targetName {
-						continue
-					}
-					conn := strings.Split(target.Host, ":")
-					if len(conn) != 2 {
-						p.logger.Warn("Skipping target, could not identify host", "type", "TCP", "func", "AddTargets", "host", target.Host, "name", target.Name)
-						continue
-					}
-					ipAddrs, err := common.DestAddrs(context.Background(), conn[0], p.resolver.Resolver, p.resolver.Timeout, p.ipv6)
-					if err != nil || len(ipAddrs) == 0 {
-						p.logger.Warn("Skipping resolve target", "type", "TCP", "func", "AddTargets", "host", target.Host, "err", err)
-					}
-					for _, ipAddr := range ipAddrs {
-						// Add jitter to prevent thundering herd (0-10% of interval)
-						jitter := time.Duration(rand.Int63n(int64(p.interval / 10)))
-						err := p.AddTargetDelayed(target.Name+" "+ipAddr, conn[0], ipAddr, target.SourceIp, conn[1], target.Labels.Kv, jitter)
-						if err != nil {
-							p.logger.Warn("Skipping target", "type", "TCP", "func", "AddTargets", "host", target.Host, "ip", ipAddr, "err", err)
-						}
-					}
-				}
+	// Build a lookup map to avoid O(n²) complexity
+	targetLookup := make(map[string]bool)
+	for _, t := range targetAdd {
+		targetLookup[t] = true
+	}
+
+	for _, target := range p.sc.Cfg.Targets {
+		if target.Type != "TCP" {
+			continue
+		}
+
+		// Parse host:port once
+		conn := strings.Split(target.Host, ":")
+		if len(conn) != 2 {
+			p.logger.Warn("Skipping target, could not identify host", "type", "TCP", "func", "AddTargets", "host", target.Host, "name", target.Name)
+			continue
+		}
+
+		// Resolve DNS once per target
+		ipAddrs, err := common.DestAddrs(context.Background(), conn[0], p.resolver.Resolver, p.resolver.Timeout, p.ipv6)
+		if err != nil || len(ipAddrs) == 0 {
+			p.logger.Warn("Skipping resolve target", "type", "TCP", "func", "AddTargets", "name", target.Name, "err", err)
+			continue
+		}
+
+		// Add all IPs for this target
+		for _, ipAddr := range ipAddrs {
+			targetName := target.Name + " " + ipAddr
+			if !targetLookup[targetName] {
+				continue
+			}
+			// Add jitter to prevent thundering herd (0-10% of interval)
+			jitter := time.Duration(rand.Int63n(int64(p.interval / 10)))
+			err := p.AddTargetDelayed(targetName, conn[0], ipAddr, target.SourceIp, conn[1], target.Labels.Kv, jitter)
+			if err != nil {
+				p.logger.Warn("Skipping target", "type", "TCP", "func", "AddTargets", "host", target.Host, "ip", ipAddr, "err", err)
 			}
 		}
 	}
@@ -224,15 +226,7 @@ func (p *TCPPort) CheckActiveTargets() (err error) {
 				return err
 			}
 
-			if !func(ips []string, target string) bool {
-				for _, ip := range ips {
-					if ip == target {
-						return true
-					}
-				}
-				return false
-			}(ipAddrs, targetIp) {
-
+			if !common.ContainsString(ipAddrs, targetIp) {
 				p.RemoveTarget(targetName + " " + targetIp)
 
 				conn := strings.Split(target.Host, ":")
