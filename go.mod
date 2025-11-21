@@ -1,4 +1,4 @@
-go 1.25.1
+go 1.23
 
 module github.com/syepes/network_exporter
 

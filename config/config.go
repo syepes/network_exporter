@@ -23,7 +23,8 @@ import (
 
 type Targets []struct {
 	Name     string   `yaml:"name" json:"name"`
-	Host     string   `yaml:"host" json:"host"`
+	Host     string   `yaml:"host,omitempty" json:"host,omitempty"`
+	Hosts    []string `yaml:"hosts,omitempty" json:"hosts,omitempty"`
 	Type     string   `yaml:"type" json:"type"`
 	Proxy    string   `yaml:"proxy" json:"proxy"`
 	Probe    []string `yaml:"probe" json:"probe"`

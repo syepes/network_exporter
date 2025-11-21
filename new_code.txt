@@ -1,0 +1,80 @@
+# Validate and Filter config
+		targets := Targets{}
+		re := regexp.MustCompile("^ICMP|MTR|ICMP+MTR|TCP|HTTPGet$")
+		for _, t := range c.Targets {
+			// Handle both single host and multiple hosts
+			var targetHosts []string
+			
+			// If both host and hosts are specified, use hosts and ignore host
+			if len(t.Hosts) > 0 {
+				targetHosts = t.Hosts
+			} else if t.Host != "" {
+				targetHosts = []string{t.Host}
+			} else {
+				logger.Error("No host specified for target", "type", "Config", "func", "ReloadConfig", "target", t.Name)
+				continue
+			}
+			
+			for _, host := range targetHosts {
+				// Create a copy of the target for each host
+				newTarget := t
+				newTarget.Host = host
+				
+				if common.SrvRecordCheck(host) {
+					found := re.MatchString(newTarget.Type)
+					if !found {
+						logger.Error("Unknown check type", "type", "Config", "func", "ReloadConfig", "target", newTarget.Name, "check_type", newTarget.Type, "allowed", "(ICMP|MTR|ICMP+MTR|TCP|HTTPGet)")
+						continue
+					}
+					// Check that SRV record's type is TCP, if config's type is TCP
+					if newTarget.Type == "TCP" {
+						if !strings.EqualFold(newTarget.Type, strings.Split(host, ".")[1][1:]) {
+							logger.Error("Target type doesn't match SRV record protocol", "type", "Config", "func", "ReloadConfig", "target", newTarget.Name, "check_type", newTarget.Type, "srv_proto", strings.Split(host, ".")[1][1:])
+							continue
+						}
+					}
+
+					srv_record_hosts, err := common.SrvRecordHosts(host)
+					if err != nil {
+						logger.Error("Error processing SRV record", "type", "Config", "func", "ReloadConfig", "target", host, "err", err)
+						continue
+					}
+
+					for _, srvTarget := range srv_record_hosts {
+						sub_target := newTarget
+						sub_target.Name = srvTarget
+						sub_target.Host = srvTarget
+
+						// Filter out the targets that are not assigned to the running host, if the `probe` is not specified don't filter
+						if sub_target.Probe == nil {
+							targets = append(targets, sub_target)
+						} else {
+							for _, p := range sub_target.Probe {
+								if p == hostname {
+									targets = append(targets, sub_target)
+									break
+								}
+							}
+						}
+					}
+				} else {
+					found := re.MatchString(newTarget.Type)
+					if !found {
+						logger.Error("Unknown check type", "type", "Config", "func", "ReloadConfig", "target", newTarget.Name, "check_type", newTarget.Type, "allowed", "(ICMP|MTR|ICMP+MTR|TCP|HTTPGet)")
+						continue
+					}
+
+					// Filter out the targets that are not assigned to the running host, if the `probe` is not specified don't filter
+					if newTarget.Probe == nil {
+						targets = append(targets, newTarget)
+					} else {
+						for _, p := range newTarget.Probe {
+							if p == hostname {
+								targets = append(targets, newTarget)
+								break
+							}
+						}
+					}
+				}
+			}
+		}
