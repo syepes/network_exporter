@@ -49,9 +49,12 @@ targets:
     host: 8.8.4.4
     type: MTR
 
-  # Combined ICMP Ping + MTR Traceroute
+  # Combined ICMP Ping + MTR Traceroute with multiple hosts
   - name: cloudflare-dns
-    host: 1.1.1.1
+    hosts:
+      - 1.1.1.1
+      - 1.0.0.1
+      - 2606:4700:4700::1111  # IPv6 example
     type: ICMP+MTR
 
   # TCP Port Check with custom source IP
