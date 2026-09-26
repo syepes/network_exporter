@@ -115,9 +115,6 @@ func (p *MTR) AddTarget(name string, host string, srcAddr string, labels map[str
 func (p *MTR) AddTargetDelayed(name string, host string, srcAddr string, labels map[string]string, startupDelay time.Duration) (err error) {
 	p.logger.Info("Adding Target", "type", "MTR", "func", "AddTargetDelayed", "name", name, "host", host, "delay", startupDelay)
 
-	p.mtx.Lock()
-	defer p.mtx.Unlock()
-
 	// Parse port from host if specified (for TCP protocol)
 	targetHost := host
 	targetPort := p.tcpPort // Use default port from config
@@ -130,8 +127,10 @@ func (p *MTR) AddTargetDelayed(name string, host string, srcAddr string, labels 
 		}
 	}
 
-	// Resolve hostnames
-	ipAddrs, err := common.DestAddrs(context.Background(), targetHost, p.resolver.Resolver, p.resolver.Timeout, p.ipv6)
+	// Resolve hostnames before taking the lock so a slow DNS lookup does not stall
+	// concurrent scrapes/reloads that need p.mtx; the lock only guards the map
+	// mutation below.
+	ipAddrs, err := p.resolver.Resolve(context.Background(), targetHost, p.ipv6)
 	if err != nil || len(ipAddrs) == 0 {
 		return err
 	}
@@ -140,6 +139,9 @@ func (p *MTR) AddTargetDelayed(name string, host string, srcAddr string, labels 
 	if err != nil {
 		return err
 	}
+
+	p.mtx.Lock()
+	defer p.mtx.Unlock()
 	p.removeTarget(name)
 	p.targets[name] = target
 	return nil
@@ -208,7 +210,7 @@ func (p *MTR) CheckActiveTargets() (err error) {
 			if target.Name != targetName {
 				continue
 			}
-			ipAddrs, err := common.DestAddrs(context.Background(), target.Host, p.resolver.Resolver, p.resolver.Timeout, p.ipv6)
+			ipAddrs, err := p.resolver.Resolve(context.Background(), target.Host, p.ipv6)
 			if err != nil || len(ipAddrs) == 0 {
 				return err
 			}
@@ -227,53 +229,30 @@ func (p *MTR) CheckActiveTargets() (err error) {
 	return nil
 }
 
-// ExportMetrics collects the metrics for each monitored target and returns it as a simple map
-func (p *MTR) ExportMetrics() map[string]*mtr.MtrResult {
-	m := make(map[string]*mtr.MtrResult)
-
+// Snapshot returns a consistent point-in-time view of every monitored target
+// (results, labels, and the full live name set) captured under a single read
+// lock. This replaces the former ExportMetrics/ExportLabels/TargetNames trio,
+// which each took the lock and walked the target map separately: that both
+// re-locked every target several times per scrape and could skew the three
+// views against each other under a concurrent add/remove.
+func (p *MTR) Snapshot() common.Snapshot[mtr.MtrResult] {
 	p.mtx.RLock()
 	defer p.mtx.RUnlock()
 
+	snap := common.Snapshot[mtr.MtrResult]{
+		Metrics: make(map[string]*mtr.MtrResult, len(p.targets)),
+		Labels:  make(map[string]map[string]string, len(p.targets)),
+		Names:   make([]string, 0, len(p.targets)),
+	}
 	for _, target := range p.targets {
 		name := target.Name()
-		metrics := target.Compute()
-
-		if metrics != nil {
-			// p.logger.Debug("Export metrics", "type", "MTR", "func", "ExportMetrics", "name", name, "metrics", metrics, "labels", target.Labels())
-			m[name] = metrics
+		snap.Names = append(snap.Names, name)
+		if labels := target.Labels(); labels != nil {
+			snap.Labels[name] = labels
+		}
+		if metrics := target.Compute(); metrics != nil {
+			snap.Metrics[name] = metrics
 		}
 	}
-	return m
-}
-
-// ExportLabels target labels
-func (p *MTR) ExportLabels() map[string]map[string]string {
-	l := make(map[string]map[string]string)
-
-	p.mtx.RLock()
-	defer p.mtx.RUnlock()
-
-	for _, target := range p.targets {
-		name := target.Name()
-		labels := target.Labels()
-
-		if labels != nil {
-			l[name] = labels
-		}
-	}
-	return l
-}
-
-// TargetNames returns the names of all currently monitored targets.
-// It reflects the live target set (including targets that have not yet
-// produced a metric result), so callers can prune metrics of removed targets.
-func (p *MTR) TargetNames() []string {
-	p.mtx.RLock()
-	defer p.mtx.RUnlock()
-
-	names := make([]string, 0, len(p.targets))
-	for _, target := range p.targets {
-		names = append(names, target.Name())
-	}
-	return names
+	return snap
 }

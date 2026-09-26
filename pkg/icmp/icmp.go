@@ -73,13 +73,11 @@ func icmpIpv4(localAddr string, dst net.Addr, ttl int, pid int, timeout time.Dur
 		return hop, err
 	}
 
-	// Create payload: 4-byte sequence number + (payloadSize - 4) filler bytes
-	bs := make([]byte, 4)
-	binary.LittleEndian.PutUint32(bs, uint32(seq))
-
-	// Generate dynamic payload with specified size
+	// Payload: 4-byte little-endian sequence number followed by filler bytes.
+	// The sequence bytes are written directly into the payload to avoid a separate
+	// intermediate allocation per probe.
 	payload := make([]byte, payloadSize)
-	copy(payload, bs) // First 4 bytes are sequence number
+	binary.LittleEndian.PutUint32(payload, uint32(seq))
 	for i := 4; i < payloadSize; i++ {
 		payload[i] = 'x' // Fill remaining bytes
 	}
@@ -132,13 +130,11 @@ func icmpIpv6(localAddr string, dst net.Addr, ttl, pid int, timeout time.Duratio
 		return hop, err
 	}
 
-	// Create payload: 4-byte sequence number + (payloadSize - 4) filler bytes
-	bs := make([]byte, 4)
-	binary.LittleEndian.PutUint32(bs, uint32(seq))
-
-	// Generate dynamic payload with specified size
+	// Payload: 4-byte little-endian sequence number followed by filler bytes.
+	// The sequence bytes are written directly into the payload to avoid a separate
+	// intermediate allocation per probe.
 	payload := make([]byte, payloadSize)
-	copy(payload, bs) // First 4 bytes are sequence number
+	binary.LittleEndian.PutUint32(payload, uint32(seq))
 	for i := 4; i < payloadSize; i++ {
 		payload[i] = 'x' // Fill remaining bytes
 	}
@@ -175,8 +171,11 @@ func icmpIpv6(localAddr string, dst net.Addr, ttl, pid int, timeout time.Duratio
 
 // Listen IPv4 icmp returned packet and verify the content
 func listenForSpecific4(conn *icmp.PacketConn, neededBody []byte, needID int, needSeq int, sent []byte) (string, []byte, error) {
+	// The read buffer is fully overwritten by each ReadFrom and nothing is
+	// retained across iterations (a match returns immediately), so a single
+	// buffer per call is reused instead of allocating 1500 bytes per read.
+	b := make([]byte, 1500)
 	for {
-		b := make([]byte, 1500)
 		n, peer, err := conn.ReadFrom(b)
 		// Any read error (including the read deadline / timeout that bounds this
 		// loop) means no matching reply arrived; return it so the caller counts a
@@ -241,8 +240,9 @@ func listenForSpecific4(conn *icmp.PacketConn, neededBody []byte, needID int, ne
 
 // Listen IPv6 icmp returned packet and verify the content
 func listenForSpecific6(conn *icmp.PacketConn, neededBody []byte, needID int, needSeq int) (string, []byte, error) {
+	// See listenForSpecific4: one reused read buffer per call.
+	b := make([]byte, 1500)
 	for {
-		b := make([]byte, 1500)
 		n, peer, err := conn.ReadFrom(b)
 		// Any read error (including the read deadline / timeout that bounds this
 		// loop) means no matching reply arrived; return it so the caller counts a

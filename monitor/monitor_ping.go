@@ -75,7 +75,7 @@ func (p *PING) AddTargets() {
 	targetConfigTmp := []string{}
 	for _, v := range p.sc.Cfg.Targets {
 		if v.Type == "ICMP" || v.Type == "ICMP+MTR" {
-			ipAddrs, err := common.DestAddrs(context.Background(), v.Host, p.resolver.Resolver, p.resolver.Timeout, p.ipv6)
+			ipAddrs, err := p.resolver.Resolve(context.Background(), v.Host, p.ipv6)
 			if err != nil || len(ipAddrs) == 0 {
 				p.logger.Warn("Skipping resolve target", "type", "ICMP", "func", "AddTargets", "host", v.Host, "name", v.Name, "err", err)
 			}
@@ -91,7 +91,7 @@ func (p *PING) AddTargets() {
 	for _, targetName := range targetAdd {
 		for _, target := range p.sc.Cfg.Targets {
 			if target.Type == "ICMP" || target.Type == "ICMP+MTR" {
-				ipAddrs, err := common.DestAddrs(context.Background(), target.Host, p.resolver.Resolver, p.resolver.Timeout, p.ipv6)
+				ipAddrs, err := p.resolver.Resolve(context.Background(), target.Host, p.ipv6)
 				if err != nil || len(ipAddrs) == 0 {
 					p.logger.Warn("Skipping resolve target", "type", "ICMP", "func", "AddTargets", "host", target.Host, "name", target.Name, "err", err)
 				}
@@ -147,7 +147,7 @@ func (p *PING) DelTargets() {
 	targetConfigTmp := []string{}
 	for _, v := range p.sc.Cfg.Targets {
 		if v.Type == "ICMP" || v.Type == "ICMP+MTR" {
-			ipAddrs, err := common.DestAddrs(context.Background(), v.Host, p.resolver.Resolver, p.resolver.Timeout, p.ipv6)
+			ipAddrs, err := p.resolver.Resolve(context.Background(), v.Host, p.ipv6)
 			if err != nil || len(ipAddrs) == 0 {
 				p.logger.Warn("Skipping resolve target", "type", "ICMP", "func", "DelTargets", "host", v.Host, "name", v.Name, "err", err)
 			}
@@ -205,7 +205,7 @@ func (p *PING) CheckActiveTargets() (err error) {
 			if !strings.HasPrefix(targetName, target.Name+" ") {
 				continue
 			}
-			ipAddrs, err := common.DestAddrs(context.Background(), target.Host, p.resolver.Resolver, p.resolver.Timeout, p.ipv6)
+			ipAddrs, err := p.resolver.Resolve(context.Background(), target.Host, p.ipv6)
 			if err != nil || len(ipAddrs) == 0 {
 				return err
 			}
@@ -227,53 +227,30 @@ func (p *PING) CheckActiveTargets() (err error) {
 	return nil
 }
 
-// ExportMetrics collects the metrics for each monitored target and returns it as a simple map
-func (p *PING) ExportMetrics() map[string]*ping.PingResult {
-	m := make(map[string]*ping.PingResult)
-
+// Snapshot returns a consistent point-in-time view of every monitored target
+// (results, labels, and the full live name set) captured under a single read
+// lock. This replaces the former ExportMetrics/ExportLabels/TargetNames trio,
+// which each took the lock and walked the target map separately: that both
+// re-locked every target several times per scrape and could skew the three
+// views against each other under a concurrent add/remove.
+func (p *PING) Snapshot() common.Snapshot[ping.PingResult] {
 	p.mtx.RLock()
 	defer p.mtx.RUnlock()
 
+	snap := common.Snapshot[ping.PingResult]{
+		Metrics: make(map[string]*ping.PingResult, len(p.targets)),
+		Labels:  make(map[string]map[string]string, len(p.targets)),
+		Names:   make([]string, 0, len(p.targets)),
+	}
 	for _, target := range p.targets {
 		name := target.Name()
-		metrics := target.Compute()
-
-		if metrics != nil {
-			// p.logger.Debug("Export metrics", "type", "ICMP", "func", "ExportMetrics", "name", name, "metrics", metrics, "labels", target.Labels())
-			m[name] = metrics
+		snap.Names = append(snap.Names, name)
+		if labels := target.Labels(); labels != nil {
+			snap.Labels[name] = labels
+		}
+		if metrics := target.Compute(); metrics != nil {
+			snap.Metrics[name] = metrics
 		}
 	}
-	return m
-}
-
-// ExportLabels target labels
-func (p *PING) ExportLabels() map[string]map[string]string {
-	l := make(map[string]map[string]string)
-
-	p.mtx.RLock()
-	defer p.mtx.RUnlock()
-
-	for _, target := range p.targets {
-		name := target.Name()
-		labels := target.Labels()
-
-		if labels != nil {
-			l[name] = labels
-		}
-	}
-	return l
-}
-
-// TargetNames returns the names of all currently monitored targets.
-// It reflects the live target set (including targets that have not yet
-// produced a metric result), so callers can prune metrics of removed targets.
-func (p *PING) TargetNames() []string {
-	p.mtx.RLock()
-	defer p.mtx.RUnlock()
-
-	names := make([]string, 0, len(p.targets))
-	for _, target := range p.targets {
-		names = append(names, target.Name())
-	}
-	return names
+	return snap
 }

@@ -1,12 +1,12 @@
 package target
 
 import (
-	"encoding/json"
 	"log/slog"
 	"os"
 	"sync"
 	"time"
 
+	"github.com/syepes/network_exporter/pkg/selfmon"
 	"github.com/syepes/network_exporter/pkg/tcp"
 )
 
@@ -65,17 +65,14 @@ func (t *TCPPort) run(startupDelay time.Duration) {
 
 	// Execute first probe immediately (after jitter delay)
 	// This ensures targets start probing as quickly as possible
-	select {
-	case <-t.stop:
+	if !acquireSlot(selfmon.TypeTCP, waitChan, t.stop) {
 		t.wg.Done()
 		return
-	default:
-		waitChan <- struct{}{}
-		go func() {
-			t.portCheck()
-			<-waitChan
-		}()
 	}
+	go func() {
+		t.portCheck()
+		<-waitChan
+	}()
 
 	tick := time.NewTicker(t.interval)
 	defer tick.Stop()
@@ -86,7 +83,10 @@ func (t *TCPPort) run(startupDelay time.Duration) {
 			t.wg.Done()
 			return
 		case <-tick.C:
-			waitChan <- struct{}{}
+			if !acquireSlot(selfmon.TypeTCP, waitChan, t.stop) {
+				t.wg.Done()
+				return
+			}
 			go func() {
 				t.portCheck()
 				<-waitChan
@@ -102,16 +102,14 @@ func (t *TCPPort) Stop() {
 }
 
 func (t *TCPPort) portCheck() {
+	done := selfmon.ProbeStarted(selfmon.TypeTCP)
 	data, err := tcp.Port(t.host, t.ip, t.srcAddr, t.port, t.timeout)
+	done(err == nil)
 	if err != nil {
 		t.logger.Error("TCP Port check failed", "type", "TCP", "func", "port", "err", err)
 	}
 
-	bytes, err2 := json.Marshal(data)
-	if err2 != nil {
-		t.logger.Error("Failed to marshal result", "type", "TCP", "func", "port", "err", err2)
-	}
-	t.logger.Debug("TCP Port result", "type", "TCP", "func", "port", "result", string(bytes))
+	logDebugResult(t.logger, "TCP Port result", "TCP", "port", data)
 
 	t.Lock()
 	defer t.Unlock()

@@ -1,7 +1,6 @@
 package target
 
 import (
-	"encoding/json"
 	"log/slog"
 	"os"
 	"sync"
@@ -9,9 +8,8 @@ import (
 
 	"github.com/syepes/network_exporter/pkg/common"
 	"github.com/syepes/network_exporter/pkg/ping"
+	"github.com/syepes/network_exporter/pkg/selfmon"
 )
-
-const MaxConcurrentJobs = 3 // DEPRECATED: Use maxConcurrentJobs parameter instead
 
 // PING Object
 type PING struct {
@@ -77,17 +75,14 @@ func (t *PING) run(startupDelay time.Duration) {
 
 	// Execute first probe immediately (after jitter delay)
 	// This ensures targets start probing as quickly as possible
-	select {
-	case <-t.stop:
+	if !acquireSlot(selfmon.TypePing, waitChan, t.stop) {
 		t.wg.Done()
 		return
-	default:
-		waitChan <- struct{}{}
-		go func() {
-			t.ping()
-			<-waitChan
-		}()
 	}
+	go func() {
+		t.ping()
+		<-waitChan
+	}()
 
 	tick := time.NewTicker(t.interval)
 	defer tick.Stop()
@@ -98,7 +93,10 @@ func (t *PING) run(startupDelay time.Duration) {
 			t.wg.Done()
 			return
 		case <-tick.C:
-			waitChan <- struct{}{}
+			if !acquireSlot(selfmon.TypePing, waitChan, t.stop) {
+				t.wg.Done()
+				return
+			}
 			go func() {
 				t.ping()
 				<-waitChan
@@ -114,8 +112,10 @@ func (t *PING) Stop() {
 }
 
 func (t *PING) ping() {
+	done := selfmon.ProbeStarted(selfmon.TypePing)
 	icmpID := int(t.icmpID.Get())
 	data, err := ping.Ping(t.host, t.ip, t.srcAddr, t.count, t.timeout, icmpID, t.payloadSize, t.ttl, t.ipv6)
+	done(err == nil)
 	if err != nil {
 		t.logger.Error("Ping failed", "type", "ICMP", "func", "ping", "err", err)
 	}
@@ -127,11 +127,7 @@ func (t *PING) ping() {
 	data.SntTimeSummary += t.result.SntTimeSummary
 	t.result = data
 
-	bytes, err2 := json.Marshal(t.result)
-	if err2 != nil {
-		t.logger.Error("Failed to marshal result", "type", "ICMP", "func", "ping", "err", err2)
-	}
-	t.logger.Debug("Ping result", "type", "ICMP", "func", "ping", "result", string(bytes))
+	logDebugResult(t.logger, "Ping result", "ICMP", "ping", t.result)
 }
 
 // Compute returns the results of the Ping metrics

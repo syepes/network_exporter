@@ -10,6 +10,7 @@ import (
 	"net/http/pprof"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/alecthomas/kingpin/v2"
@@ -24,9 +25,10 @@ import (
 	"github.com/syepes/network_exporter/config"
 	"github.com/syepes/network_exporter/monitor"
 	"github.com/syepes/network_exporter/pkg/common"
+	"github.com/syepes/network_exporter/pkg/selfmon"
 )
 
-const version string = "1.8.0"
+const version string = "2.0.0"
 
 var (
 	WebListenAddresses = kingpin.Flag("web.listen-address", "The address to listen on for HTTP requests").Default(":9427").Strings()
@@ -37,14 +39,15 @@ var (
 	configFile         = kingpin.Flag("config.file", "Exporter configuration file").Default("/app/cfg/network_exporter.yml").String()
 	configFileHeaders  = HTTPHeader(kingpin.Flag("config.file.header", "Headers for loading configuration file from URL"))
 	enableProfileing   = kingpin.Flag("profiling", "Enable Profiling (pprof + fgprof)").Default("false").Bool()
-	// SCALING: maxConcurrentJobs controls how many probe operations can run concurrently per target.
-	// Higher values increase throughput but consume more resources (memory, CPU, file descriptors).
-	// Default: 3 operations per target
-	// Recommended ranges based on target count:
-	//   - Small deployments (<100 targets): 3-5
-	//   - Medium deployments (100-1000 targets): 2-3
-	//   - Large deployments (>1000 targets): 1-2
-	maxConcurrentJobs = kingpin.Flag("max-concurrent-jobs", "Maximum concurrent probe operations per target (affects memory and CPU usage)").Default("3").Int()
+	// SCALING: maxConcurrentJobs bounds how many probe cycles may overlap for a
+	// SINGLE target. Overlap only happens when a probe takes longer than the
+	// target's `interval` to complete; the per-target run loop then applies
+	// back-pressure once this many probes are already in flight for that target.
+	// This is a PER-TARGET limit, not a global one: with N targets the worst-case
+	// global concurrency is N*maxConcurrentJobs, so it is not a total resource cap.
+	// A global concurrency budget is planned as part of the scheduler rework.
+	// Default: 3 overlapping probes per target.
+	maxConcurrentJobs = kingpin.Flag("max-concurrent-jobs", "Maximum overlapping probe cycles per target (per-target, not a global cap)").Default("3").Int()
 	sc                = &config.SafeConfig{Cfg: &config.Config{}}
 	logger            *slog.Logger
 	// SCALING: icmpID is a shared counter across all PING and MTR targets (see pkg/common/type.go for limits)
@@ -71,6 +74,7 @@ func (h *HTTPHeaderValue) Set(input string) error {
 func (h *HTTPHeaderValue) String() string {
 	return ""
 }
+
 func HTTPHeader(s kingpin.Settings) (target *http.Header) {
 	target = &http.Header{}
 	s.SetValue((*HTTPHeaderValue)(target))
@@ -117,6 +121,39 @@ func main() {
 	startServer()
 }
 
+// reloadMtx serializes configuration reloads so the multi-step
+// Del/Check/Add sequence never races on the monitor target maps when
+// triggered concurrently by the interval ticker, an OS signal, or the HTTP
+// endpoint.
+var reloadMtx sync.Mutex
+
+// reloadConfig re-reads the configuration file and reconciles every monitor's
+// targets. It is safe to call concurrently from any trigger; calls are
+// serialized via reloadMtx. The trigger label identifies the reload source in
+// the logs. On a config load error the previous configuration stays active.
+func reloadConfig(trigger string) error {
+	reloadMtx.Lock()
+	defer reloadMtx.Unlock()
+
+	logger.Info("ReLoading config", "trigger", trigger)
+	if err := sc.ReloadConfig(logger, *configFile, *configFileHeaders); err != nil {
+		logger.Error("Reloading config skipped", "trigger", trigger, "err", err)
+		return err
+	}
+	monitorPING.DelTargets()
+	_ = monitorPING.CheckActiveTargets()
+	monitorPING.AddTargets()
+	monitorMTR.DelTargets()
+	_ = monitorMTR.CheckActiveTargets()
+	monitorMTR.AddTargets()
+	monitorTCP.DelTargets()
+	_ = monitorTCP.CheckActiveTargets()
+	monitorTCP.AddTargets()
+	monitorHTTPGet.DelTargets()
+	monitorHTTPGet.AddTargets()
+	return nil
+}
+
 func startConfigRefresh() {
 	interval := sc.Cfg.Conf.Refresh.Duration()
 	if interval <= 0 {
@@ -127,22 +164,7 @@ func startConfigRefresh() {
 	defer ticker.Stop()
 
 	for range ticker.C {
-		logger.Info("ReLoading config")
-		if err := sc.ReloadConfig(logger, *configFile, *configFileHeaders); err != nil {
-			logger.Error("Reloading config skipped", "err", err)
-			continue
-		}
-		monitorPING.DelTargets()
-		_ = monitorPING.CheckActiveTargets()
-		monitorPING.AddTargets()
-		monitorMTR.DelTargets()
-		_ = monitorMTR.CheckActiveTargets()
-		monitorMTR.AddTargets()
-		monitorTCP.DelTargets()
-		_ = monitorTCP.CheckActiveTargets()
-		monitorTCP.AddTargets()
-		monitorHTTPGet.DelTargets()
-		monitorHTTPGet.AddTargets()
+		_ = reloadConfig("interval")
 	}
 }
 
@@ -153,6 +175,8 @@ func startServer() {
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(collectors.NewGoCollector())
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
+	// Internal self-monitoring metrics for probe scheduling/execution health.
+	selfmon.Register(reg)
 	reg.MustRegister(&collector.MTR{Monitor: monitorMTR})
 	reg.MustRegister(&collector.PING{Monitor: monitorPING})
 	reg.MustRegister(&collector.TCP{Monitor: monitorTCP})
@@ -161,6 +185,22 @@ func startServer() {
 	mux.Handle(webMetricsPath, h)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, indexHTML, webMetricsPath)
+	})
+
+	// Cross-platform on-demand configuration reload. This is the only on-demand
+	// reload mechanism available on Windows (which has no SIGHUP delivery).
+	// POST/PUT only so a stray GET or link prefetch cannot trigger a reload.
+	mux.HandleFunc("/-/reload", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost && r.Method != http.MethodPut {
+			w.Header().Set("Allow", "POST, PUT")
+			http.Error(w, "This endpoint requires a POST or PUT request.", http.StatusMethodNotAllowed)
+			return
+		}
+		if err := reloadConfig("HTTP"); err != nil {
+			http.Error(w, fmt.Sprintf("Failed to reload config: %v", err), http.StatusInternalServerError)
+			return
+		}
+		fmt.Fprintln(w, "Configuration reloaded successfully")
 	})
 
 	if *enableProfileing {
@@ -194,7 +234,7 @@ func startServer() {
 func getResolver() *config.Resolver {
 	if sc.Cfg.Conf.Nameserver == "" {
 		logger.Info("Configured default DNS resolver")
-		return &config.Resolver{Resolver: net.DefaultResolver, Timeout: sc.Cfg.Conf.NameserverTimeout.Duration()}
+		return &config.Resolver{Resolver: net.DefaultResolver, Timeout: sc.Cfg.Conf.NameserverTimeout.Duration(), TTL: sc.Cfg.Conf.NameserverCacheTTL.Duration()}
 	}
 
 	logger.Info("Configured custom DNS resolver")
@@ -202,7 +242,7 @@ func getResolver() *config.Resolver {
 		d := net.Dialer{Timeout: sc.Cfg.Conf.NameserverTimeout.Duration()}
 		return d.DialContext(ctx, network, sc.Cfg.Conf.Nameserver)
 	}
-	return &config.Resolver{Resolver: &net.Resolver{PreferGo: true, Dial: dialer}, Timeout: sc.Cfg.Conf.NameserverTimeout.Duration()}
+	return &config.Resolver{Resolver: &net.Resolver{PreferGo: true, Dial: dialer}, Timeout: sc.Cfg.Conf.NameserverTimeout.Duration(), TTL: sc.Cfg.Conf.NameserverCacheTTL.Duration()}
 }
 
 func expVars(w http.ResponseWriter, r *http.Request) {

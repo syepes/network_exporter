@@ -1,13 +1,13 @@
 package target
 
 import (
-	"encoding/json"
 	"log/slog"
 	"os"
 	"sync"
 	"time"
 
 	"github.com/syepes/network_exporter/pkg/http"
+	"github.com/syepes/network_exporter/pkg/selfmon"
 )
 
 // HTTPGet Object
@@ -63,17 +63,14 @@ func (t *HTTPGet) run(startupDelay time.Duration) {
 
 	// Execute first probe immediately (after jitter delay)
 	// This ensures targets start probing as quickly as possible
-	select {
-	case <-t.stop:
+	if !acquireSlot(selfmon.TypeHTTP, waitChan, t.stop) {
 		t.wg.Done()
 		return
-	default:
-		waitChan <- struct{}{}
-		go func() {
-			t.httpGetCheck()
-			<-waitChan
-		}()
 	}
+	go func() {
+		t.httpGetCheck()
+		<-waitChan
+	}()
 
 	tick := time.NewTicker(t.interval)
 	defer tick.Stop()
@@ -84,7 +81,10 @@ func (t *HTTPGet) run(startupDelay time.Duration) {
 			t.wg.Done()
 			return
 		case <-tick.C:
-			waitChan <- struct{}{}
+			if !acquireSlot(selfmon.TypeHTTP, waitChan, t.stop) {
+				t.wg.Done()
+				return
+			}
 			go func() {
 				t.httpGetCheck()
 				<-waitChan
@@ -100,6 +100,7 @@ func (t *HTTPGet) Stop() {
 }
 
 func (t *HTTPGet) httpGetCheck() {
+	done := selfmon.ProbeStarted(selfmon.TypeHTTP)
 	var data *http.HTTPReturn
 	var err error
 
@@ -115,12 +116,9 @@ func (t *HTTPGet) httpGetCheck() {
 			t.logger.Error("HTTP Get failed", "type", "HTTPGet", "func", "httpGetCheck", "err", err)
 		}
 	}
+	done(err == nil)
 
-	bytes, err2 := json.Marshal(data)
-	if err2 != nil {
-		t.logger.Error("Failed to marshal result", "type", "HTTPGet", "func", "httpGetCheck", "err", err2)
-	}
-	t.logger.Debug("HTTP Get result", "type", "HTTPGet", "func", "httpGetCheck", "result", string(bytes))
+	logDebugResult(t.logger, "HTTP Get result", "HTTPGet", "httpGetCheck", data)
 
 	t.Lock()
 	defer t.Unlock()

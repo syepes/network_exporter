@@ -1,6 +1,7 @@
 .idea
 *.iml
 .vscode/settings.json
+.claude/
 artifacts/
 vendor/
 logs/

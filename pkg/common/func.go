@@ -161,6 +161,54 @@ func TimeCorrectedDeviation(values []time.Duration) float64 {
 	return math.Sqrt(sd / (float64(len(values)) - 1))
 }
 
+// TimeStats holds the summary statistics derived from a set of RTT samples.
+type TimeStats struct {
+	UncorrectedSD time.Duration
+	CorrectedSD   time.Duration
+	Range         time.Duration
+}
+
+// ComputeTimeStats derives the uncorrected/corrected standard deviations and the
+// range of a set of durations in a single computation. Calling
+// TimeUncorrectedDeviation, TimeCorrectedDeviation and TimeRange separately scans
+// the slice five times (each deviation recomputes the mean and the squared
+// deviation, and the range does its own min/max pass); this helper computes the
+// mean, min and max in one pass and the squared deviation in a second, matching
+// the math of the individual functions exactly while scanning far fewer times.
+func ComputeTimeStats(values []time.Duration) TimeStats {
+	n := len(values)
+	if n == 0 {
+		return TimeStats{}
+	}
+
+	min := values[0]
+	max := values[0]
+	var sum time.Duration
+	for _, v := range values {
+		sum += v
+		if v < min {
+			min = v
+		}
+		if v > max {
+			max = v
+		}
+	}
+	avg := float64(sum) / float64(n)
+
+	sd := 0.0
+	for _, v := range values {
+		d := float64(v) - avg
+		sd += d * d
+	}
+
+	stats := TimeStats{UncorrectedSD: time.Duration(math.Sqrt(sd / float64(n)))}
+	if n > 1 {
+		stats.CorrectedSD = time.Duration(math.Sqrt(sd / (float64(n) - 1)))
+		stats.Range = max - min
+	}
+	return stats
+}
+
 // CompareList Compare two lists and return a list with the difference
 // Returns elements in b that are not in a
 func CompareList(a, b []string) []string {

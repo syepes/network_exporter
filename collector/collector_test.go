@@ -6,6 +6,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
+	"github.com/syepes/network_exporter/pkg/common"
 	"github.com/syepes/network_exporter/pkg/ping"
 	"github.com/syepes/network_exporter/pkg/tcp"
 )
@@ -33,9 +34,9 @@ type fakePingMonitor struct {
 	names   []string
 }
 
-func (f *fakePingMonitor) ExportMetrics() map[string]*ping.PingResult { return f.metrics }
-func (f *fakePingMonitor) ExportLabels() map[string]map[string]string { return f.labels }
-func (f *fakePingMonitor) TargetNames() []string                      { return f.names }
+func (f *fakePingMonitor) Snapshot() common.Snapshot[ping.PingResult] {
+	return common.Snapshot[ping.PingResult]{Metrics: f.metrics, Labels: f.labels, Names: f.names}
+}
 
 func pingTarget(name string) (string, *ping.PingResult, map[string]string) {
 	key := name + " 1.1.1.1"
@@ -133,9 +134,9 @@ type fakeTCPMonitor struct {
 	names   []string
 }
 
-func (f *fakeTCPMonitor) ExportMetrics() map[string]*tcp.TCPPortReturn { return f.metrics }
-func (f *fakeTCPMonitor) ExportLabels() map[string]map[string]string   { return f.labels }
-func (f *fakeTCPMonitor) TargetNames() []string                        { return f.names }
+func (f *fakeTCPMonitor) Snapshot() common.Snapshot[tcp.TCPPortReturn] {
+	return common.Snapshot[tcp.TCPPortReturn]{Metrics: f.metrics, Labels: f.labels, Names: f.names}
+}
 
 func (f *fakeTCPMonitor) set(names ...string) {
 	f.metrics = map[string]*tcp.TCPPortReturn{}

@@ -61,6 +61,9 @@ func runPing(ipAddr string, ip string, srcAddr string, icmpID int, option *PingO
 		ttl = defaultTTL
 	}
 	pingReturn := PingReturn{}
+	// Successful samples are bounded by the probe count; preallocate to avoid the
+	// incremental slice growth as replies arrive.
+	pingReturn.allTime = make([]time.Duration, 0, option.Count())
 
 	seq := 0
 	for cnt := 0; cnt < option.Count(); cnt++ {
@@ -92,9 +95,10 @@ func runPing(ipAddr string, ip string, srcAddr string, icmpID int, option *PingO
 	pingResult.AvgTime = pingReturn.avgTime
 	pingResult.BestTime = pingReturn.bestTime
 	pingResult.WorstTime = pingReturn.worstTime
-	pingResult.UncorrectedSDTime = time.Duration(common.TimeUncorrectedDeviation(pingReturn.allTime))
-	pingResult.CorrectedSDTime = time.Duration(common.TimeCorrectedDeviation(pingReturn.allTime))
-	pingResult.RangeTime = time.Duration(common.TimeRange(pingReturn.allTime))
+	stats := common.ComputeTimeStats(pingReturn.allTime)
+	pingResult.UncorrectedSDTime = stats.UncorrectedSD
+	pingResult.CorrectedSDTime = stats.CorrectedSD
+	pingResult.RangeTime = stats.Range
 	pingResult.SntSummary = option.Count()
 	pingResult.SntFailSummary = option.Count() - pingReturn.succSum
 	pingResult.SntTimeSummary = pingReturn.sumTime

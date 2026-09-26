@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -60,9 +61,10 @@ type ICMP struct {
 }
 
 type Conf struct {
-	Refresh           duration `yaml:"refresh" json:"refresh" default:"0s"`
-	Nameserver        string   `yaml:"nameserver" json:"nameserver"`
-	NameserverTimeout duration `yaml:"nameserver_timeout" json:"nameserver_timeout" default:"250ms"`
+	Refresh            duration `yaml:"refresh" json:"refresh" default:"0s"`
+	Nameserver         string   `yaml:"nameserver" json:"nameserver"`
+	NameserverTimeout  duration `yaml:"nameserver_timeout" json:"nameserver_timeout" default:"250ms"`
+	NameserverCacheTTL duration `yaml:"nameserver_cache_ttl" json:"nameserver_cache_ttl" default:"5s"`
 }
 
 type Config struct {
@@ -85,10 +87,70 @@ func (b *extraKV) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return unmarshal(&b.Kv)
 }
 
-// SafeConfig Safe configuration reload
+// Resolver wraps a *net.Resolver with a short-TTL, host-keyed cache. The
+// AddTargets/DelTargets/CheckActiveTargets refresh passes each resolve every
+// configured host, and AddTargets resolves the same host twice per pass; at tens
+// of thousands of targets this is ~4N sequential lookups per refresh round. The
+// cache collapses the lookups that happen within one refresh round (they run
+// back-to-back in well under the TTL) down to one per host, while a TTL short
+// enough to stay well under the refresh interval keeps DNS-change detection
+// (CheckActiveTargets) responsive.
 type Resolver struct {
 	Resolver *net.Resolver
 	Timeout  time.Duration
+	// TTL is the lifetime of a cached resolution. A value <= 0 disables caching.
+	TTL time.Duration
+
+	mu    sync.Mutex
+	cache map[string]resolveEntry
+}
+
+type resolveEntry struct {
+	addrs   []string
+	expires time.Time
+}
+
+// Resolve returns the resolved IPs for host, serving them from the short-TTL
+// cache when a fresh entry exists. Only successful resolutions are cached (a
+// transient DNS failure must not be pinned for the whole TTL). The returned slice
+// is shared with the cache and callers must treat it as read-only.
+func (r *Resolver) Resolve(ctx context.Context, host string, enableIPv6 bool) ([]string, error) {
+	return r.resolve(ctx, host, enableIPv6, common.DestAddrs)
+}
+
+// resolve holds the cache logic with an injectable lookup function so the caching
+// behavior can be unit-tested without performing real DNS queries.
+func (r *Resolver) resolve(ctx context.Context, host string, enableIPv6 bool, lookup func(context.Context, string, *net.Resolver, time.Duration, bool) ([]string, error)) ([]string, error) {
+	// Key by family so the IPv4/IPv6-filtered results never collide.
+	key := host + "|4"
+	if enableIPv6 {
+		key = host + "|6"
+	}
+
+	if r.TTL > 0 {
+		r.mu.Lock()
+		if e, ok := r.cache[key]; ok && time.Now().Before(e.expires) {
+			addrs := e.addrs
+			r.mu.Unlock()
+			return addrs, nil
+		}
+		r.mu.Unlock()
+	}
+
+	addrs, err := lookup(ctx, host, r.Resolver, r.Timeout, enableIPv6)
+	if err != nil {
+		return addrs, err
+	}
+
+	if r.TTL > 0 {
+		r.mu.Lock()
+		if r.cache == nil {
+			r.cache = make(map[string]resolveEntry)
+		}
+		r.cache[key] = resolveEntry{addrs: addrs, expires: time.Now().Add(r.TTL)}
+		r.mu.Unlock()
+	}
+	return addrs, nil
 }
 
 // SafeConfig Safe configuration reload

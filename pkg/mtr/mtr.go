@@ -101,7 +101,9 @@ func runMtr(destAddr string, srcAddr string, icmpID int, options *MtrOptions, pa
 	for snt := 0; snt < options.Count(); snt++ {
 		for ttl := firstTTL; ttl <= options.MaxHops(); ttl++ {
 			if mtrReturns[ttl] == nil {
-				mtrReturns[ttl] = &MtrReturn{ttl: ttl, host: "unknown", succSum: 0, success: false, lastTime: time.Duration(0), sumTime: time.Duration(0), bestTime: time.Duration(0), worstTime: time.Duration(0), avgTime: time.Duration(0)}
+				// Successful samples per hop are bounded by the probe count;
+				// preallocate to avoid incremental slice growth across cycles.
+				mtrReturns[ttl] = &MtrReturn{ttl: ttl, host: "unknown", succSum: 0, success: false, lastTime: time.Duration(0), sumTime: time.Duration(0), bestTime: time.Duration(0), worstTime: time.Duration(0), avgTime: time.Duration(0), allTime: make([]time.Duration, 0, options.Count())}
 			}
 
 			var hopReturn common.IcmpReturn
@@ -179,9 +181,10 @@ func aggregateHops(mtrReturns []*MtrReturn, firstTTL int, count int, destAddr st
 		hop.AvgTime = mtrReturn.avgTime
 		hop.BestTime = mtrReturn.bestTime
 		hop.WorstTime = mtrReturn.worstTime
-		hop.UncorrectedSDTime = time.Duration(common.TimeUncorrectedDeviation(mtrReturn.allTime))
-		hop.CorrectedSDTime = time.Duration(common.TimeCorrectedDeviation(mtrReturn.allTime))
-		hop.RangeTime = time.Duration(common.TimeRange(mtrReturn.allTime))
+		stats := common.ComputeTimeStats(mtrReturn.allTime)
+		hop.UncorrectedSDTime = stats.UncorrectedSD
+		hop.CorrectedSDTime = stats.CorrectedSD
+		hop.RangeTime = stats.Range
 
 		failSum := count - mtrReturn.succSum
 		hop.SntFail = failSum

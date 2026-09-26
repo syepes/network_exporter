@@ -1,12 +1,14 @@
 package collector
 
 import (
-	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/syepes/network_exporter/pkg/common"
 	"github.com/syepes/network_exporter/pkg/ping"
+	"github.com/syepes/network_exporter/pkg/selfmon"
 )
 
 var (
@@ -20,8 +22,9 @@ var (
 	icmpTargetsDesc        = prometheus.NewDesc("ping_targets", "Number of active targets", nil, nil)
 	icmpStateDesc          = prometheus.NewDesc("ping_up", "Exporter state", nil, nil)
 	icmpMutex              = &sync.Mutex{}
-	// Descriptor cache for custom labels
-	icmpDescCache      = make(map[string]*descriptorSet)
+	// Descriptor cache keyed by target identity (name); see collector_mtr.go for
+	// the rationale behind identity keying plus a labelsEqual reload check.
+	icmpDescCache      = make(map[string]*icmpDescCacheEntry)
 	icmpDescCacheMutex sync.RWMutex
 )
 
@@ -35,26 +38,27 @@ type descriptorSet struct {
 	loss           *prometheus.Desc
 }
 
-// getDescriptors returns cached or creates new descriptors for a label set
-func getDescriptors(labels prometheus.Labels) *descriptorSet {
-	// Create cache key from labels
-	cacheKey := fmt.Sprintf("%v", labels)
+// icmpDescCacheEntry stores a target's descriptors with the labels they were
+// built from so a reload that changes labels forces a rebuild.
+type icmpDescCacheEntry struct {
+	labels prometheus.Labels
+	descs  *descriptorSet
+}
 
-	// Try read lock first
+// getDescriptors returns cached or creates new descriptors for a target.
+func getDescriptors(name string, labels prometheus.Labels) *descriptorSet {
 	icmpDescCacheMutex.RLock()
-	if descSet, exists := icmpDescCache[cacheKey]; exists {
+	if e, ok := icmpDescCache[name]; ok && labelsEqual(e.labels, labels) {
 		icmpDescCacheMutex.RUnlock()
-		return descSet
+		return e.descs
 	}
 	icmpDescCacheMutex.RUnlock()
 
-	// Create new descriptor set
 	icmpDescCacheMutex.Lock()
 	defer icmpDescCacheMutex.Unlock()
 
-	// Double-check after acquiring write lock
-	if descSet, exists := icmpDescCache[cacheKey]; exists {
-		return descSet
+	if e, ok := icmpDescCache[name]; ok && labelsEqual(e.labels, labels) {
+		return e.descs
 	}
 
 	descSet := &descriptorSet{
@@ -65,15 +69,20 @@ func getDescriptors(labels prometheus.Labels) *descriptorSet {
 		sntTimeSummary: prometheus.NewDesc("ping_rtt_snt_seconds", "Packet sent time total", icmpLabelNames, labels),
 		loss:           prometheus.NewDesc("ping_loss_percent", "Packet loss in percent", icmpLabelNames, labels),
 	}
-	icmpDescCache[cacheKey] = descSet
+	icmpDescCache[name] = &icmpDescCacheEntry{labels: labels, descs: descSet}
 	return descSet
+}
+
+// evictPingDescriptors drops descriptor-cache entries for inactive targets.
+func evictPingDescriptors(active map[string]struct{}) {
+	icmpDescCacheMutex.Lock()
+	defer icmpDescCacheMutex.Unlock()
+	pruneDescCache(icmpDescCache, active)
 }
 
 // PingMonitor is the subset of *monitor.PING that the collector depends on.
 type PingMonitor interface {
-	ExportMetrics() map[string]*ping.PingResult
-	ExportLabels() map[string]map[string]string
-	TargetNames() []string
+	Snapshot() common.Snapshot[ping.PingResult]
 }
 
 // PING prom
@@ -94,32 +103,39 @@ func (p *PING) Describe(ch chan<- *prometheus.Desc) {
 
 // Collect prom
 func (p *PING) Collect(ch chan<- prometheus.Metric) {
+	defer selfmon.ObserveScrape(selfmon.TypePing, time.Now())
+
+	// Take one consistent snapshot of the live targets, then reconcile it against
+	// the collector's cache so that targets removed at runtime (e.g. on a SIGHUP
+	// config reload) stop being exported, while newly added targets appear once
+	// they produce a result. reconcile returns fresh maps, so the lock only needs
+	// to guard the pointer swap; the emission below runs lock-free over the local
+	// maps, which no concurrent scrape mutates.
+	snap := p.Monitor.Snapshot()
+	active := newActiveSet(snap.Names)
+
 	icmpMutex.Lock()
-	defer icmpMutex.Unlock()
+	metrics := reconcile(p.metrics, snap.Metrics, active)
+	labels := reconcile(p.labels, snap.Labels, active)
+	p.metrics = metrics
+	p.labels = labels
+	icmpMutex.Unlock()
 
-	// Reconcile the cached metrics/labels against the live target set so that
-	// targets removed at runtime (e.g. on a SIGHUP config reload) stop being
-	// exported, while newly added targets appear once they produce a result.
-	active := newActiveSet(p.Monitor.TargetNames())
-	p.metrics = reconcile(p.metrics, p.Monitor.ExportMetrics(), active)
-	p.labels = reconcile(p.labels, p.Monitor.ExportLabels(), active)
+	evictPingDescriptors(active)
 
-	if len(p.metrics) > 0 {
+	if len(metrics) > 0 {
 		ch <- prometheus.MustNewConstMetric(icmpStateDesc, prometheus.GaugeValue, 1)
 	} else {
 		ch <- prometheus.MustNewConstMetric(icmpStateDesc, prometheus.GaugeValue, 0)
 	}
 
-	targets := []string{}
-	for target, metric := range p.metrics {
-		targets = append(targets, target)
-		l := strings.SplitN(strings.SplitN(target, " ", 2)[0], " ", 2) // get name without ip and create slice
-		l = append(l, metric.DestAddr)
-		l = append(l, metric.DestIp)
-		l2 := prometheus.Labels(p.labels[target])
+	for target, metric := range metrics {
+		namePart := strings.SplitN(target, " ", 2)[0] // name without trailing ip
 
-		// Get cached descriptors for this label set
-		descs := getDescriptors(l2)
+		descs := getDescriptors(target, prometheus.Labels(labels[target]))
+
+		// Base [name, target, target_ip] label set reused by the non-typed metrics.
+		l := []string{namePart, metric.DestAddr, metric.DestIp}
 
 		if metric.Success {
 			ch <- prometheus.MustNewConstMetric(descs.status, prometheus.GaugeValue, 1, l...)
@@ -127,17 +143,29 @@ func (p *PING) Collect(ch chan<- prometheus.Metric) {
 			ch <- prometheus.MustNewConstMetric(descs.status, prometheus.GaugeValue, 0, l...)
 		}
 
-		ch <- prometheus.MustNewConstMetric(descs.rtt, prometheus.GaugeValue, metric.BestTime.Seconds(), append(l, "best")...)
-		ch <- prometheus.MustNewConstMetric(descs.rtt, prometheus.GaugeValue, metric.AvgTime.Seconds(), append(l, "mean")...)
-		ch <- prometheus.MustNewConstMetric(descs.rtt, prometheus.GaugeValue, metric.WorstTime.Seconds(), append(l, "worst")...)
-		ch <- prometheus.MustNewConstMetric(descs.rtt, prometheus.GaugeValue, metric.SumTime.Seconds(), append(l, "sum")...)
-		ch <- prometheus.MustNewConstMetric(descs.rtt, prometheus.GaugeValue, metric.UncorrectedSDTime.Seconds(), append(l, "usd")...)
-		ch <- prometheus.MustNewConstMetric(descs.rtt, prometheus.GaugeValue, metric.CorrectedSDTime.Seconds(), append(l, "csd")...)
-		ch <- prometheus.MustNewConstMetric(descs.rtt, prometheus.GaugeValue, metric.RangeTime.Seconds(), append(l, "range")...)
+		// rtt metrics reuse a single [name, target, target_ip, type] slice; only
+		// the type slot is overwritten per emission (MustNewConstMetric copies the
+		// values synchronously, so reusing the backing array is safe).
+		rttLabels := []string{namePart, metric.DestAddr, metric.DestIp, ""}
+		rttLabels[3] = "best"
+		ch <- prometheus.MustNewConstMetric(descs.rtt, prometheus.GaugeValue, metric.BestTime.Seconds(), rttLabels...)
+		rttLabels[3] = "mean"
+		ch <- prometheus.MustNewConstMetric(descs.rtt, prometheus.GaugeValue, metric.AvgTime.Seconds(), rttLabels...)
+		rttLabels[3] = "worst"
+		ch <- prometheus.MustNewConstMetric(descs.rtt, prometheus.GaugeValue, metric.WorstTime.Seconds(), rttLabels...)
+		rttLabels[3] = "sum"
+		ch <- prometheus.MustNewConstMetric(descs.rtt, prometheus.GaugeValue, metric.SumTime.Seconds(), rttLabels...)
+		rttLabels[3] = "usd"
+		ch <- prometheus.MustNewConstMetric(descs.rtt, prometheus.GaugeValue, metric.UncorrectedSDTime.Seconds(), rttLabels...)
+		rttLabels[3] = "csd"
+		ch <- prometheus.MustNewConstMetric(descs.rtt, prometheus.GaugeValue, metric.CorrectedSDTime.Seconds(), rttLabels...)
+		rttLabels[3] = "range"
+		ch <- prometheus.MustNewConstMetric(descs.rtt, prometheus.GaugeValue, metric.RangeTime.Seconds(), rttLabels...)
+
 		ch <- prometheus.MustNewConstMetric(descs.sntSummary, prometheus.GaugeValue, float64(metric.SntSummary), l...)
 		ch <- prometheus.MustNewConstMetric(descs.sntFailSummary, prometheus.GaugeValue, float64(metric.SntFailSummary), l...)
 		ch <- prometheus.MustNewConstMetric(descs.sntTimeSummary, prometheus.GaugeValue, metric.SntTimeSummary.Seconds(), l...)
 		ch <- prometheus.MustNewConstMetric(descs.loss, prometheus.GaugeValue, metric.DropRate, l...)
 	}
-	ch <- prometheus.MustNewConstMetric(icmpTargetsDesc, prometheus.GaugeValue, float64(len(targets)))
+	ch <- prometheus.MustNewConstMetric(icmpTargetsDesc, prometheus.GaugeValue, float64(len(metrics)))
 }

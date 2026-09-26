@@ -183,53 +183,30 @@ func (p *HTTPGet) removeTarget(key string) {
 	delete(p.targets, key)
 }
 
-// Export collects the metrics for each monitored target and returns it as a simple map
-func (p *HTTPGet) ExportMetrics() map[string]*http.HTTPReturn {
-	m := make(map[string]*http.HTTPReturn)
-
+// Snapshot returns a consistent point-in-time view of every monitored target
+// (results, labels, and the full live name set) captured under a single read
+// lock. This replaces the former ExportMetrics/ExportLabels/TargetNames trio,
+// which each took the lock and walked the target map separately: that both
+// re-locked every target several times per scrape and could skew the three
+// views against each other under a concurrent add/remove.
+func (p *HTTPGet) Snapshot() common.Snapshot[http.HTTPReturn] {
 	p.mtx.RLock()
 	defer p.mtx.RUnlock()
 
+	snap := common.Snapshot[http.HTTPReturn]{
+		Metrics: make(map[string]*http.HTTPReturn, len(p.targets)),
+		Labels:  make(map[string]map[string]string, len(p.targets)),
+		Names:   make([]string, 0, len(p.targets)),
+	}
 	for _, target := range p.targets {
 		name := target.Name()
-		metrics := target.Compute()
-
-		if metrics != nil {
-			// p.logger.Debug("Export metrics", "type", "HTTPGet", "func", "ExportMetrics", "name", name, "metrics", metrics, "labels", target.Labels())
-			m[name] = metrics
+		snap.Names = append(snap.Names, name)
+		if labels := target.Labels(); labels != nil {
+			snap.Labels[name] = labels
+		}
+		if metrics := target.Compute(); metrics != nil {
+			snap.Metrics[name] = metrics
 		}
 	}
-	return m
-}
-
-// ExportLabels target labels
-func (p *HTTPGet) ExportLabels() map[string]map[string]string {
-	l := make(map[string]map[string]string)
-
-	p.mtx.RLock()
-	defer p.mtx.RUnlock()
-
-	for _, target := range p.targets {
-		name := target.Name()
-		labels := target.Labels()
-
-		if labels != nil {
-			l[name] = labels
-		}
-	}
-	return l
-}
-
-// TargetNames returns the names of all currently monitored targets.
-// It reflects the live target set (including targets that have not yet
-// produced a metric result), so callers can prune metrics of removed targets.
-func (p *HTTPGet) TargetNames() []string {
-	p.mtx.RLock()
-	defer p.mtx.RUnlock()
-
-	names := make([]string, 0, len(p.targets))
-	for _, target := range p.targets {
-		names = append(names, target.Name())
-	}
-	return names
+	return snap
 }

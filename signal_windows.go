@@ -3,40 +3,10 @@
 
 package main
 
-import (
-	"os"
-	"os/signal"
-	"syscall"
-)
-
+// reloadSignal is a no-op on Windows: the OS has no SIGHUP/SIGUSR1 delivery
+// mechanism, so signal-based configuration reload is not possible there. Use
+// the HTTP endpoint (POST /-/reload) or a positive `refresh` config interval
+// for on-demand configuration reload instead.
 func reloadSignal() {
-
-	// Signal handling
-	hup := make(chan os.Signal, 1)
-	signal.Notify(hup, syscall.SIGHUP)
-	go func() {
-		for {
-			select {
-			case <-hup:
-				logger.Debug("Signal: HUP")
-				logger.Info("ReLoading config")
-				if err := sc.ReloadConfig(logger, *configFile, *configFileHeaders); err != nil {
-					logger.Error("Reloading config skipped", "err", err)
-					continue
-				} else {
-					monitorPING.DelTargets()
-					_ = monitorPING.CheckActiveTargets()
-					monitorPING.AddTargets()
-					monitorMTR.DelTargets()
-					_ = monitorMTR.CheckActiveTargets()
-					monitorMTR.AddTargets()
-					monitorTCP.DelTargets()
-					_ = monitorTCP.CheckActiveTargets()
-					monitorTCP.AddTargets()
-					monitorHTTPGet.DelTargets()
-					monitorHTTPGet.AddTargets()
-				}
-			}
-		}
-	}()
+	logger.Info("Signal-based reload is unavailable on Windows; use HTTP 'POST /-/reload' or the 'refresh' config interval")
 }

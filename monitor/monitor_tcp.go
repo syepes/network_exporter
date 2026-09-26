@@ -72,7 +72,7 @@ func (p *TCPPort) AddTargets() {
 				p.logger.Warn("Skipping target, could not identify host", "type", "TCP", "func", "AddTargets", "host", v.Host, "name", v.Name)
 				continue
 			}
-			ipAddrs, err := common.DestAddrs(context.Background(), conn[0], p.resolver.Resolver, p.resolver.Timeout, p.ipv6)
+			ipAddrs, err := p.resolver.Resolve(context.Background(), conn[0], p.ipv6)
 			if err != nil || len(ipAddrs) == 0 {
 				p.logger.Warn("Skipping resolve target", "type", "TCP", "func", "AddTargets", "host", v.Host, "name", v.Name, "err", err)
 			}
@@ -104,7 +104,7 @@ func (p *TCPPort) AddTargets() {
 		}
 
 		// Resolve DNS once per target
-		ipAddrs, err := common.DestAddrs(context.Background(), conn[0], p.resolver.Resolver, p.resolver.Timeout, p.ipv6)
+		ipAddrs, err := p.resolver.Resolve(context.Background(), conn[0], p.ipv6)
 		if err != nil || len(ipAddrs) == 0 {
 			p.logger.Warn("Skipping resolve target", "type", "TCP", "func", "AddTargets", "name", target.Name, "err", err)
 			continue
@@ -166,7 +166,7 @@ func (p *TCPPort) DelTargets() {
 				p.logger.Warn("Skipping target, could not identify host", "type", "TCP", "func", "DelTargets", "host", v.Host, "name", v.Name)
 				continue
 			}
-			ipAddrs, err := common.DestAddrs(context.Background(), conn[0], p.resolver.Resolver, p.resolver.Timeout, p.ipv6)
+			ipAddrs, err := p.resolver.Resolve(context.Background(), conn[0], p.ipv6)
 			if err != nil || len(ipAddrs) == 0 {
 				p.logger.Warn("Skipping resolve target", "type", "TCP", "func", "DelTargets", "host", v.Host, "name", v.Name, "err", err)
 			}
@@ -221,7 +221,7 @@ func (p *TCPPort) CheckActiveTargets() (err error) {
 			if target.Name != targetName {
 				continue
 			}
-			ipAddrs, err := common.DestAddrs(context.Background(), strings.Split(target.Host, ":")[0], p.resolver.Resolver, p.resolver.Timeout, p.ipv6)
+			ipAddrs, err := p.resolver.Resolve(context.Background(), strings.Split(target.Host, ":")[0], p.ipv6)
 			if err != nil || len(ipAddrs) == 0 {
 				return err
 			}
@@ -248,53 +248,30 @@ func (p *TCPPort) CheckActiveTargets() (err error) {
 	return nil
 }
 
-// ExportMetrics collects the metrics for each monitored target and returns it as a simple map
-func (p *TCPPort) ExportMetrics() map[string]*tcp.TCPPortReturn {
-	m := make(map[string]*tcp.TCPPortReturn)
-
+// Snapshot returns a consistent point-in-time view of every monitored target
+// (results, labels, and the full live name set) captured under a single read
+// lock. This replaces the former ExportMetrics/ExportLabels/TargetNames trio,
+// which each took the lock and walked the target map separately: that both
+// re-locked every target several times per scrape and could skew the three
+// views against each other under a concurrent add/remove.
+func (p *TCPPort) Snapshot() common.Snapshot[tcp.TCPPortReturn] {
 	p.mtx.RLock()
 	defer p.mtx.RUnlock()
 
+	snap := common.Snapshot[tcp.TCPPortReturn]{
+		Metrics: make(map[string]*tcp.TCPPortReturn, len(p.targets)),
+		Labels:  make(map[string]map[string]string, len(p.targets)),
+		Names:   make([]string, 0, len(p.targets)),
+	}
 	for _, target := range p.targets {
 		name := target.Name()
-		metrics := target.Compute()
-
-		if metrics != nil {
-			// p.logger.Debug("Export metrics", "type", "TCP", "func", "ExportMetrics", "name", name, "metrics", metrics, "labels", target.Labels())
-			m[name] = metrics
+		snap.Names = append(snap.Names, name)
+		if labels := target.Labels(); labels != nil {
+			snap.Labels[name] = labels
+		}
+		if metrics := target.Compute(); metrics != nil {
+			snap.Metrics[name] = metrics
 		}
 	}
-	return m
-}
-
-// ExportLabels target labels
-func (p *TCPPort) ExportLabels() map[string]map[string]string {
-	l := make(map[string]map[string]string)
-
-	p.mtx.RLock()
-	defer p.mtx.RUnlock()
-
-	for _, target := range p.targets {
-		name := target.Name()
-		labels := target.Labels()
-
-		if labels != nil {
-			l[name] = labels
-		}
-	}
-	return l
-}
-
-// TargetNames returns the names of all currently monitored targets.
-// It reflects the live target set (including targets that have not yet
-// produced a metric result), so callers can prune metrics of removed targets.
-func (p *TCPPort) TargetNames() []string {
-	p.mtx.RLock()
-	defer p.mtx.RUnlock()
-
-	names := make([]string, 0, len(p.targets))
-	for _, target := range p.targets {
-		names = append(names, target.Name())
-	}
-	return names
+	return snap
 }

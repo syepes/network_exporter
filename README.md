@@ -12,7 +12,7 @@ This exporter gathers either ICMP, MTR, TCP Port or HTTP Get stats and exports t
 ## Features
 
 - IPv4 & IPv6 support
-- Configuration reloading (By interval or OS signal)
+- Configuration reloading (by `refresh` interval, by `SIGHUP` on Linux/macOS, or by `POST /-/reload` on any platform including Windows)
 - Dynamically Add or Remove targets without affecting the currently running tests
 - Automatic update of the target IP when the DNS resolution changes
 - Targets can be executed on all hosts or a list of specified ones `probe`
@@ -174,6 +174,20 @@ ulimit -n 40000
 - `http_get_seconds{type=ContentTransfer}`:        ContentTransfer connection drill down time in seconds
 - `http_get_seconds{type=Total}`:                  Total connection time in seconds
 
+---
+
+Internal self-monitoring metrics describe how the exporter itself is scheduling and executing its checks (as opposed to the check results above).
+They are always exported, are independent of the configured targets, and are the primary signal for spotting scheduling and execution bottlenecks as the number of active targets grows.
+The `type` label is the probe kind (`ping`, `mtr`, `tcp`, `http`).
+
+- `network_exporter_probe_duration_seconds{type}`:                 Histogram of how long a single probe execution takes
+- `network_exporter_probe_total{type,result}`:                     Total probe executions by execution result (`success` means the probe ran without an execution error, independent of target reachability)
+- `network_exporter_probe_inflight{type}`:                         Number of probes currently executing
+- `network_exporter_probe_queue_wait_seconds{type}`:               Histogram of how long a scheduled probe waited for a concurrency slot before executing (sustained non-zero values indicate a scheduling/concurrency bottleneck)
+- `network_exporter_probe_skipped_total{type,reason}`:             Total probe cycles skipped instead of executed (`reason` is `saturation` or `inflight`)
+- `network_exporter_probe_last_completion_timestamp_seconds{type}`: Unix timestamp of the most recent completed probe (stops advancing if the scheduler stalls for that type)
+- `network_exporter_collector_scrape_duration_seconds{collector}`: Histogram of how long each collector's `/metrics` scrape takes
+
 Each metric contains the below labels and additionally the ones added in the configuration file.
 
 - `name` (ALL: The target name)
@@ -249,6 +263,37 @@ docker run --privileged --cap-add NET_ADMIN --cap-add NET_RAW -p 9427:9427 \
   /app/network_exporter --max-concurrent-jobs=5
 ```
 
+## HTTP Endpoints
+
+The exporter serves the following endpoints on `--web.listen-address` (default `:9427`):
+
+| Method     | Path                        | Description                                             |
+| ---------- | --------------------------- | ------------------------------------------------------- |
+| `GET`      | `/`                         | Landing page with a link to the metrics endpoint.       |
+| `GET`      | `/metrics` (`--web.metrics.path`) | Prometheus metrics.                               |
+| `POST/PUT` | `/-/reload`                 | Reload the configuration on demand.                     |
+
+### Reloading the configuration
+
+Configuration can be reloaded in three ways.
+The `refresh` interval in the config file reloads automatically when set to a value greater than `0`.
+On Linux and macOS, sending `SIGHUP` to the process reloads immediately (`kill -HUP <pid>`).
+On any platform, including Windows, a `POST /-/reload` request reloads immediately.
+
+`POST /-/reload` is the only on-demand reload mechanism available on Windows, because Windows has no `SIGHUP` delivery mechanism.
+
+```bash
+curl -X POST http://127.0.0.1:9427/-/reload
+```
+
+Details:
+
+- The endpoint accepts `POST` and `PUT`; any other method returns `405 Method Not Allowed` with an `Allow: POST, PUT` header, so a stray `GET` or link prefetch cannot trigger a reload.
+- On success it returns `200 OK` with the body `Configuration reloaded successfully`.
+- On a config load error it returns `500 Internal Server Error` with the error message, and the previously loaded configuration stays active.
+- Reloads from the interval, `SIGHUP`, and `/-/reload` are serialized, so concurrent triggers cannot race on the target set.
+- The endpoint is always enabled and shares the metrics listener, so anyone who can reach the metrics port can trigger a reload; place it behind the same network controls you use for `/metrics`.
+
 ## Configuration
 
 ### Command-Line Flags
@@ -279,6 +324,7 @@ conf:
   refresh: 15m
   nameserver: 192.168.0.1:53 # Optional
   nameserver_timeout: 250ms # Optional
+  nameserver_cache_ttl: 5s # Optional, short-TTL DNS cache (0 disables)
 
 # Specific Protocol settings
 icmp:
@@ -521,7 +567,7 @@ mtr:
   count: 6
 ```
 
-A dedicated, ready-to-use example is available at [`examples/cilium/network_exporter.yml`](examples/cilium/network_exporter.yml).
+A dedicated, ready-to-use example is available at [`dist/deploy/cfg/network_exporter_cilium.yml`](dist/deploy/cfg/network_exporter_cilium.yml).
 
 **Source IP**
 
@@ -538,6 +584,7 @@ Supported for all types of the checks
 **Note:** Domain names are resolved (regularly) to their corresponding A and AAAA records (IPv4 and IPv6).
 By default if not configured, `network_exporter` uses the system resolver to translate domain names to IP addresses.
 You can also override the DNS resolver address by specifying the `conf.nameserver` configuration setting.
+Resolutions are cached for a short window (`conf.nameserver_cache_ttl`, default `5s`) so the periodic add/delete/change-detection passes collapse to a single lookup per host per refresh round instead of resolving every host several times; set it to `0` to disable caching.
 
 **[SRV records](https://en.wikipedia.org/wiki/SRV_record):**
 If the host field of a target contains a SRV record with the format `_<service>._<protocol>.<domain>` it will be resolved, all it's A records will be added (dynamically) as separate targets with name and host of the this A record.
