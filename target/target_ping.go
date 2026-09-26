@@ -25,6 +25,7 @@ type PING struct {
 	timeout           time.Duration
 	count             int
 	payloadSize       int
+	ttl               int
 	ipv6              bool
 	maxConcurrentJobs int
 	labels            map[string]string
@@ -35,7 +36,7 @@ type PING struct {
 }
 
 // NewPing starts a new monitoring goroutine
-func NewPing(logger *slog.Logger, icmpID *common.IcmpID, startupDelay time.Duration, name string, host string, ip string, srcAddr string, interval time.Duration, timeout time.Duration, count int, payloadSize int, labels map[string]string, ipv6 bool, maxConcurrentJobs int) (*PING, error) {
+func NewPing(logger *slog.Logger, icmpID *common.IcmpID, startupDelay time.Duration, name string, host string, ip string, srcAddr string, interval time.Duration, timeout time.Duration, count int, payloadSize int, ttl int, labels map[string]string, ipv6 bool, maxConcurrentJobs int) (*PING, error) {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(os.Stderr, nil))
 	}
@@ -50,6 +51,7 @@ func NewPing(logger *slog.Logger, icmpID *common.IcmpID, startupDelay time.Durat
 		timeout:           timeout,
 		count:             count,
 		payloadSize:       payloadSize,
+		ttl:               ttl,
 		ipv6:              ipv6,
 		maxConcurrentJobs: maxConcurrentJobs,
 		labels:            labels,
@@ -113,7 +115,7 @@ func (t *PING) Stop() {
 
 func (t *PING) ping() {
 	icmpID := int(t.icmpID.Get())
-	data, err := ping.Ping(t.host, t.ip, t.srcAddr, t.count, t.timeout, icmpID, t.payloadSize, t.ipv6)
+	data, err := ping.Ping(t.host, t.ip, t.srcAddr, t.count, t.timeout, icmpID, t.payloadSize, t.ttl, t.ipv6)
 	if err != nil {
 		t.logger.Error("Ping failed", "type", "ICMP", "func", "ping", "err", err)
 	}

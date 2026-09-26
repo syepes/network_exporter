@@ -82,12 +82,12 @@ func (p *HTTPGet) AddTargets() {
 				if target.Proxy != "" {
 					err := p.AddTargetDelayed(target.Name, target.Host, target.SourceIp, target.Proxy, target.Labels.Kv, jitter)
 					if err != nil {
-						p.logger.Warn("Skipping target", "type", "HTTPGet", "func", "AddTargets", "host", target.Host, "err", err)
+						p.logger.Warn("Skipping target", "type", "HTTPGet", "func", "AddTargets", "host", target.Host, "name", target.Name, "err", err)
 					}
 				} else {
 					err := p.AddTargetDelayed(target.Name, target.Host, target.SourceIp, "", target.Labels.Kv, jitter)
 					if err != nil {
-						p.logger.Warn("Skipping target", "type", "HTTPGet", "func", "AddTargets", "host", target.Host, "err", err)
+						p.logger.Warn("Skipping target", "type", "HTTPGet", "func", "AddTargets", "host", target.Host, "name", target.Name, "err", err)
 					}
 				}
 			}

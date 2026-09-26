@@ -74,7 +74,7 @@ func (p *TCPPort) AddTargets() {
 			}
 			ipAddrs, err := common.DestAddrs(context.Background(), conn[0], p.resolver.Resolver, p.resolver.Timeout, p.ipv6)
 			if err != nil || len(ipAddrs) == 0 {
-				p.logger.Warn("Skipping resolve target", "type", "TCP", "func", "AddTargets", "host", v.Host, "err", err)
+				p.logger.Warn("Skipping resolve target", "type", "TCP", "func", "AddTargets", "host", v.Host, "name", v.Name, "err", err)
 			}
 			for _, ipAddr := range ipAddrs {
 				targetConfigTmp = common.AppendIfMissing(targetConfigTmp, v.Name+" "+ipAddr)
@@ -120,7 +120,7 @@ func (p *TCPPort) AddTargets() {
 			jitter := time.Duration(rand.Int63n(int64(p.interval / 10)))
 			err := p.AddTargetDelayed(targetName, conn[0], ipAddr, target.SourceIp, conn[1], target.Labels.Kv, jitter)
 			if err != nil {
-				p.logger.Warn("Skipping target", "type", "TCP", "func", "AddTargets", "host", target.Host, "ip", ipAddr, "err", err)
+				p.logger.Warn("Skipping target", "type", "TCP", "func", "AddTargets", "host", target.Host, "name", target.Name, "ip", ipAddr, "err", err)
 			}
 		}
 	}
@@ -168,7 +168,7 @@ func (p *TCPPort) DelTargets() {
 			}
 			ipAddrs, err := common.DestAddrs(context.Background(), conn[0], p.resolver.Resolver, p.resolver.Timeout, p.ipv6)
 			if err != nil || len(ipAddrs) == 0 {
-				p.logger.Warn("Skipping resolve target", "type", "TCP", "func", "DelTargets", "host", v.Host, "err", err)
+				p.logger.Warn("Skipping resolve target", "type", "TCP", "func", "DelTargets", "host", v.Host, "name", v.Name, "err", err)
 			}
 			for _, ipAddr := range ipAddrs {
 				targetConfigTmp = common.AppendIfMissing(targetConfigTmp, v.Name+" "+ipAddr)
@@ -239,7 +239,7 @@ func (p *TCPPort) CheckActiveTargets() (err error) {
 					jitter := time.Duration(rand.Int63n(int64(p.interval / 10)))
 					err := p.AddTargetDelayed(target.Name+" "+ipAddr, conn[0], ipAddr, target.SourceIp, conn[1], target.Labels.Kv, jitter)
 					if err != nil {
-						p.logger.Warn("Skipping target", "type", "TCP", "func", "CheckActiveTargets", "host", target.Host, "err", err)
+						p.logger.Warn("Skipping target", "type", "TCP", "func", "CheckActiveTargets", "host", target.Host, "name", target.Name, "err", err)
 					}
 				}
 			}

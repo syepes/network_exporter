@@ -11,14 +11,14 @@ import (
 )
 
 // Ping ICMP Operation
-func Ping(addr string, ip string, srcAddr string, count int, timeout time.Duration, icmpID int, payloadSize int, ipv6 bool) (*PingResult, error) {
+func Ping(addr string, ip string, srcAddr string, count int, timeout time.Duration, icmpID int, payloadSize int, ttl int, ipv6 bool) (*PingResult, error) {
 	var out PingResult
 
 	pingOptions := &PingOptions{}
 	pingOptions.SetCount(count)
 	pingOptions.SetTimeout(timeout)
 
-	out, err := runPing(addr, ip, srcAddr, icmpID, pingOptions, payloadSize, ipv6)
+	out, err := runPing(addr, ip, srcAddr, icmpID, pingOptions, payloadSize, ttl, ipv6)
 	if err != nil {
 		return &out, err
 	}
@@ -26,7 +26,7 @@ func Ping(addr string, ip string, srcAddr string, count int, timeout time.Durati
 }
 
 // PingString ICMP Operation
-func PingString(addr string, ip string, srcAddr string, count int, timeout time.Duration, icmpID int, payloadSize int, ipv6 bool) (result string, err error) {
+func PingString(addr string, ip string, srcAddr string, count int, timeout time.Duration, icmpID int, payloadSize int, ttl int, ipv6 bool) (result string, err error) {
 	pingOptions := &PingOptions{}
 	pingOptions.SetCount(count)
 	pingOptions.SetTimeout(timeout)
@@ -34,7 +34,7 @@ func PingString(addr string, ip string, srcAddr string, count int, timeout time.
 	var buffer bytes.Buffer
 	buffer.WriteString(fmt.Sprintf("Start %v, PING %v (%v)\n", time.Now().Format("2006-01-02 15:04:05"), addr, addr))
 	begin := time.Now().UnixNano() / 1e6
-	pingResult, err := runPing(addr, ip, srcAddr, icmpID, pingOptions, payloadSize, ipv6)
+	pingResult, err := runPing(addr, ip, srcAddr, icmpID, pingOptions, payloadSize, ttl, ipv6)
 	end := time.Now().UnixNano() / 1e6
 
 	buffer.WriteString(fmt.Sprintf("%v packets transmitted, %v packet loss, time %vms\n", count, pingResult.DropRate, end-begin))
@@ -49,14 +49,18 @@ func PingString(addr string, ip string, srcAddr string, count int, timeout time.
 	return result, nil
 }
 
-func runPing(ipAddr string, ip string, srcAddr string, icmpID int, option *PingOptions, payloadSize int, ipv6 bool) (pingResult PingResult, err error) {
+func runPing(ipAddr string, ip string, srcAddr string, icmpID int, option *PingOptions, payloadSize int, ttl int, ipv6 bool) (pingResult PingResult, err error) {
 	pingResult.DestAddr = ipAddr
 	pingResult.DestIp = ip
 
 	// Avoid collisions/interference caused by multiple coroutines initiating mtr
 	pid := icmpID
 	timeout := option.Timeout()
-	ttl := defaultTTL
+	// Fall back to the default TTL when the caller leaves it unset (0), preserving
+	// the historical behavior for callers that do not configure an initial TTL.
+	if ttl == 0 {
+		ttl = defaultTTL
+	}
 	pingReturn := PingReturn{}
 
 	seq := 0

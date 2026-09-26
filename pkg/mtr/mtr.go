@@ -12,12 +12,13 @@ import (
 )
 
 // Mtr Return traceroute object
-func Mtr(addr string, srcAddr string, maxHops int, count int, timeout time.Duration, icmpID int, payloadSize int, protocol string, port string, ipv6 bool) (*MtrResult, error) {
+func Mtr(addr string, srcAddr string, maxHops int, firstTTL int, count int, timeout time.Duration, icmpID int, payloadSize int, protocol string, port string, ipv6 bool) (*MtrResult, error) {
 	var out MtrResult
 	var err error
 
 	options := MtrOptions{}
 	options.SetMaxHops(maxHops)
+	options.SetFirstTTL(firstTTL)
 	options.SetCount(count)
 	options.SetTimeout(timeout)
 
@@ -35,9 +36,10 @@ func Mtr(addr string, srcAddr string, maxHops int, count int, timeout time.Durat
 }
 
 // MtrString Console print traceroute operation
-func MtrString(addr string, srcAddr string, maxHops int, count int, timeout time.Duration, icmpID int, payloadSize int, protocol string, port string, ipv6 bool) (result string, err error) {
+func MtrString(addr string, srcAddr string, maxHops int, firstTTL int, count int, timeout time.Duration, icmpID int, payloadSize int, protocol string, port string, ipv6 bool) (result string, err error) {
 	options := MtrOptions{}
 	options.SetMaxHops(maxHops)
+	options.SetFirstTTL(firstTTL)
 	options.SetCount(count)
 	options.SetTimeout(timeout)
 
@@ -96,8 +98,9 @@ func runMtr(destAddr string, srcAddr string, icmpID int, options *MtrOptions, pa
 
 	// Verify data packets
 	seq := 0
+	firstTTL := options.FirstTTL()
 	for snt := 0; snt < options.Count(); snt++ {
-		for ttl := 1; ttl < options.MaxHops(); ttl++ {
+		for ttl := firstTTL; ttl < options.MaxHops(); ttl++ {
 			if mtrReturns[ttl] == nil {
 				mtrReturns[ttl] = &MtrReturn{ttl: ttl, host: "unknown", succSum: 0, success: false, lastTime: time.Duration(0), sumTime: time.Duration(0), bestTime: time.Duration(0), worstTime: time.Duration(0), avgTime: time.Duration(0)}
 			}
@@ -136,20 +139,39 @@ func runMtr(destAddr string, srcAddr string, icmpID int, options *MtrOptions, pa
 		}
 	}
 
+	result.Hops = aggregateHops(mtrReturns, firstTTL, options.Count(), destAddr)
+
+	// fmt.Printf("Mtr.result %+v\n", result)
+	return result, nil
+}
+
+// aggregateHops folds the per-TTL probe results (indexed by TTL) into the ordered
+// list of hops. It starts at firstTTL because the probe loop only initializes
+// entries from the configured first TTL onwards; indices below firstTTL are never
+// probed and remain nil, so they are skipped rather than being treated as the end
+// of the path. A nil entry at or above firstTTL marks the end of the probed range
+// (beyond the discovered path, or the un-probed MaxHops index) and stops the walk.
+func aggregateHops(mtrReturns []*MtrReturn, firstTTL int, count int, destAddr string) []common.IcmpHop {
+	hops := []common.IcmpHop{}
 	for index, mtrReturn := range mtrReturns {
-		if index == 0 {
+		// Skip the synthetic index 0 and every index below the configured first
+		// TTL (those entries are never probed and remain nil).
+		if index < firstTTL {
 			continue
 		}
 
+		// A nil entry marks the end of the probed range; stop here.
 		if mtrReturn == nil {
 			break
 		}
 
-		hop := common.IcmpHop{TTL: mtrReturn.ttl, Snt: options.Count()}
-		if index != 1 {
-			hop.AddressFrom = mtrReturns[index-1].host
-		} else {
+		hop := common.IcmpHop{TTL: mtrReturn.ttl, Snt: count}
+		// The first reported hop has no predecessor within the probed range
+		// (indices below firstTTL are nil), so it references its own host.
+		if index == firstTTL {
 			hop.AddressFrom = mtrReturn.host
+		} else {
+			hop.AddressFrom = mtrReturns[index-1].host
 		}
 		hop.AddressTo = mtrReturn.host
 		hop.Success = mtrReturn.success
@@ -163,18 +185,16 @@ func runMtr(destAddr string, srcAddr string, icmpID int, options *MtrOptions, pa
 		hop.CorrectedSDTime = time.Duration(common.TimeCorrectedDeviation(mtrReturn.allTime))
 		hop.RangeTime = time.Duration(common.TimeRange(mtrReturn.allTime))
 
-		failSum := options.Count() - mtrReturn.succSum
+		failSum := count - mtrReturn.succSum
 		hop.SntFail = failSum
-		loss := (float64)(failSum) / (float64)(options.Count())
+		loss := (float64)(failSum) / (float64)(count)
 		hop.Loss = float64(loss)
 
-		result.Hops = append(result.Hops, hop)
+		hops = append(hops, hop)
 
 		if common.IsEqualIP(hop.AddressTo, destAddr) {
 			break
 		}
 	}
-
-	// fmt.Printf("Mtr.result %+v\n", result)
-	return result, nil
+	return hops
 }

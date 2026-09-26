@@ -288,11 +288,13 @@ icmp:
   timeout: 1s
   count: 6
   payload_size: 56  # Optional, ICMP payload size in bytes (default: 56)
+  ttl: 128          # Optional, fixed IP TTL for echo packets (default: 128, range: 1-255)
 
 mtr:
   interval: 3s
   timeout: 500ms
   max-hops: 30
+  first-ttl: 1      # Optional, starting TTL of the traceroute (default: 1, range: 1-255, must be < max-hops)
   count: 6
   payload_size: 56  # Optional, ICMP payload size in bytes (default: 56)
   protocol: icmp    # Optional, Protocol to use: "icmp" or "tcp" (default: "icmp")
@@ -338,6 +340,12 @@ targets:
     type: HTTPGet
     proxy: http://localhost:3128
 ```
+
+The check `type` accepts `ICMP`, `MTR`, `ICMP+MTR`, `TCP`, and `HTTPGet`.
+The combined ICMP and MTR check is order-independent, so `ICMP+MTR` and `MTR+ICMP` are equivalent.
+
+A target `name` is free-form and may contain underscores (for example `cloudflare-dns0_1`); it is used only as a Prometheus label value and never causes an error.
+If you see a warning such as `resolving target: lookup <host>: i/o timeout`, it refers to a DNS failure for that target's `host` (tunable with `conf.nameserver` and `conf.nameserver_timeout`), not to the target `name`.
 
 **Payload Size**
 
@@ -488,6 +496,34 @@ targets:
     host: example.com:443    # Uses port 443
     type: MTR
 ```
+
+**Initial TTL / Cilium**
+
+By default MTR traceroute emits its first probe with an IP TTL of 1 (to discover the first hop), and ICMP ping uses a fixed TTL of 128.
+In Kubernetes clusters running the Cilium CNI, probe packets that leave with a very low IP TTL are counted as "Invalid Packets" and dropped by the Cilium datapath before they reach the wire.
+Two options let operators raise the initial TTL so the probes traverse Cilium.
+
+- `icmp.ttl` sets a fixed IP TTL for every ICMP echo packet.
+  Default is **128** (unchanged behavior), valid range is **1-255**.
+- `mtr.first-ttl` sets the starting TTL of the traceroute, analogous to `traceroute --first-ttl`.
+  Default is **1** (unchanged behavior), valid range is **1-255**, and it must be less than `mtr.max-hops`.
+  Note that hops below the start TTL are intentionally not reported, so raising it skips the near-side hops (which is exactly what avoids the Cilium drops).
+
+Only ICMP and MTR emit low TTLs; plain TCP and HTTP probes use the OS stack default and are unaffected.
+MTR with `protocol: tcp` also honors `first-ttl`.
+
+```yaml
+icmp:
+  count: 6
+  ttl: 64           # Raised so Cilium does not drop the probe as an Invalid Packet
+
+mtr:
+  max-hops: 30
+  first-ttl: 5      # Skip the low-TTL hops that Cilium drops
+  count: 6
+```
+
+A dedicated, ready-to-use example is available at [`examples/cilium/network_exporter.yml`](examples/cilium/network_exporter.yml).
 
 **Source IP**
 

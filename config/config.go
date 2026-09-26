@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -45,6 +44,7 @@ type MTR struct {
 	Interval    duration `yaml:"interval" json:"interval" default:"5s"`
 	Timeout     duration `yaml:"timeout" json:"timeout" default:"4s"`
 	MaxHops     int      `yaml:"max-hops" json:"max-hops" default:"30"`
+	FirstTTL    int      `yaml:"first-ttl" json:"first-ttl" default:"1"`
 	Count       int      `yaml:"count" json:"count" default:"10"`
 	PayloadSize int      `yaml:"payload_size" json:"payload_size" default:"56"`
 	Protocol    string   `yaml:"protocol" json:"protocol" default:"icmp"`
@@ -56,6 +56,7 @@ type ICMP struct {
 	Timeout     duration `yaml:"timeout" json:"timeout" default:"4s"`
 	Count       int      `yaml:"count" json:"count" default:"10"`
 	PayloadSize int      `yaml:"payload_size" json:"payload_size" default:"56"`
+	TTL         int      `yaml:"ttl" json:"ttl" default:"128"`
 }
 
 type Conf struct {
@@ -186,10 +187,15 @@ func (sc *SafeConfig) ReloadConfig(logger *slog.Logger, confFile string, confFil
 
 	// Validate and Filter config
 	targets := Targets{}
-	re := regexp.MustCompile("^ICMP|MTR|ICMP+MTR|TCP|HTTPGet$")
 	for _, t := range c.Targets {
+		// Canonicalize the check type so combined types are order-independent
+		// (e.g. "MTR+ICMP" is treated exactly like "ICMP+MTR"). This must run
+		// before validation, duplicate detection, and monitor dispatch so every
+		// downstream consumer sees a single canonical form.
+		t.Type = NormalizeCheckType(t.Type)
+
 		if common.SrvRecordCheck(t.Host) {
-			found := re.MatchString(t.Type)
+			found := IsValidCheckType(t.Type)
 			if !found {
 				logger.Error("Unknown check type", "type", "Config", "func", "ReloadConfig", "target", t.Name, "check_type", t.Type, "allowed", "(ICMP|MTR|ICMP+MTR|TCP|HTTPGet)")
 				continue
@@ -226,7 +232,7 @@ func (sc *SafeConfig) ReloadConfig(logger *slog.Logger, confFile string, confFil
 				}
 			}
 		} else {
-			found := re.MatchString(t.Type)
+			found := IsValidCheckType(t.Type)
 			if !found {
 				logger.Error("Unknown check type", "type", "Config", "func", "ReloadConfig", "target", t.Name, "check_type", t.Type, "allowed", "(ICMP|MTR|ICMP+MTR|TCP|HTTPGet)")
 				continue
@@ -266,6 +272,17 @@ func (sc *SafeConfig) ReloadConfig(logger *slog.Logger, confFile string, confFil
 	if c.MTR.Protocol != "icmp" && c.MTR.Protocol != "tcp" {
 		return fmt.Errorf("mtr.protocol must be 'icmp' or 'tcp'")
 	}
+	if c.ICMP.TTL < 1 || c.ICMP.TTL > 255 {
+		return fmt.Errorf("icmp.ttl must be between 1 and 255")
+	}
+	if c.MTR.FirstTTL < 1 || c.MTR.FirstTTL > 255 {
+		return fmt.Errorf("mtr.first-ttl must be between 1 and 255")
+	}
+	// Guard on MaxHops > 0 to preserve the legacy "max-hops: 0" escape hatch,
+	// where the internal default (30) is substituted later by the getter.
+	if c.MTR.MaxHops > 0 && c.MTR.FirstTTL >= c.MTR.MaxHops {
+		return fmt.Errorf("mtr.first-ttl must be less than mtr.max-hops")
+	}
 
 	sc.Lock()
 	sc.Cfg = c
@@ -296,6 +313,38 @@ func (d duration) Duration() time.Duration {
 // Set updates the underlying duration.
 func (d *duration) Set(dur time.Duration) {
 	*d = duration(dur)
+}
+
+// NormalizeCheckType canonicalizes a target's check type so that combined types
+// are order-independent: "MTR+ICMP" is treated exactly like "ICMP+MTR". Single
+// types and unrecognized values are returned unchanged so downstream validation
+// can still reject them. Only the ICMP/MTR combination is currently supported.
+func NormalizeCheckType(t string) string {
+	if !strings.Contains(t, "+") {
+		return t
+	}
+
+	set := make(map[string]bool)
+	for _, p := range strings.Split(t, "+") {
+		set[strings.TrimSpace(p)] = true
+	}
+
+	if len(set) == 2 && set["ICMP"] && set["MTR"] {
+		return "ICMP+MTR"
+	}
+
+	return t
+}
+
+// IsValidCheckType reports whether t is one of the supported (already
+// canonicalized) check types.
+func IsValidCheckType(t string) bool {
+	switch t {
+	case "ICMP", "MTR", "ICMP+MTR", "TCP", "HTTPGet":
+		return true
+	default:
+		return false
+	}
 }
 
 // HasDuplicateTargets Find duplicates with same type

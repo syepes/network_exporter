@@ -16,7 +16,7 @@ type TCPPortReturn struct {
 
 // TCPPortOptions ICMP Options
 type TCPPortOptions struct {
-	timeout  time.Duration
+	timeout time.Duration
 }
 
 // Timeout Getter

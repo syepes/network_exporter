@@ -7,6 +7,7 @@ import (
 )
 
 const defaultMaxHops = 30
+const defaultFirstTTL = 1
 const defaultTimeout = 5 * time.Second
 const defaultPackerSize = 56
 const defaultCount = 10
@@ -38,6 +39,7 @@ type MtrReturn struct {
 // MtrOptions MTR Options
 type MtrOptions struct {
 	maxHops    int
+	firstTTL   int
 	timeout    time.Duration
 	packetSize int
 	count      int
@@ -54,6 +56,19 @@ func (options *MtrOptions) MaxHops() int {
 // SetMaxHops Setter
 func (options *MtrOptions) SetMaxHops(maxHops int) {
 	options.maxHops = maxHops
+}
+
+// FirstTTL Getter
+func (options *MtrOptions) FirstTTL() int {
+	if options.firstTTL == 0 {
+		options.firstTTL = defaultFirstTTL
+	}
+	return options.firstTTL
+}
+
+// SetFirstTTL Setter
+func (options *MtrOptions) SetFirstTTL(firstTTL int) {
+	options.firstTTL = firstTTL
 }
 
 // Timeout Getter

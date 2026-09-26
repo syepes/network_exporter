@@ -22,6 +22,7 @@ type MTR struct {
 	interval          time.Duration
 	timeout           time.Duration
 	maxHops           int
+	firstTTL          int
 	count             int
 	payloadSize       int
 	protocol          string
@@ -36,7 +37,7 @@ type MTR struct {
 }
 
 // NewMTR starts a new monitoring goroutine
-func NewMTR(logger *slog.Logger, icmpID *common.IcmpID, startupDelay time.Duration, name string, host string, srcAddr string, interval time.Duration, timeout time.Duration, maxHops int, count int, payloadSize int, protocol string, port string, labels map[string]string, ipv6 bool, maxConcurrentJobs int) (*MTR, error) {
+func NewMTR(logger *slog.Logger, icmpID *common.IcmpID, startupDelay time.Duration, name string, host string, srcAddr string, interval time.Duration, timeout time.Duration, maxHops int, firstTTL int, count int, payloadSize int, protocol string, port string, labels map[string]string, ipv6 bool, maxConcurrentJobs int) (*MTR, error) {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(os.Stderr, nil))
 	}
@@ -49,6 +50,7 @@ func NewMTR(logger *slog.Logger, icmpID *common.IcmpID, startupDelay time.Durati
 		interval:          interval,
 		timeout:           timeout,
 		maxHops:           maxHops,
+		firstTTL:          firstTTL,
 		count:             count,
 		payloadSize:       payloadSize,
 		protocol:          protocol,
@@ -116,7 +118,7 @@ func (t *MTR) Stop() {
 
 func (t *MTR) mtr() {
 	icmpID := int(t.icmpID.Get())
-	data, err := mtr.Mtr(t.host, t.srcAddr, t.maxHops, t.count, t.timeout, icmpID, t.payloadSize, t.protocol, t.port, t.ipv6)
+	data, err := mtr.Mtr(t.host, t.srcAddr, t.maxHops, t.firstTTL, t.count, t.timeout, icmpID, t.payloadSize, t.protocol, t.port, t.ipv6)
 	if err != nil {
 		t.logger.Error("MTR failed", "type", "MTR", "func", "mtr", "err", err)
 	}

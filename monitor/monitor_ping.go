@@ -25,6 +25,7 @@ type PING struct {
 	timeout           time.Duration
 	count             int
 	payloadSize       int
+	ttl               int
 	ipv6              bool
 	maxConcurrentJobs int
 	targets           map[string]*target.PING
@@ -45,6 +46,7 @@ func NewPing(logger *slog.Logger, sc *config.SafeConfig, resolver *config.Resolv
 		timeout:           sc.Cfg.ICMP.Timeout.Duration(),
 		count:             sc.Cfg.ICMP.Count,
 		payloadSize:       sc.Cfg.ICMP.PayloadSize,
+		ttl:               sc.Cfg.ICMP.TTL,
 		ipv6:              ipv6,
 		maxConcurrentJobs: maxConcurrentJobs,
 		targets:           make(map[string]*target.PING),
@@ -75,7 +77,7 @@ func (p *PING) AddTargets() {
 		if v.Type == "ICMP" || v.Type == "ICMP+MTR" {
 			ipAddrs, err := common.DestAddrs(context.Background(), v.Host, p.resolver.Resolver, p.resolver.Timeout, p.ipv6)
 			if err != nil || len(ipAddrs) == 0 {
-				p.logger.Warn("Skipping resolve target", "type", "ICMP", "func", "AddTargets", "host", v.Host, "err", err)
+				p.logger.Warn("Skipping resolve target", "type", "ICMP", "func", "AddTargets", "host", v.Host, "name", v.Name, "err", err)
 			}
 			for _, ipAddr := range ipAddrs {
 				targetConfigTmp = common.AppendIfMissing(targetConfigTmp, v.Name+" "+ipAddr)
@@ -91,7 +93,7 @@ func (p *PING) AddTargets() {
 			if target.Type == "ICMP" || target.Type == "ICMP+MTR" {
 				ipAddrs, err := common.DestAddrs(context.Background(), target.Host, p.resolver.Resolver, p.resolver.Timeout, p.ipv6)
 				if err != nil || len(ipAddrs) == 0 {
-					p.logger.Warn("Skipping resolve target", "type", "ICMP", "func", "AddTargets", "host", target.Host, "err", err)
+					p.logger.Warn("Skipping resolve target", "type", "ICMP", "func", "AddTargets", "host", target.Host, "name", target.Name, "err", err)
 				}
 
 				for _, ipAddr := range ipAddrs {
@@ -102,7 +104,7 @@ func (p *PING) AddTargets() {
 					jitter := time.Duration(rand.Int63n(int64(p.interval / 10)))
 					err := p.AddTargetDelayed(target.Name+" "+ipAddr, target.Host, ipAddr, target.SourceIp, target.Labels.Kv, jitter)
 					if err != nil {
-						p.logger.Warn("Skipping target", "type", "ICMP", "func", "AddTargets", "host", target.Host, "ip", ipAddr, "err", err)
+						p.logger.Warn("Skipping target", "type", "ICMP", "func", "AddTargets", "host", target.Host, "name", target.Name, "ip", ipAddr, "err", err)
 					}
 				}
 			}
@@ -122,7 +124,7 @@ func (p *PING) AddTargetDelayed(name string, host string, ip string, srcAddr str
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
 
-	target, err := target.NewPing(p.logger, p.icmpID, startupDelay, name, host, ip, srcAddr, p.interval, p.timeout, p.count, p.payloadSize, labels, p.ipv6, p.maxConcurrentJobs)
+	target, err := target.NewPing(p.logger, p.icmpID, startupDelay, name, host, ip, srcAddr, p.interval, p.timeout, p.count, p.payloadSize, p.ttl, labels, p.ipv6, p.maxConcurrentJobs)
 	if err != nil {
 		return err
 	}
@@ -147,7 +149,7 @@ func (p *PING) DelTargets() {
 		if v.Type == "ICMP" || v.Type == "ICMP+MTR" {
 			ipAddrs, err := common.DestAddrs(context.Background(), v.Host, p.resolver.Resolver, p.resolver.Timeout, p.ipv6)
 			if err != nil || len(ipAddrs) == 0 {
-				p.logger.Warn("Skipping resolve target", "type", "ICMP", "func", "DelTargets", "host", v.Host, "err", err)
+				p.logger.Warn("Skipping resolve target", "type", "ICMP", "func", "DelTargets", "host", v.Host, "name", v.Name, "err", err)
 			}
 			for _, ipAddr := range ipAddrs {
 				targetConfigTmp = common.AppendIfMissing(targetConfigTmp, v.Name+" "+ipAddr)
@@ -216,7 +218,7 @@ func (p *PING) CheckActiveTargets() (err error) {
 					jitter := time.Duration(rand.Int63n(int64(p.interval / 10)))
 					err := p.AddTargetDelayed(target.Name+" "+ipAddr, target.Host, ipAddr, target.SourceIp, target.Labels.Kv, jitter)
 					if err != nil {
-						p.logger.Warn("Skipping target", "type", "ICMP", "func", "CheckActiveTargets", "host", target.Host, "ip", ipAddr, "err", err)
+						p.logger.Warn("Skipping target", "type", "ICMP", "func", "CheckActiveTargets", "host", target.Host, "name", target.Name, "ip", ipAddr, "err", err)
 					}
 				}
 			}

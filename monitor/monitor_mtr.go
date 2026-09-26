@@ -24,6 +24,7 @@ type MTR struct {
 	interval          time.Duration
 	timeout           time.Duration
 	maxHops           int
+	firstTTL          int
 	count             int
 	payloadSize       int
 	protocol          string
@@ -47,6 +48,7 @@ func NewMTR(logger *slog.Logger, sc *config.SafeConfig, resolver *config.Resolve
 		interval:          sc.Cfg.MTR.Interval.Duration(),
 		timeout:           sc.Cfg.MTR.Timeout.Duration(),
 		maxHops:           sc.Cfg.MTR.MaxHops,
+		firstTTL:          sc.Cfg.MTR.FirstTTL,
 		count:             sc.Cfg.MTR.Count,
 		payloadSize:       sc.Cfg.MTR.PayloadSize,
 		protocol:          sc.Cfg.MTR.Protocol,
@@ -97,7 +99,7 @@ func (p *MTR) AddTargets() {
 				jitter := time.Duration(rand.Int63n(int64(p.interval / 10)))
 				err := p.AddTargetDelayed(target.Name, target.Host, target.SourceIp, target.Labels.Kv, jitter)
 				if err != nil {
-					p.logger.Warn("Skipping target", "type", "MTR", "func", "AddTargets", "host", target.Host, "err", err)
+					p.logger.Warn("Skipping target", "type", "MTR", "func", "AddTargets", "host", target.Host, "name", target.Name, "err", err)
 				}
 			}
 		}
@@ -134,7 +136,7 @@ func (p *MTR) AddTargetDelayed(name string, host string, srcAddr string, labels 
 		return err
 	}
 
-	target, err := target.NewMTR(p.logger, p.icmpID, startupDelay, name, ipAddrs[0], srcAddr, p.interval, p.timeout, p.maxHops, p.count, p.payloadSize, p.protocol, targetPort, labels, p.ipv6, p.maxConcurrentJobs)
+	target, err := target.NewMTR(p.logger, p.icmpID, startupDelay, name, ipAddrs[0], srcAddr, p.interval, p.timeout, p.maxHops, p.firstTTL, p.count, p.payloadSize, p.protocol, targetPort, labels, p.ipv6, p.maxConcurrentJobs)
 	if err != nil {
 		return err
 	}
@@ -217,7 +219,7 @@ func (p *MTR) CheckActiveTargets() (err error) {
 				jitter := time.Duration(rand.Int63n(int64(p.interval / 10)))
 				err := p.AddTargetDelayed(target.Name, target.Host, target.SourceIp, target.Labels.Kv, jitter)
 				if err != nil {
-					p.logger.Warn("Skipping target", "type", "MTR", "func", "CheckActiveTargets", "host", target.Host, "err", err)
+					p.logger.Warn("Skipping target", "type", "MTR", "func", "CheckActiveTargets", "host", target.Host, "name", target.Name, "err", err)
 				}
 			}
 		}

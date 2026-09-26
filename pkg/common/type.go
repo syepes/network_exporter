@@ -13,6 +13,7 @@ import (
 // With default settings (3 concurrent jobs per target), this supports:
 //   - ~20,000 PING targets (assuming 3 operations each)
 //   - ~1,000 MTR targets (MTR uses more ICMP IDs per operation)
+//
 // The counter automatically resets when reaching 65500 to prevent exhaustion.
 type IcmpID struct {
 	icmpID int32
