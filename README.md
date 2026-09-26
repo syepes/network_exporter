@@ -32,88 +32,101 @@ The network_exporter is designed to efficiently handle large numbers of targets 
 
 ### Scaling Limits
 
-With default settings (`--max-concurrent-jobs=3`) and built-in optimizations:
+With default settings (`--max-concurrent-jobs=3`):
 
 | Target Type | Recommended Limit | Notes |
 |-------------|------------------|-------|
 | **PING** | 10,000 - 15,000 targets | Limited by ICMP ID counter (~65,500 concurrent operations) |
 | **MTR** | 1,000 - 1,500 targets | MTR uses multiple ICMP IDs per operation |
-| **TCP** | 15,000 - 25,000 targets | Optimized DNS handling improves scaling |
-| **HTTPGet** | 10,000 - 15,000 targets | Connection pooling enables better scaling |
+| **TCP** | 15,000 - 25,000 targets | Short-TTL DNS caching (`conf.nameserver_cache_ttl`) reduces resolver load |
+| **HTTPGet** | 10,000 - 15,000 targets | Bounded by per-probe connection setup and file descriptors (cross-probe keep-alive reuse is not yet enabled) |
 
 ### Performance Tuning
 
 #### Understanding Concurrency
 
-The `--max-concurrent-jobs` parameter controls **per-target** concurrency, not total system concurrency.
+In steady state each target runs exactly one probe per its configured `interval`.
+The `--max-concurrent-jobs` parameter caps how many probe cycles may **overlap for a single target**, and overlap only happens when a probe takes longer than that target's `interval` to finish.
+Once the ceiling is reached the per-target run loop applies back-pressure until an in-flight probe completes.
+This is a **per-target** limit, not a total-system one, and there is currently no global concurrency cap.
 
-**Formula:** `Total System Concurrency = Number of Targets × max-concurrent-jobs`
+**Worst-case ceiling:** `targets × max-concurrent-jobs`.
+This ceiling is reached only if every probe consistently outruns its `interval`; under normal conditions the real load is close to one in-flight probe per target.
 
-**Why lower per-target concurrency for large deployments?**
+**Worst-case concurrent operations by deployment size:**
 
-| Targets | max-concurrent-jobs | Total Concurrent Operations | Resource Impact |
-|---------|---------------------|----------------------------|--------------------------------------|
-| 100 | 5 | 100 × 5 = **500** | ✓ Low - system handles easily |
-| 100 | 2 | 100 × 2 = **200** | ✓ Low - but slower per target |
-| 1,000 | 5 | 1,000 × 5 = **5,000** | ⚠️ Moderate - manageable with optimizations |
-| 1,000 | 3 | 1,000 × 3 = **3,000** | ✓ Low-Moderate - recommended |
-| 5,000 | 3 | 5,000 × 3 = **15,000** | ⚠️ High - possible but use monitoring |
-| 5,000 | 2 | 5,000 × 2 = **10,000** | ✓ Moderate - optimized for scale |
-| 15,000 | 2 | 15,000 × 2 = **30,000** | ✓ High but manageable - was not feasible before |
+| Targets | max-concurrent-jobs | Worst-case concurrent operations | Notes |
+|---------|---------------------|----------------------------------|-------|
+| 100 | 5 | 100 × 5 = **500** | Reached only if probes routinely exceed their interval |
+| 1,000 | 3 | 1,000 × 3 = **3,000** | Recommended default |
+| 5,000 | 3 | 5,000 × 3 = **15,000** | Watch the internal metrics (see below) |
+| 5,000 | 2 | 5,000 × 2 = **10,000** | Lower overlap for tighter resource bounds |
+| 15,000 | 2 | 15,000 × 2 = **30,000** | Large scale, monitor closely |
 
-**The Tradeoff:**
-- **Higher per-target concurrency** = Faster individual target probing, but higher total resource usage
-- **Lower per-target concurrency** = Slower individual target probing, but prevents resource exhaustion at scale
+**The tradeoff:**
+- **Higher per-target overlap** allows more concurrent samples when a probe is slower than its interval, at the cost of a higher worst-case resource ceiling.
+- **Lower per-target overlap** bounds worst-case resource use more tightly, at the cost of back-pressuring a target whose probes are slower than its interval.
+
+Because a target normally has at most one probe in flight, leaving `--max-concurrent-jobs` at the default of `3` is right for most deployments.
+Change it only when the internal metrics show probes routinely overlapping (see [Observing scheduling health](#observing-scheduling-health)).
+
+#### Observing scheduling health
+
+The exporter exports internal `network_exporter_*` metrics that let you tune concurrency from measured behavior instead of guesswork.
+The bundled Grafana dashboard visualizes all of them in its "Internal Metrics (network_exporter)" row.
+
+- `network_exporter_probe_duration_seconds` versus the configured `interval`: when the p95 duration approaches or exceeds a target type's `interval`, probes of that type will start to overlap.
+- `network_exporter_probe_inflight`: the live number of overlapping probes per type, which you can compare directly against `--max-concurrent-jobs`.
+- `network_exporter_probe_queue_wait_seconds`: how long a scheduled probe waited for a slot, so sustained non-zero values mean probes are hitting the per-target ceiling and being back-pressured.
+- `time() - network_exporter_probe_last_completion_timestamp_seconds`: a value that keeps climbing indicates the scheduler has stalled for that type.
+- `network_exporter_collector_scrape_duration_seconds`: how long each `/metrics` scrape takes, which is the signal to watch as the number of targets grows.
+
+`network_exporter_probe_skipped_total` is currently always zero and is reserved for a future global scheduler, so it is not yet a live tuning signal.
 
 #### Concurrency Recommendations
 
-With built-in optimizations, the exporter can handle larger deployments more efficiently:
+For most deployments the default is correct; deviate only when the internal metrics show probes overlapping:
 
 ```bash
-# Default: 3 concurrent operations per target (100 targets × 3 = 300 operations)
+# Default: up to 3 overlapping probe cycles per target
 ./network_exporter --max-concurrent-jobs=3
 
-# Small deployments (<100 targets): Use higher per-target concurrency
-# Example: 50 targets × 5 = 250 total concurrent operations
+# Small deployments (<100 targets): allow more overlap per target if probes can exceed their interval
 ./network_exporter --max-concurrent-jobs=5
 
-# Medium deployments (100-1000 targets): Use default
-# Example: 500 targets × 3 = 1,500 total concurrent operations
+# Medium deployments (100-1000 targets): keep the default
 ./network_exporter --max-concurrent-jobs=3
 
-# Large deployments (1000-5000 targets): Use default or slightly lower
-# Example: 3,000 targets × 3 = 9,000 total concurrent operations
+# Large deployments (1000-5000 targets): keep the default and watch the internal metrics
 ./network_exporter --max-concurrent-jobs=3
 
-# Very large deployments (>5000 targets): Use lower per-target concurrency
-# Example: 15,000 targets × 2 = 30,000 total concurrent operations
-# Optimizations make this feasible where it wasn't before
+# Very large deployments (>5000 targets): lower the per-target ceiling to bound worst-case resource use
 ./network_exporter --max-concurrent-jobs=2
 ```
 
 #### Resource Requirements
 
-With built-in optimizations, resource requirements are reduced:
+Rough resource guidance:
 
-- **Memory:** ~50-100MB baseline + ~0.8-3KB per target (reduced from 1-5KB due to optimizations)
-- **CPU:** Mostly I/O bound, 25-40% more efficient with optimizations
-- **File Descriptors:** Set `ulimit -n` to at least `(targets × max-concurrent-jobs) + 1000`
+- **Memory:** ~50-100MB baseline plus a few KB per target.
+- **CPU:** Mostly I/O bound.
+- **File Descriptors:** Set `ulimit -n` to at least `(targets × max-concurrent-jobs) + 1000`, which bounds the worst case where every target's probes overlap up to the ceiling.
 
 **Example for 5,000 targets:**
 ```bash
-# Calculate file descriptor needs: 5,000 targets × 2 jobs = 10,000 + buffer
+# Worst-case file descriptors: 5,000 targets × 2 + buffer
 ulimit -n 20000
 
-# Run with optimized settings (10,000 total concurrent operations)
+# Lower the per-target overlap ceiling for large scale
 ./network_exporter --max-concurrent-jobs=2
 ```
 
-**Example for 15,000 targets (with optimizations):**
+**Example for 15,000 targets:**
 ```bash
-# Higher scale now possible with built-in optimizations
+# Worst-case file descriptors: 15,000 targets × 2 + buffer
 ulimit -n 40000
 
-# Run with conservative settings for large scale
+# Conservative per-target overlap ceiling for very large scale
 ./network_exporter --max-concurrent-jobs=2
 ```
 
@@ -238,25 +251,24 @@ docker run --privileged --cap-add NET_ADMIN --cap-add NET_RAW -p 9427:9427 \
   --name network_exporter syepes/network_exporter \
   /app/network_exporter --log.level=debug
 
-# Large deployment (e.g., 5000 targets): Lower per-target concurrency
-# Total concurrency: 5000 targets × 2 = 10,000 concurrent operations
-# Built-in optimizations reduce resource usage by 25-40%
+# Large deployment (e.g., 5000 targets): lower the per-target overlap ceiling
+# Worst-case concurrency: 5000 targets × 2 = 10,000 overlapping operations
 docker run --privileged --cap-add NET_ADMIN --cap-add NET_RAW -p 9427:9427 \
   -v $PWD/network_exporter.yml:/app/cfg/network_exporter.yml:ro \
   --ulimit nofile=20000:20000 \
   --name network_exporter syepes/network_exporter \
   /app/network_exporter --max-concurrent-jobs=2
 
-# Very large deployment (e.g., 15000 targets): Now possible with optimizations
-# Total concurrency: 15000 targets × 2 = 30,000 concurrent operations
+# Very large deployment (e.g., 15000 targets): conservative per-target ceiling
+# Worst-case concurrency: 15000 targets × 2 = 30,000 overlapping operations
 docker run --privileged --cap-add NET_ADMIN --cap-add NET_RAW -p 9427:9427 \
   -v $PWD/network_exporter.yml:/app/cfg/network_exporter.yml:ro \
   --ulimit nofile=40000:40000 \
   --name network_exporter syepes/network_exporter \
   /app/network_exporter --max-concurrent-jobs=2
 
-# Small deployment (e.g., 50 targets): Higher per-target concurrency
-# Total concurrency: 50 targets × 5 = 250 concurrent operations
+# Small deployment (e.g., 50 targets): allow more overlap per target
+# Worst-case concurrency: 50 targets × 5 = 250 overlapping operations
 docker run --privileged --cap-add NET_ADMIN --cap-add NET_RAW -p 9427:9427 \
   -v $PWD/network_exporter.yml:/app/cfg/network_exporter.yml:ro \
   --name network_exporter syepes/network_exporter \
@@ -306,7 +318,7 @@ To see all available configuration flags:
 
 **Key flags:**
 - `--config.file` - Path to the YAML configuration file (default: `/app/cfg/network_exporter.yml`)
-- `--max-concurrent-jobs` - Maximum concurrent probe operations per target (default: `3`)
+- `--max-concurrent-jobs` - Maximum overlapping probe cycles per target; per-target, not a global cap (default: `3`)
 - `--ipv6` - Enable IPv6 support (default: `true`)
 - `--web.listen-address` - Address to listen on for HTTP requests (default: `:9427`)
 - `--log.level` - Logging level: debug, info, warn, error (default: `info`)
