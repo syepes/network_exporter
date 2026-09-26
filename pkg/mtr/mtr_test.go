@@ -101,4 +101,31 @@ func TestAggregateHops(t *testing.T) {
 			t.Fatalf("expected 0 hops, got %d", len(hops))
 		}
 	})
+
+	// With the max-hops off-by-one fixed, the probe loop now fills the final
+	// mtrReturns slot (index == MaxHops), so aggregateHops must fold a fully
+	// probed array (no nil tail) without dropping the last hop or panicking.
+	t.Run("max-hops boundary hop is aggregated when the last slot is probed", func(t *testing.T) {
+		const maxHops = 4
+		// mtrReturns is sized MaxHops+1 (indices 0..MaxHops); every TTL from
+		// firstTTL..MaxHops is probed, so there is no nil tail to break on.
+		mtrReturns := []*MtrReturn{
+			nil,                          // 0 synthetic
+			ret(1, "10.0.0.1", count, 6), // 1
+			ret(2, "10.0.0.2", count, 6), // 2
+			ret(3, "10.0.0.3", count, 6), // 3
+			ret(4, "10.0.0.4", count, 6), // 4 == MaxHops
+		}
+		hops := aggregateHops(mtrReturns, 1, count, "9.9.9.9")
+		if len(hops) != maxHops {
+			t.Fatalf("expected %d hops (incl. the max-hops slot), got %d", maxHops, len(hops))
+		}
+		last := hops[len(hops)-1]
+		if last.TTL != maxHops || last.AddressTo != "10.0.0.4" {
+			t.Fatalf("expected last hop at TTL %d to 10.0.0.4, got %+v", maxHops, last)
+		}
+		if last.AddressFrom != "10.0.0.3" {
+			t.Fatalf("expected last hop predecessor 10.0.0.3, got %+v", last)
+		}
+	})
 }

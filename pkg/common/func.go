@@ -95,9 +95,11 @@ func IsEqualIP(ips1, ips2 string) bool {
 	return true
 }
 
-// Time2Float Convert time to float32
+// Time2Float Convert a duration to milliseconds as a float32, preserving
+// sub-microsecond precision (divide in floating point rather than truncating
+// to whole microseconds first).
 func Time2Float(t time.Duration) float32 {
-	return (float32)(t/time.Microsecond) / float32(1000)
+	return float32(float64(t) / float64(time.Millisecond))
 }
 
 // TimeRange finds the range of a slice of durations

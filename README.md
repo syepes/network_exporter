@@ -126,7 +126,6 @@ ulimit -n 40000
 - `ping_rtt_seconds{type=worst}`:                  Worst round trip time in seconds
 - `ping_rtt_seconds{type=mean}`:                   Mean round trip time in seconds
 - `ping_rtt_seconds{type=sum}`:                    Sum round trip time in seconds
-- `ping_rtt_seconds{type=sd}`:                     Squared deviation in seconds
 - `ping_rtt_seconds{type=usd}`:                    Standard deviation without correction in seconds
 - `ping_rtt_seconds{type=csd}`:                    Standard deviation with correction (Bessel's) in seconds
 - `ping_rtt_seconds{type=range}`:                  Range in seconds
@@ -145,7 +144,6 @@ ulimit -n 40000
 - `mtr_rtt_seconds{type=worst}`:                   Worst round trip time in seconds
 - `mtr_rtt_seconds{type=mean}`:                    Mean round trip time in seconds
 - `mtr_rtt_seconds{type=sum}`:                     Sum round trip time in seconds
-- `mtr_rtt_seconds{type=sd}`:                      Squared deviation in seconds
 - `mtr_rtt_seconds{type=usd}`:                     Standard deviation without correction in seconds
 - `mtr_rtt_seconds{type=csd}`:                     Standard deviation with correction (Bessel's) in seconds
 - `mtr_rtt_seconds{type=range}`:                   Range in seconds

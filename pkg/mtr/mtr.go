@@ -3,7 +3,6 @@ package mtr
 import (
 	"bytes"
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/syepes/network_exporter/pkg/common"
@@ -100,7 +99,7 @@ func runMtr(destAddr string, srcAddr string, icmpID int, options *MtrOptions, pa
 	seq := 0
 	firstTTL := options.FirstTTL()
 	for snt := 0; snt < options.Count(); snt++ {
-		for ttl := firstTTL; ttl < options.MaxHops(); ttl++ {
+		for ttl := firstTTL; ttl <= options.MaxHops(); ttl++ {
 			if mtrReturns[ttl] == nil {
 				mtrReturns[ttl] = &MtrReturn{ttl: ttl, host: "unknown", succSum: 0, success: false, lastTime: time.Duration(0), sumTime: time.Duration(0), bestTime: time.Duration(0), worstTime: time.Duration(0), avgTime: time.Duration(0)}
 			}
@@ -180,7 +179,6 @@ func aggregateHops(mtrReturns []*MtrReturn, firstTTL int, count int, destAddr st
 		hop.AvgTime = mtrReturn.avgTime
 		hop.BestTime = mtrReturn.bestTime
 		hop.WorstTime = mtrReturn.worstTime
-		hop.SquaredDeviationTime = time.Duration(math.Sqrt(common.TimeSquaredDeviation(mtrReturn.allTime)))
 		hop.UncorrectedSDTime = time.Duration(common.TimeUncorrectedDeviation(mtrReturn.allTime))
 		hop.CorrectedSDTime = time.Duration(common.TimeCorrectedDeviation(mtrReturn.allTime))
 		hop.RangeTime = time.Duration(common.TimeRange(mtrReturn.allTime))

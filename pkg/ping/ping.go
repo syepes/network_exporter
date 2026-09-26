@@ -3,7 +3,6 @@ package ping
 import (
 	"bytes"
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/syepes/network_exporter/pkg/common"
@@ -38,7 +37,7 @@ func PingString(addr string, ip string, srcAddr string, count int, timeout time.
 	end := time.Now().UnixNano() / 1e6
 
 	buffer.WriteString(fmt.Sprintf("%v packets transmitted, %v packet loss, time %vms\n", count, pingResult.DropRate, end-begin))
-	buffer.WriteString(fmt.Sprintf("rtt min/avg/max = %v/%v/%v ms\n", common.Time2Float(pingResult.WorstTime), common.Time2Float(pingResult.AvgTime), common.Time2Float(pingResult.BestTime)))
+	buffer.WriteString(fmt.Sprintf("rtt min/avg/max = %v/%v/%v ms\n", common.Time2Float(pingResult.BestTime), common.Time2Float(pingResult.AvgTime), common.Time2Float(pingResult.WorstTime)))
 
 	result = buffer.String()
 
@@ -93,13 +92,12 @@ func runPing(ipAddr string, ip string, srcAddr string, icmpID int, option *PingO
 	pingResult.AvgTime = pingReturn.avgTime
 	pingResult.BestTime = pingReturn.bestTime
 	pingResult.WorstTime = pingReturn.worstTime
-	pingResult.SquaredDeviationTime = time.Duration(math.Sqrt(common.TimeSquaredDeviation(pingReturn.allTime)))
 	pingResult.UncorrectedSDTime = time.Duration(common.TimeUncorrectedDeviation(pingReturn.allTime))
 	pingResult.CorrectedSDTime = time.Duration(common.TimeCorrectedDeviation(pingReturn.allTime))
 	pingResult.RangeTime = time.Duration(common.TimeRange(pingReturn.allTime))
 	pingResult.SntSummary = option.Count()
 	pingResult.SntFailSummary = option.Count() - pingReturn.succSum
-	pingResult.SntTimeSummary = time.Duration(common.TimeRange(pingReturn.allTime))
+	pingResult.SntTimeSummary = pingReturn.sumTime
 
 	return pingResult, nil
 }

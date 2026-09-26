@@ -38,9 +38,11 @@ func Icmp(destAddr string, srcAddr string, ttl int, pid int, timeout time.Durati
 		}
 		if ipv6 {
 			return icmpIpv6(srcAddr, &ipAddr, ttl, pid, timeout, seq, payloadSize)
-		} else {
-			return hop, nil
 		}
+		// IPv6 destination but IPv6 is disabled: return an unsuccessful hop
+		// (Success=false) with no error. In practice DestAddrs already filters
+		// IPv6 addresses when IPv6 is disabled, so this branch is rarely reached.
+		return hop, nil
 	}
 
 	if p4 := dstIp.To4(); len(p4) == net.IPv4len {
@@ -48,9 +50,10 @@ func Icmp(destAddr string, srcAddr string, ttl int, pid int, timeout time.Durati
 	}
 	if ipv6 {
 		return icmpIpv6("::", &ipAddr, ttl, pid, timeout, seq, payloadSize)
-	} else {
-		return hop, nil
 	}
+	// IPv6 destination but IPv6 is disabled: return an unsuccessful hop
+	// (Success=false) with no error. See the note above.
+	return hop, nil
 }
 
 func icmpIpv4(localAddr string, dst net.Addr, ttl int, pid int, timeout time.Duration, seq int, payloadSize int) (hop common.IcmpReturn, err error) {
@@ -175,10 +178,12 @@ func listenForSpecific4(conn *icmp.PacketConn, neededBody []byte, needID int, ne
 	for {
 		b := make([]byte, 1500)
 		n, peer, err := conn.ReadFrom(b)
+		// Any read error (including the read deadline / timeout that bounds this
+		// loop) means no matching reply arrived; return it so the caller counts a
+		// drop. Returning on every error also avoids spinning on a persistent,
+		// non-temporary error.
 		if err != nil {
-			if neterr, ok := err.(*net.OpError); ok && neterr.Temporary() {
-				return "", []byte{}, neterr
-			}
+			return "", []byte{}, err
 		}
 		if n == 0 {
 			continue
@@ -189,33 +194,46 @@ func listenForSpecific4(conn *icmp.PacketConn, neededBody []byte, needID int, ne
 			continue
 		}
 
-		if x.Type.(ipv4.ICMPType) == ipv4.ICMPTypeTimeExceeded {
-			body := x.Body.(*icmp.TimeExceeded).Data
-			oh, err := ipv4.ParseHeader(body)
-			if err != nil {
-				continue
-			}
-			x, err := icmp.ParseMessage(protocolICMP, body[oh.Len:])
-			if err != nil {
-				continue
-			}
-
-			switch x.Body.(type) {
-			case *icmp.Echo:
-				msg := x.Body.(*icmp.Echo)
-				if msg.ID == needID && msg.Seq == needSeq {
-					return peer.String(), []byte{}, nil
-				}
-			default:
-			}
+		// A received packet may be malformed or truncated; guard every type
+		// assertion and slice so a crafted reply cannot panic this probe
+		// goroutine (there is no recover here).
+		msgType, ok := x.Type.(ipv4.ICMPType)
+		if !ok {
+			continue
 		}
 
-		if x.Type.(ipv4.ICMPType) == ipv4.ICMPTypeEchoReply {
-			b, _ := x.Body.Marshal(protocolICMP)
-			if string(b[4:]) != string(neededBody) || x.Body.(*icmp.Echo).ID != needID {
+		switch msgType {
+		case ipv4.ICMPTypeTimeExceeded:
+			te, ok := x.Body.(*icmp.TimeExceeded)
+			if !ok {
 				continue
 			}
-
+			body := te.Data
+			oh, err := ipv4.ParseHeader(body)
+			if err != nil || len(body) < oh.Len {
+				continue
+			}
+			inner, err := icmp.ParseMessage(protocolICMP, body[oh.Len:])
+			if err != nil {
+				continue
+			}
+			if echo, ok := inner.Body.(*icmp.Echo); ok {
+				if echo.ID == needID && echo.Seq == needSeq {
+					return peer.String(), []byte{}, nil
+				}
+			}
+		case ipv4.ICMPTypeEchoReply:
+			echo, ok := x.Body.(*icmp.Echo)
+			if !ok {
+				continue
+			}
+			b, err := x.Body.Marshal(protocolICMP)
+			if err != nil || len(b) < 4 {
+				continue
+			}
+			if string(b[4:]) != string(neededBody) || echo.ID != needID {
+				continue
+			}
 			return peer.String(), b[4:], nil
 		}
 	}
@@ -226,10 +244,12 @@ func listenForSpecific6(conn *icmp.PacketConn, neededBody []byte, needID int, ne
 	for {
 		b := make([]byte, 1500)
 		n, peer, err := conn.ReadFrom(b)
+		// Any read error (including the read deadline / timeout that bounds this
+		// loop) means no matching reply arrived; return it so the caller counts a
+		// drop. Returning on every error also avoids spinning on a persistent,
+		// non-temporary error.
 		if err != nil {
-			if neterr, ok := err.(*net.OpError); ok && neterr.Temporary() {
-				return "", []byte{}, neterr
-			}
+			return "", []byte{}, err
 		}
 		if n == 0 {
 			continue
@@ -240,27 +260,47 @@ func listenForSpecific6(conn *icmp.PacketConn, neededBody []byte, needID int, ne
 			continue
 		}
 
-		if x.Type.(ipv6.ICMPType) == ipv6.ICMPTypeTimeExceeded {
-			body := x.Body.(*icmp.TimeExceeded).Data
-			x, _ := icmp.ParseMessage(protocolIPv6ICMP, body[40:])
-			switch x.Body.(type) {
-			case *icmp.Echo:
-				// Verification
-				msg := x.Body.(*icmp.Echo)
-				if msg.ID == needID && msg.Seq == needSeq {
-					return peer.String(), []byte{}, nil
-				}
-			default:
-				// ignore
-			}
+		// A received packet may be malformed or truncated; guard every type
+		// assertion and slice so a crafted reply cannot panic this probe
+		// goroutine (there is no recover here).
+		msgType, ok := x.Type.(ipv6.ICMPType)
+		if !ok {
+			continue
 		}
 
-		if x.Type.(ipv6.ICMPType) == ipv6.ICMPTypeEchoReply {
-			b, _ := x.Body.Marshal(protocolICMP)
-			if string(b[4:]) != string(neededBody) || x.Body.(*icmp.Echo).ID != needID {
+		switch msgType {
+		case ipv6.ICMPTypeTimeExceeded:
+			te, ok := x.Body.(*icmp.TimeExceeded)
+			if !ok {
 				continue
 			}
-
+			body := te.Data
+			// The quoted packet is a fixed 40-byte IPv6 header (no extension
+			// headers for these probes) followed by the original datagram.
+			if len(body) < ipv6.HeaderLen {
+				continue
+			}
+			inner, err := icmp.ParseMessage(protocolIPv6ICMP, body[ipv6.HeaderLen:])
+			if err != nil {
+				continue
+			}
+			if echo, ok := inner.Body.(*icmp.Echo); ok {
+				if echo.ID == needID && echo.Seq == needSeq {
+					return peer.String(), []byte{}, nil
+				}
+			}
+		case ipv6.ICMPTypeEchoReply:
+			echo, ok := x.Body.(*icmp.Echo)
+			if !ok {
+				continue
+			}
+			b, err := x.Body.Marshal(protocolIPv6ICMP)
+			if err != nil || len(b) < 4 {
+				continue
+			}
+			if string(b[4:]) != string(neededBody) || echo.ID != needID {
+				continue
+			}
 			return peer.String(), b[4:], nil
 		}
 	}

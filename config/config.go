@@ -283,6 +283,31 @@ func (sc *SafeConfig) ReloadConfig(logger *slog.Logger, confFile string, confFil
 	if c.MTR.MaxHops > 0 && c.MTR.FirstTTL >= c.MTR.MaxHops {
 		return fmt.Errorf("mtr.first-ttl must be less than mtr.max-hops")
 	}
+	// payload_size flows to make([]byte, payloadSize) in pkg/icmp; a negative
+	// value panics (makeslice) inside a detached probe goroutine and crashes the
+	// exporter. The 4-byte floor keeps room for the sequence number.
+	if c.ICMP.PayloadSize < 4 || c.ICMP.PayloadSize > 65500 {
+		return fmt.Errorf("icmp.payload_size must be between 4 and 65500")
+	}
+	if c.MTR.PayloadSize < 4 || c.MTR.PayloadSize > 65500 {
+		return fmt.Errorf("mtr.payload_size must be between 4 and 65500")
+	}
+	if c.ICMP.Count < 0 || c.ICMP.Count > 65500 {
+		return fmt.Errorf("icmp.count must be between 0 and 65500")
+	}
+	// A non-positive timeout is not caught by defaults.Set (only the zero value
+	// is defaulted, and a negative value is non-zero); it would make every probe
+	// fail instantly with no surfaced error.
+	if c.ICMP.Timeout <= 0 || c.MTR.Timeout <= 0 || c.TCP.Timeout <= 0 || c.HTTPGet.Timeout <= 0 {
+		return fmt.Errorf("timeouts (icmp,mtr,tcp,http_get) must be >0")
+	}
+	// Target keys are "name ip"; the collector splits the name label on the first
+	// space, so a name containing a space would silently truncate the label.
+	for _, t := range c.Targets {
+		if strings.ContainsRune(t.Name, ' ') {
+			return fmt.Errorf("target name %q must not contain spaces", t.Name)
+		}
+	}
 
 	sc.Lock()
 	sc.Cfg = c

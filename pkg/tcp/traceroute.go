@@ -1,8 +1,10 @@
 package tcp
 
 import (
+	"encoding/binary"
 	"fmt"
 	"net"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -31,12 +33,22 @@ func Traceroute(destAddr string, port string, srcAddr string, ttl int, timeout t
 	if ipv6 {
 		return tcpTracerouteIPv6(destAddr, port, srcAddr, ttl, timeout)
 	}
+	// IPv6 destination but IPv6 is disabled: return an unsuccessful hop
+	// (Success=false) with no error. In practice the caller resolves targets
+	// with IPv6 filtered out when IPv6 is disabled, so this is rarely reached.
 	return hop, nil
 }
 
 func tcpTracerouteIPv4(destAddr string, port string, srcAddr string, ttl int, timeout time.Duration) (hop common.IcmpReturn, err error) {
 	hop.Success = false
 	start := time.Now()
+	deadline := start.Add(timeout)
+
+	// Flow identity used to confirm that an ICMP Time Exceeded quotes THIS
+	// probe's packet rather than another concurrent probe's.
+	wantDst := net.ParseIP(destAddr)
+	wantSrc := net.ParseIP(srcAddr) // nil when srcAddr is empty
+	wantDstPort, _ := strconv.Atoi(port)
 
 	// Create ICMP listener to receive Time Exceeded messages
 	icmpConn, err := icmp.ListenPacket("ip4:icmp", srcAddr)
@@ -45,7 +57,7 @@ func tcpTracerouteIPv4(destAddr string, port string, srcAddr string, ttl int, ti
 	}
 	defer icmpConn.Close()
 
-	if err = icmpConn.SetDeadline(time.Now().Add(timeout)); err != nil {
+	if err = icmpConn.SetReadDeadline(deadline); err != nil {
 		return hop, err
 	}
 
@@ -72,7 +84,7 @@ func tcpTracerouteIPv4(destAddr string, port string, srcAddr string, ttl int, ti
 		}
 	}
 
-	// Start TCP connection attempt (this will send SYN packet with custom TTL)
+	// Start TCP connection attempt (this sends the SYN with the custom TTL)
 	connChan := make(chan error, 1)
 	go func() {
 		conn, err := d.Dial("tcp", net.JoinHostPort(destAddr, port))
@@ -82,63 +94,80 @@ func tcpTracerouteIPv4(destAddr string, port string, srcAddr string, ttl int, ti
 		connChan <- err
 	}()
 
-	// Listen for ICMP Time Exceeded or wait for TCP connection
-	for {
-		select {
-		case connErr := <-connChan:
-			// TCP connection completed or failed
-			elapsed := time.Since(start)
-			if connErr == nil {
-				// Successfully connected - we reached the destination
-				hop.Elapsed = elapsed
-				hop.Addr = destAddr
-				hop.Success = true
-				return hop, nil
-			}
-			// Connection failed but we might have gotten ICMP response
-			// Continue to check if we received ICMP message
-			time.Sleep(10 * time.Millisecond)
-			select {
-			case <-time.After(timeout - elapsed):
-				return hop, fmt.Errorf("timeout waiting for response")
-			default:
-				// Try to read any pending ICMP message
-			}
-
-		case <-time.After(timeout):
-			return hop, fmt.Errorf("timeout")
-		default:
-			// Try to read ICMP message
+	// Read matching ICMP Time Exceeded messages in the background. The reader
+	// only reports a hit that quotes this probe's flow and exits on the read
+	// deadline or when the connection is closed (via the deferred Close).
+	icmpChan := make(chan string, 1)
+	go func() {
+		for {
 			b := make([]byte, 1500)
 			n, peer, readErr := icmpConn.ReadFrom(b)
 			if readErr != nil {
-				// No ICMP message yet, continue waiting
-				time.Sleep(10 * time.Millisecond)
+				return
+			}
+			if n == 0 {
 				continue
 			}
-
-			if n > 0 {
-				x, err := icmp.ParseMessage(protocolICMP, b[:n])
-				if err != nil {
-					continue
-				}
-
-				// Check for Time Exceeded message
-				if x.Type == ipv4.ICMPTypeTimeExceeded {
-					elapsed := time.Since(start)
-					hop.Elapsed = elapsed
-					hop.Addr = peer.String()
-					hop.Success = true
-					return hop, nil
-				}
+			msg, err := icmp.ParseMessage(protocolICMP, b[:n])
+			if err != nil {
+				continue
 			}
+			if msg.Type != ipv4.ICMPTypeTimeExceeded {
+				continue
+			}
+			te, ok := msg.Body.(*icmp.TimeExceeded)
+			if !ok {
+				continue
+			}
+			if !icmpMatchesFlowV4(te.Data, wantSrc, wantDst, wantDstPort) {
+				continue
+			}
+			icmpChan <- peer.String()
+			return
 		}
+	}()
+
+	// Whichever completes first wins: a finished TCP dial (we reached the
+	// destination), a flow-matched Time Exceeded (an intermediate hop), or the
+	// overall timeout.
+	select {
+	case connErr := <-connChan:
+		if connErr == nil {
+			hop.Elapsed = time.Since(start)
+			hop.Addr = destAddr
+			hop.Success = true
+			return hop, nil
+		}
+		// The dial failed (SYN dropped at an intermediate hop, or refused/timed
+		// out). Give the ICMP reader the remaining budget to surface a matching
+		// Time Exceeded before giving up.
+		select {
+		case peer := <-icmpChan:
+			hop.Elapsed = time.Since(start)
+			hop.Addr = peer
+			hop.Success = true
+			return hop, nil
+		case <-time.After(time.Until(deadline)):
+			return hop, fmt.Errorf("timeout")
+		}
+	case peer := <-icmpChan:
+		hop.Elapsed = time.Since(start)
+		hop.Addr = peer
+		hop.Success = true
+		return hop, nil
+	case <-time.After(time.Until(deadline)):
+		return hop, fmt.Errorf("timeout")
 	}
 }
 
 func tcpTracerouteIPv6(destAddr string, port string, srcAddr string, ttl int, timeout time.Duration) (hop common.IcmpReturn, err error) {
 	hop.Success = false
 	start := time.Now()
+	deadline := start.Add(timeout)
+
+	wantDst := net.ParseIP(destAddr)
+	wantSrc := net.ParseIP(srcAddr) // nil when srcAddr is empty
+	wantDstPort, _ := strconv.Atoi(port)
 
 	// Create ICMPv6 listener
 	icmpConn, err := icmp.ListenPacket("ip6:ipv6-icmp", srcAddr)
@@ -147,7 +176,7 @@ func tcpTracerouteIPv6(destAddr string, port string, srcAddr string, ttl int, ti
 	}
 	defer icmpConn.Close()
 
-	if err = icmpConn.SetDeadline(time.Now().Add(timeout)); err != nil {
+	if err = icmpConn.SetReadDeadline(deadline); err != nil {
 		return hop, err
 	}
 
@@ -184,50 +213,118 @@ func tcpTracerouteIPv6(destAddr string, port string, srcAddr string, ttl int, ti
 		connChan <- err
 	}()
 
-	// Listen for ICMPv6 Time Exceeded or wait for TCP connection
-	for {
-		select {
-		case connErr := <-connChan:
-			elapsed := time.Since(start)
-			if connErr == nil {
-				// Successfully connected - we reached the destination
-				hop.Elapsed = elapsed
-				hop.Addr = destAddr
-				hop.Success = true
-				return hop, nil
-			}
-			time.Sleep(10 * time.Millisecond)
-			select {
-			case <-time.After(timeout - elapsed):
-				return hop, fmt.Errorf("timeout waiting for response")
-			default:
-			}
-
-		case <-time.After(timeout):
-			return hop, fmt.Errorf("timeout")
-		default:
+	icmpChan := make(chan string, 1)
+	go func() {
+		for {
 			b := make([]byte, 1500)
 			n, peer, readErr := icmpConn.ReadFrom(b)
 			if readErr != nil {
-				time.Sleep(10 * time.Millisecond)
+				return
+			}
+			if n == 0 {
 				continue
 			}
-
-			if n > 0 {
-				x, err := icmp.ParseMessage(protocolIPv6ICMP, b[:n])
-				if err != nil {
-					continue
-				}
-
-				// Check for Time Exceeded message
-				if x.Type == ipv6.ICMPTypeTimeExceeded {
-					elapsed := time.Since(start)
-					hop.Elapsed = elapsed
-					hop.Addr = peer.String()
-					hop.Success = true
-					return hop, nil
-				}
+			msg, err := icmp.ParseMessage(protocolIPv6ICMP, b[:n])
+			if err != nil {
+				continue
 			}
+			if msg.Type != ipv6.ICMPTypeTimeExceeded {
+				continue
+			}
+			te, ok := msg.Body.(*icmp.TimeExceeded)
+			if !ok {
+				continue
+			}
+			if !icmpMatchesFlowV6(te.Data, wantSrc, wantDst, wantDstPort) {
+				continue
+			}
+			icmpChan <- peer.String()
+			return
+		}
+	}()
+
+	select {
+	case connErr := <-connChan:
+		if connErr == nil {
+			hop.Elapsed = time.Since(start)
+			hop.Addr = destAddr
+			hop.Success = true
+			return hop, nil
+		}
+		select {
+		case peer := <-icmpChan:
+			hop.Elapsed = time.Since(start)
+			hop.Addr = peer
+			hop.Success = true
+			return hop, nil
+		case <-time.After(time.Until(deadline)):
+			return hop, fmt.Errorf("timeout")
+		}
+	case peer := <-icmpChan:
+		hop.Elapsed = time.Since(start)
+		hop.Addr = peer
+		hop.Success = true
+		return hop, nil
+	case <-time.After(time.Until(deadline)):
+		return hop, fmt.Errorf("timeout")
+	}
+}
+
+// icmpMatchesFlowV4 reports whether the payload quoted inside an ICMPv4 Time
+// Exceeded message (the original IPv4 header plus the first bytes of the
+// original datagram) belongs to the probe identified by wantSrc/wantDst and the
+// TCP destination port wantDstPort. The source (ephemeral) port is chosen by
+// the kernel and therefore is not matched.
+func icmpMatchesFlowV4(data []byte, wantSrc, wantDst net.IP, wantDstPort int) bool {
+	oh, err := ipv4.ParseHeader(data)
+	if err != nil {
+		return false
+	}
+	if wantDst != nil && !oh.Dst.Equal(wantDst) {
+		return false
+	}
+	if wantSrc != nil && !oh.Src.Equal(wantSrc) {
+		return false
+	}
+	// The quoted transport header follows the IPv4 header. RFC 792 guarantees at
+	// least the first 8 bytes of the original datagram, which covers the TCP
+	// source (2) and destination (2) ports.
+	if wantDstPort != 0 {
+		if len(data) < oh.Len+4 {
+			return false
+		}
+		dstPort := int(binary.BigEndian.Uint16(data[oh.Len+2 : oh.Len+4]))
+		if dstPort != wantDstPort {
+			return false
 		}
 	}
+	return true
+}
+
+// icmpMatchesFlowV6 reports whether the payload quoted inside an ICMPv6 Time
+// Exceeded message belongs to the probe identified by wantSrc/wantDst and the
+// TCP destination port wantDstPort. It assumes the quoted packet has no IPv6
+// extension headers (true for the TCP SYN probes emitted here), consistent with
+// the fixed-offset parsing used elsewhere in this codebase.
+func icmpMatchesFlowV6(data []byte, wantSrc, wantDst net.IP, wantDstPort int) bool {
+	h, err := ipv6.ParseHeader(data)
+	if err != nil {
+		return false
+	}
+	if wantDst != nil && !h.Dst.Equal(wantDst) {
+		return false
+	}
+	if wantSrc != nil && !h.Src.Equal(wantSrc) {
+		return false
+	}
+	if wantDstPort != 0 {
+		if len(data) < ipv6.HeaderLen+4 {
+			return false
+		}
+		dstPort := int(binary.BigEndian.Uint16(data[ipv6.HeaderLen+2 : ipv6.HeaderLen+4]))
+		if dstPort != wantDstPort {
+			return false
+		}
+	}
+	return true
 }

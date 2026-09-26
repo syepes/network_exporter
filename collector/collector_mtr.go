@@ -121,7 +121,6 @@ func (p *MTR) Collect(ch chan<- prometheus.Metric) {
 			ch <- prometheus.MustNewConstMetric(descs.rtt, prometheus.GaugeValue, hop.BestTime.Seconds(), append(ll, "best")...)
 			ch <- prometheus.MustNewConstMetric(descs.rtt, prometheus.GaugeValue, hop.AvgTime.Seconds(), append(ll, "mean")...)
 			ch <- prometheus.MustNewConstMetric(descs.rtt, prometheus.GaugeValue, hop.WorstTime.Seconds(), append(ll, "worst")...)
-			ch <- prometheus.MustNewConstMetric(descs.rtt, prometheus.GaugeValue, hop.SquaredDeviationTime.Seconds(), append(ll, "sd")...)
 			ch <- prometheus.MustNewConstMetric(descs.rtt, prometheus.GaugeValue, hop.UncorrectedSDTime.Seconds(), append(ll, "usd")...)
 			ch <- prometheus.MustNewConstMetric(descs.rtt, prometheus.GaugeValue, hop.CorrectedSDTime.Seconds(), append(ll, "csd")...)
 			ch <- prometheus.MustNewConstMetric(descs.rtt, prometheus.GaugeValue, hop.RangeTime.Seconds(), append(ll, "range")...)

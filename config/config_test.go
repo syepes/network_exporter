@@ -92,6 +92,78 @@ func TestReloadConfigTTLValidation(t *testing.T) {
 	}
 }
 
+// TestReloadConfigValueValidation covers the payload_size / timeout / count /
+// target-name checks that keep malformed values from crashing or silently
+// breaking the probes. Hosts are IPs (or targets empty) so the loader stays
+// fully offline.
+func TestReloadConfigValueValidation(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	const (
+		icmpDef = "  interval: 3s\n  timeout: 1s\n"
+		mtrDef  = "  interval: 3s\n  timeout: 1s\n  max-hops: 30\n"
+		tcpDef  = "  interval: 3s\n  timeout: 1s\n"
+		httpDef = "  interval: 15m\n  timeout: 5s\n"
+		noTgts  = "[]"
+	)
+
+	tests := []struct {
+		name                             string
+		icmp, mtr, tcp, httpget, targets string
+		wantErr                          string
+	}{
+		{name: "defaults load"},
+		// A literal 0 is indistinguishable from "unset" and is defaulted (56).
+		{name: "icmp payload zero is defaulted", icmp: icmpDef + "  payload_size: 0\n"},
+		{name: "icmp payload negative rejected", icmp: icmpDef + "  payload_size: -1\n", wantErr: "icmp.payload_size must be between 4 and 65500"},
+		{name: "icmp payload too small rejected", icmp: icmpDef + "  payload_size: 3\n", wantErr: "icmp.payload_size must be between 4 and 65500"},
+		{name: "mtr payload too large rejected", mtr: mtrDef + "  payload_size: 70000\n", wantErr: "mtr.payload_size must be between 4 and 65500"},
+		{name: "icmp count negative rejected", icmp: icmpDef + "  count: -1\n", wantErr: "icmp.count must be between 0 and 65500"},
+		{name: "icmp timeout negative rejected", icmp: "  interval: 3s\n  timeout: -1s\n", wantErr: "timeouts (icmp,mtr,tcp,http_get) must be >0"},
+		{name: "tcp timeout negative rejected", tcp: "  interval: 3s\n  timeout: -1s\n", wantErr: "timeouts (icmp,mtr,tcp,http_get) must be >0"},
+		{name: "target name with space rejected", targets: "\n  - name: bad name\n    host: 8.8.8.8\n    type: ICMP\n", wantErr: "must not contain spaces"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			icmp, mtr, tcp, httpget, targets := tc.icmp, tc.mtr, tc.tcp, tc.httpget, tc.targets
+			if icmp == "" {
+				icmp = icmpDef
+			}
+			if mtr == "" {
+				mtr = mtrDef
+			}
+			if tcp == "" {
+				tcp = tcpDef
+			}
+			if httpget == "" {
+				httpget = httpDef
+			}
+			if targets == "" {
+				targets = noTgts
+			}
+			body := "icmp:\n" + icmp + "mtr:\n" + mtr + "tcp:\n" + tcp + "http_get:\n" + httpget + "targets: " + targets + "\n"
+			path := writeTempConfig(t, body)
+
+			sc := &SafeConfig{Cfg: &Config{}}
+			err := sc.ReloadConfig(logger, path, nil)
+
+			if tc.wantErr == "" {
+				if err != nil {
+					t.Fatalf("expected clean load, got error: %v", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatalf("expected error containing %q, got nil", tc.wantErr)
+			}
+			if !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("expected error containing %q, got: %v", tc.wantErr, err)
+			}
+		})
+	}
+}
+
 // TestNormalizeCheckType verifies combined check types are canonicalized so the
 // order the operator writes them in does not matter.
 func TestNormalizeCheckType(t *testing.T) {

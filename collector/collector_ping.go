@@ -131,7 +131,6 @@ func (p *PING) Collect(ch chan<- prometheus.Metric) {
 		ch <- prometheus.MustNewConstMetric(descs.rtt, prometheus.GaugeValue, metric.AvgTime.Seconds(), append(l, "mean")...)
 		ch <- prometheus.MustNewConstMetric(descs.rtt, prometheus.GaugeValue, metric.WorstTime.Seconds(), append(l, "worst")...)
 		ch <- prometheus.MustNewConstMetric(descs.rtt, prometheus.GaugeValue, metric.SumTime.Seconds(), append(l, "sum")...)
-		ch <- prometheus.MustNewConstMetric(descs.rtt, prometheus.GaugeValue, metric.SquaredDeviationTime.Seconds(), append(l, "sd")...)
 		ch <- prometheus.MustNewConstMetric(descs.rtt, prometheus.GaugeValue, metric.UncorrectedSDTime.Seconds(), append(l, "usd")...)
 		ch <- prometheus.MustNewConstMetric(descs.rtt, prometheus.GaugeValue, metric.CorrectedSDTime.Seconds(), append(l, "csd")...)
 		ch <- prometheus.MustNewConstMetric(descs.rtt, prometheus.GaugeValue, metric.RangeTime.Seconds(), append(l, "range")...)

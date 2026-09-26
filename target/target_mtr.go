@@ -148,7 +148,17 @@ func (t *MTR) mtr() {
 	t.logger.Debug("MTR result", "type", "MTR", "func", "mtr", "result", string(bytes))
 }
 
-// Compute returns the results of the MTR metrics
+// Compute returns an isolated deep copy of the MTR metrics.
+//
+// The target accumulates HopSummaryMap in place across probe cycles under the
+// write lock, while the collector iterates the returned result without holding
+// this target's lock. Returning the live pointer would let a scrape range the
+// map at the same instant a probe writes it, which is an unrecoverable Go
+// runtime "concurrent map read and map write" fatal error that crashes the
+// whole exporter. Copying under RLock hands the collector an immutable snapshot
+// while preserving the target-side lifetime accumulation. IcmpHop and
+// IcmpSummary are all-value structs, so copying slice elements and map values
+// by value is a full deep copy.
 func (t *MTR) Compute() *mtr.MtrResult {
 	t.RLock()
 	defer t.RUnlock()
@@ -156,7 +166,24 @@ func (t *MTR) Compute() *mtr.MtrResult {
 	if t.result == nil {
 		return nil
 	}
-	return t.result
+
+	snapshot := &mtr.MtrResult{DestAddr: t.result.DestAddr}
+	if t.result.Hops != nil {
+		snapshot.Hops = make([]common.IcmpHop, len(t.result.Hops))
+		copy(snapshot.Hops, t.result.Hops)
+	}
+	if t.result.HopSummaryMap != nil {
+		snapshot.HopSummaryMap = make(map[string]*common.IcmpSummary, len(t.result.HopSummaryMap))
+		for k, v := range t.result.HopSummaryMap {
+			if v == nil {
+				snapshot.HopSummaryMap[k] = nil
+				continue
+			}
+			summaryCopy := *v
+			snapshot.HopSummaryMap[k] = &summaryCopy
+		}
+	}
+	return snapshot
 }
 
 // Name returns name
