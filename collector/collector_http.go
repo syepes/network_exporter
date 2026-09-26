@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/syepes/network_exporter/monitor"
 	"github.com/syepes/network_exporter/pkg/http"
 )
 
@@ -57,9 +56,16 @@ func getHTTPDescriptors(labels prometheus.Labels) *httpDescriptorSet {
 	return descSet
 }
 
+// HTTPMonitor is the subset of *monitor.HTTPGet that the collector depends on.
+type HTTPMonitor interface {
+	ExportMetrics() map[string]*http.HTTPReturn
+	ExportLabels() map[string]map[string]string
+	TargetNames() []string
+}
+
 // HTTPGet prom
 type HTTPGet struct {
-	Monitor *monitor.HTTPGet
+	Monitor HTTPMonitor
 	metrics map[string]*http.HTTPReturn
 	labels  map[string]map[string]string
 }
@@ -78,13 +84,12 @@ func (p *HTTPGet) Collect(ch chan<- prometheus.Metric) {
 	httpMutex.Lock()
 	defer httpMutex.Unlock()
 
-	if m := p.Monitor.ExportMetrics(); len(m) > 0 {
-		p.metrics = m
-	}
-
-	if l := p.Monitor.ExportLabels(); len(l) > 0 {
-		p.labels = l
-	}
+	// Reconcile the cached metrics/labels against the live target set so that
+	// targets removed at runtime (e.g. on a SIGHUP config reload) stop being
+	// exported, while newly added targets appear once they produce a result.
+	active := newActiveSet(p.Monitor.TargetNames())
+	p.metrics = reconcile(p.metrics, p.Monitor.ExportMetrics(), active)
+	p.labels = reconcile(p.labels, p.Monitor.ExportLabels(), active)
 
 	if len(p.metrics) > 0 {
 		ch <- prometheus.MustNewConstMetric(httpStateDesc, prometheus.GaugeValue, 1)

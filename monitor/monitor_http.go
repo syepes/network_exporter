@@ -219,3 +219,17 @@ func (p *HTTPGet) ExportLabels() map[string]map[string]string {
 	}
 	return l
 }
+
+// TargetNames returns the names of all currently monitored targets.
+// It reflects the live target set (including targets that have not yet
+// produced a metric result), so callers can prune metrics of removed targets.
+func (p *HTTPGet) TargetNames() []string {
+	p.mtx.RLock()
+	defer p.mtx.RUnlock()
+
+	names := make([]string, 0, len(p.targets))
+	for _, target := range p.targets {
+		names = append(names, target.Name())
+	}
+	return names
+}

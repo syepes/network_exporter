@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/syepes/network_exporter/monitor"
 	"github.com/syepes/network_exporter/pkg/mtr"
 )
 
@@ -64,9 +63,16 @@ func getMTRDescriptors(labels prometheus.Labels) *mtrDescriptorSet {
 	return descSet
 }
 
+// MtrMonitor is the subset of *monitor.MTR that the collector depends on.
+type MtrMonitor interface {
+	ExportMetrics() map[string]*mtr.MtrResult
+	ExportLabels() map[string]map[string]string
+	TargetNames() []string
+}
+
 // MTR prom
 type MTR struct {
-	Monitor *monitor.MTR
+	Monitor MtrMonitor
 	metrics map[string]*mtr.MtrResult
 	labels  map[string]map[string]string
 }
@@ -84,13 +90,12 @@ func (p *MTR) Collect(ch chan<- prometheus.Metric) {
 	mtrMutex.Lock()
 	defer mtrMutex.Unlock()
 
-	if m := p.Monitor.ExportMetrics(); len(m) > 0 {
-		p.metrics = m
-	}
-
-	if l := p.Monitor.ExportLabels(); len(l) > 0 {
-		p.labels = l
-	}
+	// Reconcile the cached metrics/labels against the live target set so that
+	// targets removed at runtime (e.g. on a SIGHUP config reload) stop being
+	// exported, while newly added targets appear once they produce a result.
+	active := newActiveSet(p.Monitor.TargetNames())
+	p.metrics = reconcile(p.metrics, p.Monitor.ExportMetrics(), active)
+	p.labels = reconcile(p.labels, p.Monitor.ExportLabels(), active)
 
 	if len(p.metrics) > 0 {
 		ch <- prometheus.MustNewConstMetric(mtrStateDesc, prometheus.GaugeValue, 1)

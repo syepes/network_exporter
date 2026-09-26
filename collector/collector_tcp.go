@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/syepes/network_exporter/monitor"
 	"github.com/syepes/network_exporter/pkg/tcp"
 )
 
@@ -54,9 +53,16 @@ func getTCPDescriptors(labels prometheus.Labels) *tcpDescriptorSet {
 	return descSet
 }
 
+// TCPMonitor is the subset of *monitor.TCPPort that the collector depends on.
+type TCPMonitor interface {
+	ExportMetrics() map[string]*tcp.TCPPortReturn
+	ExportLabels() map[string]map[string]string
+	TargetNames() []string
+}
+
 // TCP prom
 type TCP struct {
-	Monitor *monitor.TCPPort
+	Monitor TCPMonitor
 	metrics map[string]*tcp.TCPPortReturn
 	labels  map[string]map[string]string
 }
@@ -74,13 +80,12 @@ func (p *TCP) Collect(ch chan<- prometheus.Metric) {
 	tcpMutex.Lock()
 	defer tcpMutex.Unlock()
 
-	if m := p.Monitor.ExportMetrics(); len(m) > 0 {
-		p.metrics = m
-	}
-
-	if l := p.Monitor.ExportLabels(); len(l) > 0 {
-		p.labels = l
-	}
+	// Reconcile the cached metrics/labels against the live target set so that
+	// targets removed at runtime (e.g. on a SIGHUP config reload) stop being
+	// exported, while newly added targets appear once they produce a result.
+	active := newActiveSet(p.Monitor.TargetNames())
+	p.metrics = reconcile(p.metrics, p.Monitor.ExportMetrics(), active)
+	p.labels = reconcile(p.labels, p.Monitor.ExportLabels(), active)
 
 	if len(p.metrics) > 0 {
 		ch <- prometheus.MustNewConstMetric(tcpStateDesc, prometheus.GaugeValue, 1)

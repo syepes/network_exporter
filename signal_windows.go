@@ -18,10 +18,10 @@ func reloadSignal() {
 		for {
 			select {
 			case <-hup:
-				logger.Debug("msg", "Signal: HUP")
-				logger.Info("msg", "ReLoading config")
+				logger.Debug("Signal: HUP")
+				logger.Info("ReLoading config")
 				if err := sc.ReloadConfig(logger, *configFile, *configFileHeaders); err != nil {
-					logger.Error("msg", "Reloading config skipped", "err", err)
+					logger.Error("Reloading config skipped", "err", err)
 					continue
 				} else {
 					monitorPING.DelTargets()
